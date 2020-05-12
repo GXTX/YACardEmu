@@ -4,22 +4,15 @@
 #include "JvsIo.h"
 #include "SerIo.h"
 
-#include <sched.h>
+#include <unistd.h>
 
 int main()
 {
 	char serialName[13];
-	std::sprintf(serialName, "/dev/ttyUSB4");
+	std::sprintf(serialName, "/dev/ttyUSB0");
 
-	// Set thread priority to RT. We don't care if this
-	// fails but may be required for some systems.
-	struct sched_param params;
-	params.sched_priority = sched_get_priority_max(SCHED_FIFO);
-	pthread_setschedparam(pthread_self(), SCHED_FIFO, &params);
-
-	// TODO: maybe put set these as shared in serio?
-	std::vector<uint8_t> ReadBuffer;
-	std::vector<uint8_t> WriteBuffer;
+	std::vector<uint8_t> SerialBuffer;
+	SerialBuffer.reserve(255 * 2); //max JVS packet * 2
 
 	// TODO: probably doesn't need to be shared? we only need Inputs to be a shared ptr
 	std::shared_ptr<JvsIo> JVSHandler (std::make_shared<JvsIo>());
@@ -30,23 +23,27 @@ int main()
 		return 1;
 	}
 
+	int ret;
+
 	while (true) {
-		ReadBuffer.resize(512);
-		SerialHandler->Read(ReadBuffer.data());
+		ret = SerialHandler->Read(SerialBuffer);
+	
+		if (ret == SerIo::StatusCode::Okay) {
+			ret = JVSHandler->ReceivePacket(SerialBuffer);
 
-		if (ReadBuffer.size() > 0) {
-			int temp = JVSHandler->ReceivePacket(ReadBuffer.data());
-			// TODO: Why without this does it fault?
-			WriteBuffer.resize(ReadBuffer.size());
-			ReadBuffer.clear();
+			if (ret > 1) {
+				SerialBuffer.clear();
+				ret = JVSHandler->SendPacket(SerialBuffer);
 
-			int ret = JVSHandler->SendPacket(WriteBuffer.data());
-
-			if (ret > 0) {
-				SerialHandler->Write(WriteBuffer.data(), ret);
-				WriteBuffer.clear();
+				if (ret > 0) {
+					SerialHandler->Write(SerialBuffer);
+				}
 			}
 		}
+
+		SerialBuffer.clear();
+
+		usleep(500);
 	}
 
 	return 0;

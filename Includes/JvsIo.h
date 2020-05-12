@@ -17,24 +17,25 @@ class JvsIo
 {
 public:
 	JvsIo();
-	size_t SendPacket(uint8_t* buffer);
-	size_t ReceivePacket(uint8_t *buffer);
+	size_t SendPacket(std::vector<uint8_t> &buffer);
+	size_t ReceivePacket(std::vector<uint8_t> &buffer);
 
 private:
+	enum StatusCode {
+		StatusOkay = 1,
+		UnsupportedCommand = 2,
+		ChecksumError = 3,
+		AcknowledgeOverflow = 4,
+	};
+
 	const uint8_t SYNC_BYTE = 0x02;
 	const uint8_t SERVER_WAITING_BYTE = 0x05;
 	const uint8_t RESPONSE_ACK = 0x06;
 
-	uint8_t GetByte(uint8_t* &buffer);
-	uint8_t GetEscapedByte(uint8_t* &buffer);
+	uint8_t GetByte(std::vector<uint8_t> &buffer);
 	void HandlePacket(jvs_packet_header_t* header, std::vector<uint8_t>& packet);
 
-	void SendByte(uint8_t* &buffer, uint8_t value);
-	void SendEscapedByte(uint8_t* &buffer, uint8_t value);
-
 	// Commands
-	// These return the additional param bytes used
-	// uint8_t* data
 	int WMMT_Command_10_Init();
 	int WMMT_Command_20_Get_Card_State();
 	int WMMT_Command_33_Read_Card();

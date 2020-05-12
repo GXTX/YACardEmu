@@ -8,9 +8,11 @@ JvsIo::JvsIo()
 
 }
 
-uint8_t JvsIo::GetByte(uint8_t* &buffer)
+uint8_t JvsIo::GetByte(std::vector<uint8_t> &buffer)
 {
-	uint8_t value = *buffer++;
+	uint8_t value = buffer.at(0);
+	buffer.erase(buffer.begin());
+
 #ifdef DEBUG_JVS_PACKETS
 	std::printf(" %02X", value);
 #endif
@@ -49,11 +51,8 @@ void JvsIo::HandlePacket(jvs_packet_header_t* header, std::vector<uint8_t>& pack
 	}
 }
 
-size_t JvsIo::ReceivePacket(uint8_t* buffer)
+size_t JvsIo::ReceivePacket(std::vector<uint8_t> &buffer)
 {
-	// Remember where the buffer started (so we can calculate the number of bytes we've handled)
-	uint8_t* buffer_start = buffer;
-
 	// Scan the packet header
 	jvs_packet_header_t header;
 
@@ -62,12 +61,6 @@ size_t JvsIo::ReceivePacket(uint8_t* buffer)
 	std::cout << "JvsIo::ReceivePacket:";
 #endif
 	header.sync = GetByte(buffer); // Do not unescape the sync-byte!
-
-	if (header.sync == SERVER_WAITING_BYTE) {
-		//special handling
-		return 1;
-	}
-
 	if (header.sync != SYNC_BYTE) {
 #ifdef DEBUG_JVS_PACKETS
 		std::cout << " [Missing SYNC_BYTE!]" << std::endl;
@@ -76,18 +69,20 @@ size_t JvsIo::ReceivePacket(uint8_t* buffer)
 		return 1;
 	}
 
-	// Read the count bytes
+	// Read the target and count bytes
 	header.count = GetByte(buffer);
 
 	// Calculate the checksum
-	//uint8_t actual_checksum = header.count; // checksum8 xor - sync
+	// FIXME: checksum is missing count byte
+	uint8_t actual_checksum = 0;
 
 	// Decode the payload data
+	// TODO: don't put in another vector just to send off
 	std::vector<uint8_t> packet;
 	for (int i = 0; i < header.count - 1; i++) { // Note : -1 to avoid adding the checksum byte to the packet
-		uint8_t value = GetEscapedByte(buffer);
+		uint8_t value = GetByte(buffer);
 		packet.push_back(value);
-		actual_checksum += value;
+		actual_checksum ^= value;
 	}
 
 	// Read the checksum from the last byte
@@ -99,38 +94,16 @@ size_t JvsIo::ReceivePacket(uint8_t* buffer)
 	// Verify checksum - skip packet if invalid
 	ResponseBuffer.clear();
 	if (packet_checksum != actual_checksum) {
-		//ResponseBuffer.push_back(StatusCode::ChecksumError);
-		// TODO: Probably is a correct response to give to a sum error but unknown
+		ResponseBuffer.push_back(StatusCode::ChecksumError);
 	} else {
 		// If the packet was intended for us, we need to handle it
-		//if (header.target == TARGET_BROADCAST || header.target == DeviceId) {
-			HandlePacket(&header, packet);
-		//}
+		HandlePacket(&header, packet);
 	}
 
-	// Calculate and return the total packet size including header
-	size_t total_packet_size = buffer - buffer_start;
-
-	return total_packet_size;
+	return packet.size() + 1;
 }
 
-void JvsIo::SendByte(uint8_t* &buffer, uint8_t value)
-{
-	*buffer++ = value;
-}
-
-void JvsIo::SendEscapedByte(uint8_t* &buffer, uint8_t value)
-{
-	// Special case: Send an exception byte followed by value - 1
-	//if (value == SYNC_BYTE) {
-	//	SendByte(buffer, ESCAPE_BYTE);
-	//	value--;
-	//}
-
-	SendByte(buffer, value);
-}
-
-size_t JvsIo::SendPacket(uint8_t* buffer)
+size_t JvsIo::SendPacket(std::vector<uint8_t> &buffer)
 {
 	if (ResponseBuffer.empty()) {
 		return 0;
@@ -139,43 +112,36 @@ size_t JvsIo::SendPacket(uint8_t* buffer)
 	// Build a JVS response packet containing the payload
 	jvs_packet_header_t header;
 	header.sync = SYNC_BYTE;
-	//header.target = TARGET_MASTER_DEVICE;
 	header.count = (uint8_t)ResponseBuffer.size() + 1; // Set data size to payload + 1 checksum byte
 	// TODO : What if count overflows (meaning : responses are bigger than 255 bytes); Should we split it over multiple packets??
 
-	// Remember where the buffer started (so we can calculate the number of bytes we've send)
-	uint8_t* buffer_start = buffer;
-
 	// Send the header bytes
-	SendByte(buffer, header.sync); // Do not escape the sync byte!
-	//SendEscapedByte(buffer, header.target);
-	SendEscapedByte(buffer, header.count);
+	buffer.push_back(header.sync);
+	buffer.push_back(header.count);
 
 	// Calculate the checksum
-	uint8_t packet_checksum = header.count;
+	// FIXME: checksum is missing count byte
+	uint8_t packet_checksum = 0;
 
 	// Encode the payload data
 	for (size_t i = 0; i < ResponseBuffer.size(); i++) {
 		uint8_t value = ResponseBuffer[i];
-		SendEscapedByte(buffer, value);
-		packet_checksum += value;
+		buffer.push_back(value);
+		packet_checksum ^= value;
 	}
 
 	// Write the checksum to the last byte
-	SendEscapedByte(buffer, packet_checksum);
+	buffer.push_back(packet_checksum);
 
 	ResponseBuffer.clear();
 
-	// Calculate an return the total packet size including header
-	size_t total_packet_size = buffer - buffer_start;
-
 #ifdef DEBUG_JVS_PACKETS
 	std::cout << "JvsIo::SendPacket:";
-	for (size_t i = 0; i < total_packet_size; i++) {
-		std::printf(" %02X", buffer_start[i]);
+	for (size_t i = 0; i < buffer.size(); i++) {
+		std::printf(" %02X", buffer.at(i));
 	}
 	std::cout << std::endl;
 #endif
 
-	return total_packet_size;
+	return buffer.size();
 }

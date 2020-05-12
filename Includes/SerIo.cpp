@@ -2,147 +2,81 @@
 
 SerIo::SerIo(char *devicePath)
 {
-	SerialHandler = open(devicePath, O_RDWR | O_NOCTTY | O_SYNC | O_NDELAY);
+	sp_new_config(&PortConfig);
+	sp_set_config_baudrate(PortConfig, 115200);
+	sp_set_config_bits(PortConfig, 8);
+	sp_set_config_parity(PortConfig, SP_PARITY_NONE);
+	sp_set_config_stopbits(PortConfig, 1);
+	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
 
-	if (SerialHandler < 0) {
-		std::printf("SerIo::Init: Failed to open %s.\n", devicePath);
+	sp_get_port_by_name(devicePath, &Port);
+
+	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
+
+	if (ret != SP_OK) {
+		std::printf("SerIo::Init: Failed to open %s.", devicePath);
+		std::cout << std::endl;
 		IsInitialized = false;
 	}
 	else {
 		IsInitialized = true;
-		SetAttributes(SerialHandler, B9600);
-		SetLowLatency(SerialHandler);
+		sp_set_config(Port, PortConfig);
 	}
 }
 
 SerIo::~SerIo()
 {
-	close(SerialHandler);
+	sp_close(Port);
 }
 
-int SerIo::Write(uint8_t *write_buffer, uint8_t bytes_to_write)
+int SerIo::Write(std::vector<uint8_t> &buffer)
 {
 #ifdef DEBUG_SERIAL
 	std::cout << "SerIo::Write:";
-	for(uint8_t i = 0; i < bytes_to_write; i++) {
-		std::printf(" %02X", write_buffer[i]);
+	for(uint8_t i = 0; i < buffer.size(); i++) {
+		std::printf(" %02X", buffer.at(i));
 	}
 	std::cout << std::endl;
 #endif
-	int ret = write(SerialHandler, write_buffer, bytes_to_write);
+	int ret = sp_nonblocking_write(Port, buffer.data(), buffer.size());
 
-	if (ret != bytes_to_write) {
-		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, bytes_to_write);
-		return 0;
+	if (ret <= 0) {
+		return StatusCode::WriteError;
+	}
+	else if (ret != (int)buffer.size()) {
+		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, (int)buffer.size());
+		return StatusCode::WriteError;
 	}
 
-	return 1;
+	return StatusCode::Okay;
 }
 
-int SerIo::Read(uint8_t *buffer)
+int SerIo::Read(std::vector<uint8_t> &buffer)
 {
-	fd_set fd_serial;
-	struct timeval tv;
-	int bytes,n;
+	// TODO: causing "high" cpu load
+	int bytes = sp_input_waiting(Port);
 
-	int serial = SerialHandler;
-
-	FD_ZERO(&fd_serial);
-	FD_SET(SerialHandler, &fd_serial);
-
-	/* set blocking timeout to TIMEOUT_SELECT */
-	tv.tv_sec = 0;
-	tv.tv_usec = 500 * 1000;
-
-	int asd = select(serial + 1, &fd_serial, NULL, NULL, &tv);
-
-	if (asd == 0) {
-		return StatusCode::SerialTimeout;
+	if (bytes <= 0) {
+		// TODO: this doesn't have to mean a readerror, could just be a zero size waiting
+		return StatusCode::ReadError;
 	}
-	else if (asd > 0) {
-		if (!FD_ISSET(serial, &fd_serial)) {
-			return StatusCode::SerialTimeout;
-		}
-		else {
-			// TODO: Assume this is okay?
-		}
+
+	buffer.resize(bytes);
+
+	int ret = sp_nonblocking_read(Port, buffer.data(), buffer.size());
+
+	if (ret <= 0) {
+		return StatusCode::ReadError;
 	}
 	else {
-		return StatusCode::SerialReadError;
-	}
-
-	ioctl(serial, FIONREAD, &bytes);
-
-	if (!bytes) {
-		return 0;
-	}
-
-	n = read(serial, buffer, bytes);
-
-	if (n < 0 || n == 0) {
-		// TODO: would n ever be less than 0?
-	}
-	else {
-#ifdef DEBUG_SERIAL
+		#ifdef DEBUG_SERIAL
 		std::cout << "SerIo::Read:";
-		for (int i = 0; i < bytes; i++) {
-			std::printf(" %02X", buffer[i]);
+		for (size_t i = 0; i < buffer.size(); i++) {
+			std::printf(" %02X", buffer.at(i));
 		}
 		std::cout << std::endl;
-#endif
+		#endif
 	}
 
-	return 0;
-}
-
-void SerIo::SetAttributes(int SerialHandler, int baud)
-{
-	struct termios options;
-	int status;
-	tcgetattr(SerialHandler, &options);
-
-	cfmakeraw(&options);
-	cfsetispeed(&options, baud);
-	cfsetospeed(&options, baud);
-
-	options.c_cflag |= (CLOCAL | CREAD);
-	options.c_cflag &= ~PARENB;
-	options.c_cflag &= ~CSTOPB;
-	options.c_cflag &= ~CSIZE;
-	options.c_cflag |= CS8;
-	options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-	options.c_oflag &= ~OPOST;
-
-	options.c_cc[VMIN] = 0;
-	options.c_cc[VTIME] = 0; // Ten seconds (100 deciseconds)
-
-	tcsetattr(SerialHandler, TCSANOW, &options);
-
-	ioctl(SerialHandler, TIOCMGET, &status);
-
-	status |= TIOCM_DTR;
-	status |= TIOCM_RTS;
-
-	ioctl(SerialHandler, TIOCMSET, &status);
-
-	// Why are we sleeping?
-	usleep(100 * 1000); // 10mS
-}
-
-int SerIo::SetLowLatency(int SerialHandler)
-{
-	struct serial_struct serial_settings;
-
-	if (ioctl(SerialHandler, TIOCGSERIAL, &serial_settings) < 0) {
-		std::cerr << "SerIo::SetLowLatency: Failed to read serial settings for low latency mode." << std::endl;
-		return 0;
-	}
-
-	serial_settings.flags |= ASYNC_LOW_LATENCY;
-	if (ioctl(SerialHandler, TIOCSSERIAL, &serial_settings) < 0) {
-		std::cerr << "SerIo::SetLowLatency: Failed to write serial settings for low latency mode." << std::endl;
-		return 0;
-	}
-
-	return 1;
+	return StatusCode::Okay;
 }

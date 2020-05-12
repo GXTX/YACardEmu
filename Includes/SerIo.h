@@ -2,20 +2,18 @@
 #define SERIO_H
 
 #include <iostream>
+#include <vector>
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <termios.h>
-#include <sys/ioctl.h>
-#include <linux/serial.h>
+#include <libserialport.h>
 
 class SerIo
 {
 public:
 	enum StatusCode {
-		StatusOkay,
-		SerialTimeout,
-		SerialReadError,
+		Okay,
+		Timeout,
+		ReadError,
+		WriteError,
 	};
 
 	bool IsInitialized;
@@ -23,13 +21,13 @@ public:
 	SerIo(char *devicePath);
 	~SerIo();
 
-	int Read(uint8_t *buffer);
-	int Write(uint8_t *write_buffer, uint8_t bytes_to_write);
+	int Read(std::vector<uint8_t> &buffer);
+	int Write(std::vector<uint8_t> &buffer);
 private:
 	int SerialHandler;
 
-	void SetAttributes(int SerialHandler, int baud);
-	int SetLowLatency(int SerialHandler);
+	struct sp_port *Port;
+	struct sp_port_config *PortConfig;
 };
 
 #endif
