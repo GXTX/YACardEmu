@@ -8,6 +8,50 @@ JvsIo::JvsIo()
 
 }
 
+void JvsIo::PutStatusInBuffer()
+{
+	ResponseBuffer.push_back(Status.unk_1);
+	ResponseBuffer.push_back(Status.unk_2);
+	ResponseBuffer.push_back(Status.unk_3);
+}
+
+int JvsIo::WMMT_Command_10_Init()
+{
+	Status.Init();
+	PutStatusInBuffer();
+	return 6;
+}
+
+int JvsIo::WMMT_Command_20_Get_Card_State()
+{
+	PutStatusInBuffer();
+	return 6;
+}
+
+// FIXME: This doesn't seem right..? But we need to send 30/30/30?
+int JvsIo::WMMT_Command_40_Is_Card_Present()
+{
+	Status.Init();
+	PutStatusInBuffer();
+	return 6;
+}
+
+int JvsIo::WMMT_Command_B0_Load_Card()
+{
+	if (Status.unk_1 == CardStatus::NoCard) {
+		Status.unk_1 = CardStatus::HasCard;
+	}
+	else if (Status.unk_1 == CardStatus::HasCard) {
+		Status.unk_3 = ReadWritestatus::UNK_32;
+	}
+	
+	PutStatusInBuffer();
+
+	Status.unk_3 = ReadWritestatus::Idle;
+
+	return 6;
+}
+
 uint8_t JvsIo::GetByte(std::vector<uint8_t> &buffer)
 {
 	uint8_t value = buffer.at(0);
@@ -27,19 +71,20 @@ void JvsIo::HandlePacket(jvs_packet_header_t* header, std::vector<uint8_t>& pack
 	for (size_t i = 0; i < packet.size(); i++) {
 		uint8_t* command_data = &packet.at(i);
 		switch (packet.at(i)) {
-			/*case 0x10: i += WMMT_Command_10_Init(); break;
+			case 0x10: i += WMMT_Command_10_Init(); break;
 			case 0x20: i += WMMT_Command_20_Get_Card_State(); break;
-			case 0x33: i += WMMT_Command_33_Read_Card(); break;
+			//case 0x33: i += WMMT_Command_33_Read_Card(); break;
 			case 0x40: i += WMMT_Command_40_Is_Card_Present(); break;
-			case 0x53: i += WMMT_Command_53_Write_Card(); break;
+			/*case 0x53: i += WMMT_Command_53_Write_Card(); break;
 			case 0x73: i += WMMT_Command_73_UNK(); break;
 			case 0x7A: i += WMMT_Command_7A_UNK(); break;
+			case 0x7B: i += WMMT_Command_7B_UNK(); break;
 			case 0x7C: i += WMMT_Command_7C_UNK(); break;
 			case 0x7D: i += WMMT_Command_7D_UNK(); break;
 			case 0x80: i += WMMT_Command_80_UNK(); break;
-			case 0xA0: i += WMMT_Command_A0_Clean_Card(); break;
+			case 0xA0: i += WMMT_Command_A0_Clean_Card(); break;*/
 			case 0xB0: i += WMMT_Command_B0_Load_Card(); break;
-			case 0xD0: i += WMMT_Command_D0_UNK(); break;*/
+			//case 0xD0: i += WMMT_Command_D0_UNK(); break;
 			default:
 				// Overwrite the verly-optimistic StatusCode::StatusOkay with Status::Unsupported command
 				// Don't process any further commands. Existing processed commands must still return their responses.
@@ -73,8 +118,8 @@ size_t JvsIo::ReceivePacket(std::vector<uint8_t> &buffer)
 	header.count = GetByte(buffer);
 
 	// Calculate the checksum
-	// FIXME: checksum is missing count byte
 	uint8_t actual_checksum = 0;
+	actual_checksum ^= header.count;
 
 	// Decode the payload data
 	// TODO: don't put in another vector just to send off
@@ -87,18 +132,21 @@ size_t JvsIo::ReceivePacket(std::vector<uint8_t> &buffer)
 
 	// Read the checksum from the last byte
 	uint8_t packet_checksum = GetByte(buffer);
-#ifdef DEBUG_JVS_PACKETS
-	std::cout << std::endl;
-#endif
 
 	// Verify checksum - skip packet if invalid
 	ResponseBuffer.clear();
 	if (packet_checksum != actual_checksum) {
-		ResponseBuffer.push_back(StatusCode::ChecksumError);
+#ifdef DEBUG_JVS_PACKETS
+		std::cout << " Checksum Error!" << std::endl;
+#endif
 	} else {
 		// If the packet was intended for us, we need to handle it
 		HandlePacket(&header, packet);
 	}
+
+#ifdef DEBUG_JVS_PACKETS
+	std::cout << std::endl;
+#endif
 
 	return packet.size() + 1;
 }

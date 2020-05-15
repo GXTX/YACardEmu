@@ -3,7 +3,7 @@
 SerIo::SerIo(char *devicePath)
 {
 	sp_new_config(&PortConfig);
-	sp_set_config_baudrate(PortConfig, 115200);
+	sp_set_config_baudrate(PortConfig, 9600);
 	sp_set_config_bits(PortConfig, 8);
 	sp_set_config_parity(PortConfig, SP_PARITY_NONE);
 	sp_set_config_stopbits(PortConfig, 1);

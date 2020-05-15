@@ -9,7 +9,7 @@
 int main()
 {
 	char serialName[13];
-	std::sprintf(serialName, "/dev/ttyUSB0");
+	std::sprintf(serialName, "/dev/ttyS1");
 
 	std::vector<uint8_t> SerialBuffer;
 	SerialBuffer.reserve(255 * 2); //max JVS packet * 2
@@ -29,6 +29,7 @@ int main()
 		ret = SerialHandler->Read(SerialBuffer);
 	
 		if (ret == SerIo::StatusCode::Okay) {
+
 			ret = JVSHandler->ReceivePacket(SerialBuffer);
 
 			if (ret > 1) {
@@ -43,7 +44,7 @@ int main()
 
 		SerialBuffer.clear();
 
-		usleep(500);
+		usleep(1000);
 	}
 
 	return 0;
