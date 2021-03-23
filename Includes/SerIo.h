@@ -14,6 +14,7 @@ public:
 		Timeout,
 		ReadError,
 		WriteError,
+		ZeroSizeError,
 	};
 
 	bool IsInitialized;

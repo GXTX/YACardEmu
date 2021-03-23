@@ -38,13 +38,19 @@ int SerIo::Write(std::vector<uint8_t> &buffer)
 	}
 	std::cout << std::endl;
 #endif
+
+	if (buffer.size() == 0) {
+		return StatusCode::ZeroSizeError;
+	}
+
 	int ret = sp_nonblocking_write(Port, buffer.data(), buffer.size());
 
 	if (ret <= 0) {
 		return StatusCode::WriteError;
-	}
-	else if (ret != (int)buffer.size()) {
+	} else if (ret != (int)buffer.size()) {
+#ifdef DEBUG_SERIAL
 		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, (int)buffer.size());
+#endif
 		return StatusCode::WriteError;
 	}
 
@@ -53,11 +59,11 @@ int SerIo::Write(std::vector<uint8_t> &buffer)
 
 int SerIo::Read(std::vector<uint8_t> &buffer)
 {
-	// TODO: causing "high" cpu load
 	int bytes = sp_input_waiting(Port);
 
-	if (bytes <= 0) {
-		// TODO: this doesn't have to mean a readerror, could just be a zero size waiting
+	if (bytes == 0) {
+		return StatusCode::ZeroSizeError;
+	} else if (bytes < 0) {
 		return StatusCode::ReadError;
 	}
 
@@ -68,15 +74,14 @@ int SerIo::Read(std::vector<uint8_t> &buffer)
 	if (ret <= 0) {
 		return StatusCode::ReadError;
 	}
-	else {
-		#ifdef DEBUG_SERIAL
-		std::cout << "SerIo::Read:";
-		for (size_t i = 0; i < buffer.size(); i++) {
-			std::printf(" %02X", buffer.at(i));
-		}
-		std::cout << std::endl;
-		#endif
+
+#ifdef DEBUG_SERIAL
+	std::cout << "SerIo::Read:";
+	for (size_t i = 0; i < buffer.size(); i++) {
+		std::printf(" %02X", buffer.at(i));
 	}
+	std::cout << std::endl;
+#endif
 
 	return StatusCode::Okay;
 }
