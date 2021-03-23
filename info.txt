@@ -1,0 +1,10 @@
+[SYNC][COMMAND LENGTH][COMMAND][30][30][30][unk (always 03)?][checksum8 xor without sync]
+
+Sync: 0x02
+Chihiro waiting/ACK: 0x05
+Reader ACK: 0x06
+
+GUESSING:
+The first 30 is I believe a marker for card status with 30 being no card, 31 being there's a card and 34 it's a clean card.
+No clue about 2nd 30, maybe writer or hopper status?
+The 3rd 30 is likely a reader status, 30 idle, 32 reading, 33 cleaning.
