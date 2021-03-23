@@ -19,11 +19,11 @@ public:
 
 	bool IsInitialized;
 
-	SerIo(char *devicePath);
+	SerIo(const std::string devicePath);
 	~SerIo();
 
-	int Read(std::vector<uint8_t> &buffer);
-	int Write(std::vector<uint8_t> &buffer);
+	SerIo::StatusCode Read(std::vector<uint8_t> &buffer);
+	SerIo::StatusCode Write(std::vector<uint8_t> &buffer);
 private:
 	int SerialHandler;
 

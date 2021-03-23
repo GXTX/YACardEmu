@@ -1,6 +1,6 @@
 #include "SerIo.h"
 
-SerIo::SerIo(char *devicePath)
+SerIo::SerIo(const std::string devicePath)
 {
 	sp_new_config(&PortConfig);
 	sp_set_config_baudrate(PortConfig, 9600);
@@ -9,12 +9,12 @@ SerIo::SerIo(char *devicePath)
 	sp_set_config_stopbits(PortConfig, 1);
 	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
 
-	sp_get_port_by_name(devicePath, &Port);
+	sp_get_port_by_name(devicePath.c_str(), &Port);
 
 	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
 
 	if (ret != SP_OK) {
-		std::printf("SerIo::Init: Failed to open %s.", devicePath);
+		std::printf("SerIo::Init: Failed to open %s.", devicePath.c_str());
 		std::cout << std::endl;
 		IsInitialized = false;
 	}
@@ -29,7 +29,7 @@ SerIo::~SerIo()
 	sp_close(Port);
 }
 
-int SerIo::Write(std::vector<uint8_t> &buffer)
+SerIo::StatusCode SerIo::Write(std::vector<uint8_t> &buffer)
 {
 #ifdef DEBUG_SERIAL
 	std::cout << "SerIo::Write:";
@@ -57,7 +57,7 @@ int SerIo::Write(std::vector<uint8_t> &buffer)
 	return StatusCode::Okay;
 }
 
-int SerIo::Read(std::vector<uint8_t> &buffer)
+SerIo::StatusCode SerIo::Read(std::vector<uint8_t> &buffer)
 {
 	int bytes = sp_input_waiting(Port);
 

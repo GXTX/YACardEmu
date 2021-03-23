@@ -1,16 +1,19 @@
 #include <iostream>
 #include <memory>
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 
 #include "JvsIo.h"
 #include "SerIo.h"
 
 #include <unistd.h>
 
+static const std::string serialName = "/dev/ttyS1";
+
 int main()
 {
-	char serialName[13];
-	std::sprintf(serialName, "/dev/ttyS1");
-
 	std::vector<uint8_t> SerialBuffer;
 	SerialBuffer.reserve(255 * 2); //max JVS packet * 2
 
@@ -23,28 +26,35 @@ int main()
 		return 1;
 	}
 
-	int ret;
+	// TODO: real errors, right now we just return the size processed or the size of the buffer
+	int card_status;
 
 	while (true) {
-		ret = SerialHandler->Read(SerialBuffer);
-	
-		if (ret == SerIo::StatusCode::Okay) {
-
-			ret = JVSHandler->ReceivePacket(SerialBuffer);
-
-			if (ret > 1) {
-				SerialBuffer.clear();
-				ret = JVSHandler->SendPacket(SerialBuffer);
-
-				if (ret > 0) {
-					SerialHandler->Write(SerialBuffer);
-				}
-			}
-		}
-
 		SerialBuffer.clear();
 
-		usleep(1000);
+		if (SerialHandler->Read(SerialBuffer) != SerIo::StatusCode::Okay) {
+			// TODO: Handle errors?
+			continue;
+		}
+
+		card_status = JVSHandler->ReceivePacket(SerialBuffer);
+		if (JVSHandler->ReceivePacket(SerialBuffer) < 1) {
+			continue;
+		}
+
+		// Clear out the buffer before we fill it up again.
+		// TODO: Required? JvsIo::GetByte() should be deleting entries as they're processed.
+		SerialBuffer.clear();
+		card_status = JVSHandler->SendPacket(SerialBuffer);
+		if (card_status > 0) {
+			// TODO: Handle errors?
+			SerialHandler->Write(SerialBuffer);
+		} else {
+			// TODO: We need to reply with ACK or something.. we can't just not reply.
+		}
+
+		// Reading too quickly from the port causes my test system to lockup, so we wait. (Pi3b+)
+		std::this_thread::sleep_for(std::chrono::microseconds(1000));
 	}
 
 	return 0;
