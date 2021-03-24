@@ -1,5 +1,5 @@
-#ifndef JVSIO_H
-#define JVSIO_H
+#ifndef CARDIO_H
+#define CARDIO_H
 
 #include <vector>
 #include <iostream>
@@ -7,7 +7,7 @@
 typedef struct {
 	uint8_t sync;
 	uint8_t count;
-} jvs_packet_header_t;
+} card_packet_header_t;
 
 enum CardStatus {
 	NoCard = 30,
@@ -34,10 +34,10 @@ typedef struct {
 	}
 } wmmt_status_t;
 
-class JvsIo
+class CardIo
 {
 public:
-	JvsIo();
+	CardIo();
 	size_t SendPacket(std::vector<uint8_t> &buffer);
 	size_t ReceivePacket(std::vector<uint8_t> &buffer);
 
@@ -49,7 +49,7 @@ private:
 	const uint8_t RESPONSE_ACK = 0x06;
 
 	uint8_t GetByte(std::vector<uint8_t> &buffer);
-	void HandlePacket(jvs_packet_header_t* header, std::vector<uint8_t>& packet);
+	void HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& packet);
 
 	void PutStatusInBuffer();
 

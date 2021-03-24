@@ -9,7 +9,7 @@ include_directories(${SERIAL_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/Includes)
 
 add_executable(${PROJECT_NAME}
 	main.cpp
-	Includes/JvsIo.cpp
+	Includes/CardIo.cpp
 	Includes/SerIo.cpp
 )
 

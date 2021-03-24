@@ -5,7 +5,7 @@
 #include <thread>
 
 
-#include "JvsIo.h"
+#include "CardIo.h"
 #include "SerIo.h"
 
 #include <unistd.h>
@@ -15,14 +15,13 @@ static const std::string serialName = "/dev/ttyS1";
 int main()
 {
 	std::vector<uint8_t> SerialBuffer;
-	SerialBuffer.reserve(255 * 2); //max JVS packet * 2
+	SerialBuffer.reserve(255 * 2); //max packet * 2, not required, really..
 
-	// TODO: probably doesn't need to be shared? we only need Inputs to be a shared ptr
-	std::shared_ptr<JvsIo> JVSHandler (std::make_shared<JvsIo>());
+	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>());
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName));
 	if (!SerialHandler->IsInitialized) {
-		std::cerr << "Coudln't initiate the serial controller." << std::endl;
+		std::cerr << "Coudln't initiate the serial controller.";
 		return 1;
 	}
 
@@ -37,15 +36,15 @@ int main()
 			continue;
 		}
 
-		card_status = JVSHandler->ReceivePacket(SerialBuffer);
-		if (JVSHandler->ReceivePacket(SerialBuffer) < 1) {
+		card_status = CardHandler->ReceivePacket(SerialBuffer);
+		if (CardHandler->ReceivePacket(SerialBuffer) < 1) {
 			continue;
 		}
 
 		// Clear out the buffer before we fill it up again.
-		// TODO: Required? JvsIo::GetByte() should be deleting entries as they're processed.
+		// TODO: Required? CardIo::GetByte() should be deleting entries as they're processed.
 		SerialBuffer.clear();
-		card_status = JVSHandler->SendPacket(SerialBuffer);
+		card_status = CardHandler->SendPacket(SerialBuffer);
 		if (card_status > 0) {
 			// TODO: Handle errors?
 			SerialHandler->Write(SerialBuffer);

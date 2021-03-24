@@ -1,42 +1,41 @@
-#include "JvsIo.h"
+#include "CardIo.h"
 
-#define DEBUG_JVS_PACKETS
+#define DEBUG_CARD_PACKETS
 
-// We will emulate SEGA 837-13551 IO Board
-JvsIo::JvsIo()
+CardIo::CardIo()
 {
 
 }
 
-void JvsIo::PutStatusInBuffer()
+void CardIo::PutStatusInBuffer()
 {
 	ResponseBuffer.push_back(Status.unk_1);
 	ResponseBuffer.push_back(Status.unk_2);
 	ResponseBuffer.push_back(Status.unk_3);
 }
 
-int JvsIo::WMMT_Command_10_Init()
+int CardIo::WMMT_Command_10_Init()
 {
 	Status.Init();
 	PutStatusInBuffer();
 	return 6;
 }
 
-int JvsIo::WMMT_Command_20_Get_Card_State()
+int CardIo::WMMT_Command_20_Get_Card_State()
 {
 	PutStatusInBuffer();
 	return 6;
 }
 
 // FIXME: This doesn't seem right..? But we need to send 30/30/30?
-int JvsIo::WMMT_Command_40_Is_Card_Present()
+int CardIo::WMMT_Command_40_Is_Card_Present()
 {
 	Status.Init();
 	PutStatusInBuffer();
 	return 6;
 }
 
-int JvsIo::WMMT_Command_B0_Load_Card()
+int CardIo::WMMT_Command_B0_Load_Card()
 {
 	if (Status.unk_1 == CardStatus::NoCard) {
 		Status.unk_1 = CardStatus::HasCard;
@@ -52,20 +51,20 @@ int JvsIo::WMMT_Command_B0_Load_Card()
 	return 6;
 }
 
-uint8_t JvsIo::GetByte(std::vector<uint8_t> &buffer)
+uint8_t CardIo::GetByte(std::vector<uint8_t> &buffer)
 {
 	uint8_t value = buffer.at(0);
 	buffer.erase(buffer.begin());
 
-#ifdef DEBUG_JVS_PACKETS
+#ifdef DEBUG_CARD_PACKETS
 	std::printf(" %02X", value);
 #endif
 	return value;
 }
 
-void JvsIo::HandlePacket(jvs_packet_header_t* header, std::vector<uint8_t>& packet)
+// TODO: Redo this, the system will only send 1 command packet at a time and then wait by sending SERVER_WAITING_BYTE
+void CardIo::HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& packet)
 {
-	// It's possible for a JVS packet to contain multiple commands, so we must iterate through it
 	ResponseBuffer.push_back(RESPONSE_ACK); // Assume we'll handle the command just fine
 
 	for (size_t i = 0; i < packet.size(); i++) {
@@ -86,28 +85,25 @@ void JvsIo::HandlePacket(jvs_packet_header_t* header, std::vector<uint8_t>& pack
 			case 0xB0: i += WMMT_Command_B0_Load_Card(); break;
 			//case 0xD0: i += WMMT_Command_D0_UNK(); break;
 			default:
-				// Overwrite the verly-optimistic StatusCode::StatusOkay with Status::Unsupported command
-				// Don't process any further commands. Existing processed commands must still return their responses.
-				//ResponseBuffer[0] = StatusCode::UnsupportedCommand;
-				std::printf("JvsIo::HandlePacket: Unhandled Command %02X", packet[i]);
+				std::printf("CardIo::HandlePacket: Unhandled Command %02X", packet[i]);
 				std::cout << std::endl;
 				return;
 		}
 	}
 }
 
-size_t JvsIo::ReceivePacket(std::vector<uint8_t> &buffer)
+size_t CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 {
 	// Scan the packet header
-	jvs_packet_header_t header;
+	card_packet_header_t header;
 
 	// First, read the sync byte
-#ifdef DEBUG_JVS_PACKETS
-	std::cout << "JvsIo::ReceivePacket:";
+#ifdef DEBUG_CARD_PACKETS
+	std::cout << "CardIo::ReceivePacket:";
 #endif
 	header.sync = GetByte(buffer); // Do not unescape the sync-byte!
 	if (header.sync != SYNC_BYTE) {
-#ifdef DEBUG_JVS_PACKETS
+#ifdef DEBUG_CARD_PACKETS
 		std::cout << " [Missing SYNC_BYTE!]" << std::endl;
 #endif
 		// If it's wrong, return we've processed (actually, skipped) one byte
@@ -136,7 +132,7 @@ size_t JvsIo::ReceivePacket(std::vector<uint8_t> &buffer)
 	// Verify checksum - skip packet if invalid
 	ResponseBuffer.clear();
 	if (packet_checksum != actual_checksum) {
-#ifdef DEBUG_JVS_PACKETS
+#ifdef DEBUG_CARD_PACKETS
 		std::cout << " Checksum Error!" << std::endl;
 #endif
 	} else {
@@ -144,24 +140,23 @@ size_t JvsIo::ReceivePacket(std::vector<uint8_t> &buffer)
 		HandlePacket(&header, packet);
 	}
 
-#ifdef DEBUG_JVS_PACKETS
+#ifdef DEBUG_CARD_PACKETS
 	std::cout << std::endl;
 #endif
 
 	return packet.size() + 1;
 }
 
-size_t JvsIo::SendPacket(std::vector<uint8_t> &buffer)
+size_t CardIo::SendPacket(std::vector<uint8_t> &buffer)
 {
 	if (ResponseBuffer.empty()) {
 		return 0;
 	}
 
-	// Build a JVS response packet containing the payload
-	jvs_packet_header_t header;
+	// Build a reader response packet containing the payload
+	card_packet_header_t header;
 	header.sync = SYNC_BYTE;
 	header.count = (uint8_t)ResponseBuffer.size() + 1; // Set data size to payload + 1 checksum byte
-	// TODO : What if count overflows (meaning : responses are bigger than 255 bytes); Should we split it over multiple packets??
 
 	// Send the header bytes
 	buffer.push_back(header.sync);
@@ -183,8 +178,8 @@ size_t JvsIo::SendPacket(std::vector<uint8_t> &buffer)
 
 	ResponseBuffer.clear();
 
-#ifdef DEBUG_JVS_PACKETS
-	std::cout << "JvsIo::SendPacket:";
+#ifdef DEBUG_CARD_PACKETS
+	std::cout << "CardIo::SendPacket:";
 	for (size_t i = 0; i < buffer.size(); i++) {
 		std::printf(" %02X", buffer.at(i));
 	}
