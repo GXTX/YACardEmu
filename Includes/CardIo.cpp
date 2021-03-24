@@ -41,12 +41,12 @@ int CardIo::WMMT_Command_B0_Load_Card()
 		Status.unk_1 = CardStatus::HasCard;
 	}
 	else if (Status.unk_1 == CardStatus::HasCard) {
-		Status.unk_3 = ReadWritestatus::UNK_32;
+		Status.unk_3 = RWStatus::UNK_32;
 	}
 	
 	PutStatusInBuffer();
 
-	Status.unk_3 = ReadWritestatus::Idle;
+	Status.unk_3 = RWStatus::Idle;
 
 	return 6;
 }
@@ -142,10 +142,10 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 	return StatusCode::Okay;
 }
 
-CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> *buffer)
+CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 {
+	// Should not happen?
 	if (ResponseBuffer.empty()) {
-		// Should not happen?
 		return StatusCode::EmptyResponseError;
 	}
 
@@ -160,9 +160,8 @@ CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> *buffer)
 
 	// Encode the payload data
 	for (size_t i = 0; i < ResponseBuffer.size(); i++) {
-		uint8_t value = ResponseBuffer[i];
-		buffer->push_back(value);
-		packet_checksum ^= value;
+		buffer->push_back(ResponseBuffer.at(i));
+		packet_checksum ^= ResponseBuffer.at(i);
 	}
 
 	// Write the checksum to the last byte

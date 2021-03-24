@@ -42,7 +42,7 @@ int main()
 			continue;
 		}
 
-		cardStatus = CardHandler->SendPacket(SerialBuffer);
+		cardStatus = CardHandler->BuildPacket(SerialBuffer);
 		if (cardStatus == CardIo::StatusCode::Okay) {
 			serialStatus = SerialHandler->Write(SerialBuffer);
 		}

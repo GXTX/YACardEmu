@@ -4,31 +4,6 @@
 #include <vector>
 #include <iostream>
 
-enum CardStatus {
-	NoCard = 30,
-	HasCard = 31,
-	UNK_34 = 34, // clean card? eject?
-};
-
-enum ReadWritestatus {
-	Idle = 30,
-	UNK_32 = 32,
-	UNK_33 = 33,
-	UKN_34 = 34, // card inserted? blank?
-};
-
-typedef struct {
-	CardStatus unk_1 = CardStatus::NoCard;
-	uint8_t unk_2 = 0x30;
-	ReadWritestatus unk_3 = ReadWritestatus::Idle;
-
-	void Init() {
-		unk_1 = CardStatus::NoCard;
-		unk_2 = 0x30;
-		unk_3 = ReadWritestatus::Idle;
-	}
-} wmmt_status_t;
-
 class CardIo
 {
 public:
@@ -41,15 +16,50 @@ public:
 	};
 
 	CardIo();
-	CardIo::StatusCode SendPacket(std::vector<uint8_t> *buffer);
+	CardIo::StatusCode BuildPacket(std::vector<uint8_t> *buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> *buffer);
-
-	wmmt_status_t Status;
 
 private:
 	const uint8_t SYNC_BYTE = 0x02;
 	const uint8_t SERVER_WAITING_BYTE = 0x05;
 	const uint8_t RESPONSE_ACK = 0x06;
+
+	// 1/3 in the RPS reply.
+	enum CardStatus {
+		NoCard = 30,
+		HasCard = 31,
+		//UNK_32 = 32,
+		//UNK_33 = 33,
+		UNK_34 = 34, // Seen when cleaning the card right before we reply 30/30/30? Reply as a empty card?
+	};
+
+	// 2/3 in the reply, we always return 30.
+	enum UNKStatus {
+		UNK_30 = 30,
+	};
+
+	// 3/3 in the reply, assumption is read status.
+	enum RWStatus {
+		Idle = 30,
+		//UNK_31 = 31,
+		UNK_32 = 32, // Used during LoadCard, assumption is - reading.
+		UNK_33 = 33, // 
+		UKN_34 = 34, // Only seen in ReadCard if we don't have a card?
+	};
+
+	typedef struct {
+		CardStatus unk_1 = CardStatus::NoCard;
+		uint8_t unk_2 = UNKStatus::UNK_30;
+		RWStatus unk_3 = RWStatus::Idle;
+
+		void Init() {
+			unk_1 = CardStatus::NoCard;
+			unk_2 = UNKStatus::UNK_30;
+			unk_3 = RWStatus::Idle;
+		}
+	} wmmt_status_t;
+
+	wmmt_status_t Status;
 
 	uint8_t GetByte(std::vector<uint8_t> *buffer);
 	void HandlePacket(std::vector<uint8_t> *packet);
