@@ -22,8 +22,8 @@ public:
 	SerIo(const std::string devicePath);
 	~SerIo();
 
-	SerIo::StatusCode Read(std::vector<uint8_t> &buffer);
-	SerIo::StatusCode Write(std::vector<uint8_t> &buffer);
+	SerIo::StatusCode Read(std::vector<uint8_t> *buffer);
+	SerIo::StatusCode Write(std::vector<uint8_t> *buffer);
 private:
 	int SerialHandler;
 

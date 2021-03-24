@@ -11,14 +11,14 @@ static const std::string serialName = "/dev/ttyS1";
 
 int main()
 {
-	std::vector<uint8_t> SerialBuffer;
-	SerialBuffer.reserve(255 * 2); //max packet * 2, not required, really..
+	std::vector<uint8_t> *SerialBuffer = 0;
+	SerialBuffer->reserve(255 * 2); //max packet * 2, not required, really..
 
 	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>());
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName));
 	if (!SerialHandler->IsInitialized) {
-		std::cerr << "Coudln't initiate the serial controller.";
+		std::cerr << "Coudln't initialize the serial controller.";
 		return 1;
 	}
 
@@ -26,7 +26,7 @@ int main()
 	SerIo::StatusCode serialStatus;
 
 	while (true) {
-		SerialBuffer.clear();
+		SerialBuffer->clear();
 
 		serialStatus = SerialHandler->Read(SerialBuffer);
 		if (serialStatus != SerIo::StatusCode::Okay) {

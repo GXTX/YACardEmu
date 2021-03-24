@@ -51,10 +51,10 @@ int CardIo::WMMT_Command_B0_Load_Card()
 	return 6;
 }
 
-uint8_t CardIo::GetByte(std::vector<uint8_t> &buffer)
+uint8_t CardIo::GetByte(std::vector<uint8_t> *buffer)
 {
-	uint8_t value = buffer.at(0);
-	buffer.erase(buffer.begin());
+	uint8_t value = buffer->at(0);
+	buffer->erase(buffer->begin());
 
 #ifdef DEBUG_CARD_PACKETS
 	std::printf(" %02X", value);
@@ -92,14 +92,14 @@ void CardIo::HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& pa
 	}
 }
 
-CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
+CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 {
 	// If the packet we're trying to process is the waiting byte then just return.
 	// We should've already created the reply.
 	// TODO: Broken logic, we shouldn't clear rework to just send the reply instead, maybe.
-	if (buffer.at(0) == SERVER_WAITING_BYTE) {
-		buffer.clear();
-		buffer.push_back(RESPONSE_ACK);
+	if (buffer->at(0) == SERVER_WAITING_BYTE) {
+		buffer->clear();
+		buffer->push_back(RESPONSE_ACK);
 		return StatusCode::ServerWaitingReply;
 	}
 
@@ -150,7 +150,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 	return StatusCode::Okay;
 }
 
-CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> &buffer)
+CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> *buffer)
 {
 	if (ResponseBuffer.empty()) {
 		// Should not happen?
@@ -160,11 +160,11 @@ CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> &buffer)
 	// Build a reader response packet containing the payload
 	card_packet_header_t header;
 	header.sync = SYNC_BYTE;
-	header.count = ((uint8_t)ResponseBuffer.size() + 1) & 0xFF; // Set data size to payload + 1 checksum byte
+	header.count = (ResponseBuffer.size() + 1) & 0xFF; // Set data size to payload + 1 checksum byte
 
 	// Send the header bytes
-	buffer.push_back(header.sync);
-	buffer.push_back(header.count);
+	buffer->push_back(header.sync);
+	buffer->push_back(header.count);
 
 	// Calculate the checksum
 	uint8_t packet_checksum = header.count;
@@ -172,19 +172,19 @@ CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> &buffer)
 	// Encode the payload data
 	for (size_t i = 0; i < ResponseBuffer.size(); i++) {
 		uint8_t value = ResponseBuffer[i];
-		buffer.push_back(value);
+		buffer->push_back(value);
 		packet_checksum ^= value;
 	}
 
 	// Write the checksum to the last byte
-	buffer.push_back(packet_checksum);
+	buffer->push_back(packet_checksum);
 
 	ResponseBuffer.clear();
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::SendPacket:";
-	for (size_t i = 0; i < buffer.size(); i++) {
-		std::printf(" %02X", buffer.at(i));
+	for (size_t i = 0; i < buffer->size(); i++) {
+		std::printf(" %02X", buffer->at(i));
 	}
 	std::cout << std::endl;
 #endif
