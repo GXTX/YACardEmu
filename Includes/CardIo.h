@@ -52,9 +52,9 @@ public:
 	wmmt_status_t Status;
 
 private:
-	const uint8_t SYNC_BYTE = 0x02;
-	const uint8_t SERVER_WAITING_BYTE = 0x05;
-	const uint8_t RESPONSE_ACK = 0x06;
+	static const uint8_t SYNC_BYTE = 0x02;
+	static const uint8_t SERVER_WAITING_BYTE = 0x05;
+	static const uint8_t RESPONSE_ACK = 0x06;
 
 	uint8_t GetByte(std::vector<uint8_t> &buffer);
 	void HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& packet);

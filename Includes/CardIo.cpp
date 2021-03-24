@@ -96,6 +96,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 {
 	// If the packet we're trying to process is the waiting byte then just return.
 	// We should've already created the reply.
+	// TODO: Broken logic, we shouldn't clear rework to just send the reply instead, maybe.
 	if (buffer.at(0) == SERVER_WAITING_BYTE) {
 		buffer.clear();
 		buffer.push_back(RESPONSE_ACK);
@@ -109,26 +110,20 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
 #endif
-	header.sync = GetByte(buffer); // Do not unescape the sync-byte!
+	header.sync = GetByte(buffer);
 	if (header.sync != SYNC_BYTE) {
-#ifdef DEBUG_CARD_PACKETS
-		std::cout << " [Missing SYNC_BYTE!]" << std::endl;
-#endif
-		// If it's wrong, return we've processed (actually, skipped) one byte
+		std::cerr << " Missing SYNC_BYTE!";
 		return StatusCode::SyncError;
 	}
 
-	// Read the target and count bytes
 	header.count = GetByte(buffer);
 
-	// Calculate the checksum
-	uint8_t actual_checksum = 0;
-	actual_checksum ^= header.count;
+	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
+	uint8_t actual_checksum = header.count;
 
 	// Decode the payload data
-	// TODO: don't put in another vector just to send off
 	std::vector<uint8_t> packet;
-	for (int i = 0; i < header.count - 1; i++) { // Note : -1 to avoid adding the checksum byte to the packet
+	for (int i = 0; i < header.count - 1; i++) { // NOTE: -1 to avoid adding the checksum byte to the packet
 		uint8_t value = GetByte(buffer);
 		packet.push_back(value);
 		actual_checksum ^= value;
@@ -141,12 +136,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 	ResponseBuffer.clear();
 	if (packet_checksum != actual_checksum) {
 #ifdef DEBUG_CARD_PACKETS
-		std::cout << " Checksum Error!" << std::endl;
+		std::cerr << " Checksum Error!";
 #endif
-	} else {
-		// If the packet was intended for us, we need to handle it
-		HandlePacket(&header, packet);
+		return StatusCode::ChecksumError;
 	}
+
+	HandlePacket(&header, packet);
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << std::endl;
@@ -158,21 +153,21 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> &buffer)
 {
 	if (ResponseBuffer.empty()) {
+		// Should not happen?
 		return StatusCode::EmptyResponseError;
 	}
 
 	// Build a reader response packet containing the payload
 	card_packet_header_t header;
 	header.sync = SYNC_BYTE;
-	header.count = (uint8_t)ResponseBuffer.size() + 1; // Set data size to payload + 1 checksum byte
+	header.count = ((uint8_t)ResponseBuffer.size() + 1) & 0xFF; // Set data size to payload + 1 checksum byte
 
 	// Send the header bytes
 	buffer.push_back(header.sync);
 	buffer.push_back(header.count);
 
 	// Calculate the checksum
-	// FIXME: checksum is missing count byte
-	uint8_t packet_checksum = 0;
+	uint8_t packet_checksum = header.count;
 
 	// Encode the payload data
 	for (size_t i = 0; i < ResponseBuffer.size(); i++) {
