@@ -4,11 +4,6 @@
 #include <vector>
 #include <iostream>
 
-typedef struct {
-	uint8_t sync;
-	uint8_t count;
-} card_packet_header_t;
-
 enum CardStatus {
 	NoCard = 30,
 	HasCard = 31,
@@ -57,7 +52,7 @@ private:
 	const uint8_t RESPONSE_ACK = 0x06;
 
 	uint8_t GetByte(std::vector<uint8_t> *buffer);
-	void HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& packet);
+	void HandlePacket(std::vector<uint8_t> *packet);
 
 	void PutStatusInBuffer();
 

@@ -57,38 +57,34 @@ uint8_t CardIo::GetByte(std::vector<uint8_t> *buffer)
 	buffer->erase(buffer->begin());
 
 #ifdef DEBUG_CARD_PACKETS
-	std::printf(" %02X", value);
+	//std::printf(" %02X", value);
 #endif
+
 	return value;
 }
 
-// TODO: Redo this, the system will only send 1 command packet at a time and then wait by sending SERVER_WAITING_BYTE
-void CardIo::HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& packet)
+void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 {
-	ResponseBuffer.push_back(RESPONSE_ACK); // Assume we'll handle the command just fine
-
-	for (size_t i = 0; i < packet.size(); i++) {
-		uint8_t* command_data = &packet.at(i);
-		switch (packet.at(i)) {
-			case 0x10: i += WMMT_Command_10_Init(); break;
-			case 0x20: i += WMMT_Command_20_Get_Card_State(); break;
-			//case 0x33: i += WMMT_Command_33_Read_Card(); break;
-			case 0x40: i += WMMT_Command_40_Is_Card_Present(); break;
-			/*case 0x53: i += WMMT_Command_53_Write_Card(); break;
-			case 0x73: i += WMMT_Command_73_UNK(); break;
-			case 0x7A: i += WMMT_Command_7A_UNK(); break;
-			case 0x7B: i += WMMT_Command_7B_UNK(); break;
-			case 0x7C: i += WMMT_Command_7C_UNK(); break;
-			case 0x7D: i += WMMT_Command_7D_UNK(); break;
-			case 0x80: i += WMMT_Command_80_UNK(); break;
-			case 0xA0: i += WMMT_Command_A0_Clean_Card(); break;*/
-			case 0xB0: i += WMMT_Command_B0_Load_Card(); break;
-			//case 0xD0: i += WMMT_Command_D0_UNK(); break;
-			default:
-				std::printf("CardIo::HandlePacket: Unhandled Command %02X", packet[i]);
-				std::cout << std::endl;
-				return;
-		}
+	// At this point [0] should be our command, we've already processed the header in CardIo::ReceivePacket()
+	switch (packet->at(0)) {
+		case 0x10: WMMT_Command_10_Init(); break;
+		case 0x20: WMMT_Command_20_Get_Card_State(); break;
+		//case 0x33: WMMT_Command_33_Read_Card(); break;
+		case 0x40: WMMT_Command_40_Is_Card_Present(); break;
+		//case 0x53: WMMT_Command_53_Write_Card(); break;
+		//case 0x73: WMMT_Command_73_UNK(); break;
+		//case 0x7A: WMMT_Command_7A_UNK(); break;
+		//case 0x7B: WMMT_Command_7B_UNK(); break;
+		//case 0x7C: WMMT_Command_7C_UNK(); break;
+		//case 0x7D: WMMT_Command_7D_UNK(); break;
+		//case 0x80: WMMT_Command_80_UNK(); break;
+		//case 0xA0: WMMT_Command_A0_Clean_Card(); break;
+		case 0xB0: WMMT_Command_B0_Load_Card(); break;
+		//case 0xD0: WMMT_Command_D0_UNK(); break;
+		default:
+			std::printf("CardIo::HandlePacket: Unhandled Command %02X", packet->at(0));
+			std::cout << std::endl;
+			return;
 	}
 }
 
@@ -103,27 +99,23 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 		return StatusCode::ServerWaitingReply;
 	}
 
-	// Scan the packet header
-	card_packet_header_t header;
-
 	// First, read the sync byte
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
 #endif
-	header.sync = GetByte(buffer);
-	if (header.sync != SYNC_BYTE) {
+	if (GetByte(buffer) != SYNC_BYTE) {
 		std::cerr << " Missing SYNC_BYTE!";
 		return StatusCode::SyncError;
 	}
 
-	header.count = GetByte(buffer);
+	uint8_t count = GetByte(buffer);
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
-	uint8_t actual_checksum = header.count;
+	uint8_t actual_checksum = count;
 
 	// Decode the payload data
 	std::vector<uint8_t> packet;
-	for (int i = 0; i < header.count - 1; i++) { // NOTE: -1 to avoid adding the checksum byte to the packet
+	for (int i = 0; i < count - 1; i++) { // NOTE: -1 to avoid adding the checksum byte to the packet
 		uint8_t value = GetByte(buffer);
 		packet.push_back(value);
 		actual_checksum ^= value;
@@ -136,12 +128,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 	ResponseBuffer.clear();
 	if (packet_checksum != actual_checksum) {
 #ifdef DEBUG_CARD_PACKETS
-		std::cerr << " Checksum Error!";
+		std::cerr << " Checksum error!";
 #endif
 		return StatusCode::ChecksumError;
 	}
 
-	HandlePacket(&header, packet);
+	HandlePacket(&packet);
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << std::endl;
@@ -157,17 +149,14 @@ CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> *buffer)
 		return StatusCode::EmptyResponseError;
 	}
 
-	// Build a reader response packet containing the payload
-	card_packet_header_t header;
-	header.sync = SYNC_BYTE;
-	header.count = (ResponseBuffer.size() + 1) & 0xFF; // Set data size to payload + 1 checksum byte
+	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
 
 	// Send the header bytes
-	buffer->push_back(header.sync);
-	buffer->push_back(header.count);
+	buffer->push_back(SYNC_BYTE);
+	buffer->push_back(count);
 
 	// Calculate the checksum
-	uint8_t packet_checksum = header.count;
+	uint8_t packet_checksum = count;
 
 	// Encode the payload data
 	for (size_t i = 0; i < ResponseBuffer.size(); i++) {
