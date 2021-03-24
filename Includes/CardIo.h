@@ -37,9 +37,17 @@ typedef struct {
 class CardIo
 {
 public:
+	enum StatusCode {
+		Okay,
+		SyncError,
+		ChecksumError,
+		EmptyResponseError,
+		ServerWaitingReply,
+	};
+
 	CardIo();
-	size_t SendPacket(std::vector<uint8_t> &buffer);
-	size_t ReceivePacket(std::vector<uint8_t> &buffer);
+	CardIo::StatusCode SendPacket(std::vector<uint8_t> &buffer);
+	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
 
 	wmmt_status_t Status;
 

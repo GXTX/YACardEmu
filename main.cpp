@@ -4,11 +4,8 @@
 #include <chrono>
 #include <thread>
 
-
 #include "CardIo.h"
 #include "SerIo.h"
-
-#include <unistd.h>
 
 static const std::string serialName = "/dev/ttyS1";
 
@@ -25,31 +22,29 @@ int main()
 		return 1;
 	}
 
-	// TODO: real errors, right now we just return the size processed or the size of the buffer
-	int card_status;
+	CardIo::StatusCode cardStatus;
+	SerIo::StatusCode serialStatus;
 
 	while (true) {
 		SerialBuffer.clear();
 
-		if (SerialHandler->Read(SerialBuffer) != SerIo::StatusCode::Okay) {
-			// TODO: Handle errors?
+		serialStatus = SerialHandler->Read(SerialBuffer);
+		if (serialStatus != SerIo::StatusCode::Okay) {
 			continue;
 		}
 
-		card_status = CardHandler->ReceivePacket(SerialBuffer);
-		if (CardHandler->ReceivePacket(SerialBuffer) < 1) {
+		cardStatus = CardHandler->ReceivePacket(SerialBuffer);
+		if (cardStatus == CardIo::StatusCode::ServerWaitingReply) {
+			// Server expects the ACK *before* we send our real reply.
+			serialStatus = SerialHandler->Write(SerialBuffer);
+		} else if (cardStatus != CardIo::StatusCode::Okay) {
+			// TODO: Could mean a couple of differnet things, should we consider exiting for some?
 			continue;
 		}
 
-		// Clear out the buffer before we fill it up again.
-		// TODO: Required? CardIo::GetByte() should be deleting entries as they're processed.
-		SerialBuffer.clear();
-		card_status = CardHandler->SendPacket(SerialBuffer);
-		if (card_status > 0) {
-			// TODO: Handle errors?
-			SerialHandler->Write(SerialBuffer);
-		} else {
-			// TODO: We need to reply with ACK or something.. we can't just not reply.
+		cardStatus = CardHandler->SendPacket(SerialBuffer);
+		if (cardStatus == CardIo::StatusCode::Okay) {
+			serialStatus = SerialHandler->Write(SerialBuffer);
 		}
 
 		// Reading too quickly from the port causes my test system to lockup, so we wait. (Pi3b+)

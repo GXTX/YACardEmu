@@ -92,8 +92,16 @@ void CardIo::HandlePacket(card_packet_header_t* header, std::vector<uint8_t>& pa
 	}
 }
 
-size_t CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
+CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 {
+	// If the packet we're trying to process is the waiting byte then just return.
+	// We should've already created the reply.
+	if (buffer.at(0) == SERVER_WAITING_BYTE) {
+		buffer.clear();
+		buffer.push_back(RESPONSE_ACK);
+		return StatusCode::ServerWaitingReply;
+	}
+
 	// Scan the packet header
 	card_packet_header_t header;
 
@@ -107,7 +115,7 @@ size_t CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 		std::cout << " [Missing SYNC_BYTE!]" << std::endl;
 #endif
 		// If it's wrong, return we've processed (actually, skipped) one byte
-		return 1;
+		return StatusCode::SyncError;
 	}
 
 	// Read the target and count bytes
@@ -144,13 +152,13 @@ size_t CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 	std::cout << std::endl;
 #endif
 
-	return packet.size() + 1;
+	return StatusCode::Okay;
 }
 
-size_t CardIo::SendPacket(std::vector<uint8_t> &buffer)
+CardIo::StatusCode CardIo::SendPacket(std::vector<uint8_t> &buffer)
 {
 	if (ResponseBuffer.empty()) {
-		return 0;
+		return StatusCode::EmptyResponseError;
 	}
 
 	// Build a reader response packet containing the payload
@@ -186,5 +194,5 @@ size_t CardIo::SendPacket(std::vector<uint8_t> &buffer)
 	std::cout << std::endl;
 #endif
 
-	return buffer.size();
+	return StatusCode::Okay;
 }
