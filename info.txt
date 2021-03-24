@@ -8,3 +8,66 @@ GUESSING:
 The first 30 is I believe a marker for card status with 30 being no card, 31 being there's a card and 34 it's a clean card.
 No clue about 2nd 30, maybe writer or hopper status?
 The 3rd 30 is likely a reader status, 30 idle, 32 reading, 33 cleaning.
+
+Card size appears to be 0x45 but standard magnetic cards have a legnth of 0x4F, where's the extra bytes going?
+
+=============================
+Just cutting down winteriscoming's script to make it more easily readable to me, note it was not able to actually
+pass all of the card tests in WMMT's test mode, can't remember if we're missing commands or it was getting confused on some
+
+
+if command init
+30 30 30 // iirc if we don't reply 30/30/30 to this the system gets confused
+
+if command write_text
+31 30 30 // GUESS: 31 signaling we have a card and are waiting? does the command give us what we're meant to write?
+
+if command write_card
+// strip header + footer, write to file, reply ok?
+31 30 30 // ?
+
+if command 7d
+31 30 30 // if assumptions are correct we're just signaling there's a card?
+
+if command 78
+30 30 30 // ?
+
+if command 80
+30 30 30 // GUESS: eject card(?)
+
+if command card_state
+31 30 30 // winteriscoming does not check if there's a card and just writes 31, is this correct?
+
+if command card_present
+30 30 30 // this is where it's weird, we now set 30/30/30, is this correct, assumption is that the first is card status
+
+if command load_card // is it required to actually send both options? Can we skip to part 2?
+	if load_status ==  0
+		31 30 30
+		load_status = 1;
+	else load_status == 1
+		31 30 32 // this line makes me think the third 30 is reader status with 32 being reading?
+		load_status = 0;
+
+if command clean_card
+	if clean_status == 0
+		30 30 33
+		clean_status = 1;
+	else if clean_status == 1
+		31 30 33
+		clean_status = 2;
+	else if clean_status == 2
+		34 30 30
+		clean_status = 3;
+	else if clean_status == 3
+		30 30 30 // again, wouldn't 30/30/30 signal we have no card?, does the system expect this?
+		clean_status = 0;
+
+
+if command 33
+	if previous_command = 33
+		31 30 30
+	else if have card
+		31 30 30 [card data]
+	else if no card
+		30 30 34 // what would happen if we reported 30/30/30?
