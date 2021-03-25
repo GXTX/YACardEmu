@@ -164,6 +164,9 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 		packet_checksum ^= ResponseBuffer.at(i);
 	}
 
+	// TODO: Figure out what this actually is.
+	buffer->push_back(0x03);
+
 	// Write the checksum to the last byte
 	buffer->push_back(packet_checksum);
 
