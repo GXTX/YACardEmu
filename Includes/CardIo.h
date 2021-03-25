@@ -81,7 +81,7 @@ private:
 	int WMMT_Command_20_Get_Card_State();
 	int WMMT_Command_33_Read_Card();
 	int WMMT_Command_40_Is_Card_Present();
-	int WMMT_Command_53_Write_Card();
+	int WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet);
 
 	int WMMT_Command_73_UNK();
 	int WMMT_Command_7A_UNK();

@@ -27,12 +27,31 @@ int CardIo::WMMT_Command_20_Get_Card_State()
 	return 6;
 }
 
-// FIXME: This doesn't seem right..? But we need to send 30/30/30?
+int CardIo::WMMT_Command_33_Read_Card()
+{
+	for (uint8_t i = 0; i < CARD_SIZE; i++) {
+		ResponseBuffer.push_back(card_data->at(i));
+	}
+
+	return 0;
+}
+
 int CardIo::WMMT_Command_40_Is_Card_Present()
 {
 	Status.Init();
 	PutStatusInBuffer();
 	return 6;
+}
+
+int CardIo::WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet)
+{
+	for (auto i : *packet) {
+		card_data->at(i) = packet->at(i);
+	}
+
+	SaveCardToFS(card_name);
+
+	return 0;
 }
 
 int CardIo::WMMT_Command_B0_Load_Card()
@@ -95,9 +114,9 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 	switch (packet->at(0)) {
 		case 0x10: WMMT_Command_10_Init(); break;
 		case 0x20: WMMT_Command_20_Get_Card_State(); break;
-		//case 0x33: WMMT_Command_33_Read_Card(); break;
+		case 0x33: WMMT_Command_33_Read_Card(); break;
 		case 0x40: WMMT_Command_40_Is_Card_Present(); break;
-		//case 0x53: WMMT_Command_53_Write_Card(); break;
+		case 0x53: WMMT_Command_53_Write_Card(packet); break;
 		//case 0x73: WMMT_Command_73_UNK(); break;
 		//case 0x7A: WMMT_Command_7A_UNK(); break;
 		//case 0x7B: WMMT_Command_7B_UNK(); break;
@@ -188,7 +207,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	uint8_t packet_checksum = count;
 
 	// Encode the payload data
-	for (size_t i = 0; i < ResponseBuffer.size(); i++) {
+	for (auto i : ResponseBuffer) {
 		buffer->push_back(ResponseBuffer.at(i));
 		packet_checksum ^= ResponseBuffer.at(i);
 	}
@@ -203,7 +222,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::SendPacket:";
-	for (size_t i = 0; i < buffer->size(); i++) {
+	for (auto i : *buffer) {
 		std::printf(" %02X", buffer->at(i));
 	}
 	std::cout << std::endl;
