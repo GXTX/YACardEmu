@@ -25,10 +25,8 @@ public:
 	SerIo::StatusCode Read(std::vector<uint8_t> *buffer);
 	SerIo::StatusCode Write(std::vector<uint8_t> *buffer);
 private:
-	int SerialHandler;
-
-	struct sp_port *Port;
-	struct sp_port_config *PortConfig;
+	sp_port *Port;
+	sp_port_config *PortConfig;
 };
 
 #endif

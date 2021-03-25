@@ -13,14 +13,12 @@ SerIo::SerIo(const std::string devicePath)
 
 	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
 
-	if (ret != SP_OK) {
-		std::printf("SerIo::Init: Failed to open %s.", devicePath.c_str());
-		std::cout << std::endl;
-		IsInitialized = false;
-	}
-	else {
+	if (ret == SP_OK) {
 		IsInitialized = true;
 		sp_set_config(Port, PortConfig);
+	} else {
+		IsInitialized = false;
+		std::cerr << "SerIo::Init: Failed to open the port!";
 	}
 }
 
