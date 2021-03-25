@@ -51,6 +51,32 @@ int CardIo::WMMT_Command_B0_Load_Card()
 	return 6;
 }
 
+void CardIo::LoadCardFromFS(std::string card_name)
+{
+	std::ifstream card;
+
+	if (std::filesystem::exists(card_name) && std::filesystem::file_size(card_name) == CARD_SIZE) {
+		card.open(card_name, std::ifstream::in | std::ifstream::binary);
+		card.read(reinterpret_cast<char*>(card_data->data()), std::filesystem::file_size(card_name));
+		card.close();
+	} else {
+		// TODO: If the card supplied is larger than 0x45 we might want to open a *new* card with a new name
+		// otherwise we might be overwriting the card data. Oops.
+	}
+}
+
+void CardIo::SaveCardToFS(std::string card_name)
+{
+	std::ofstream card;
+
+	// TODO: Is there ever a time when the system would give us a zero sized card?
+	if (!card_data->empty()) {
+		card.open(card_name, std::ofstream::out | std::ofstream::binary);
+		card.write(reinterpret_cast<char*>(card_data->data()), card_data->size());
+		card.close();
+	}
+} 
+
 uint8_t CardIo::GetByte(std::vector<uint8_t> *buffer)
 {
 	uint8_t value = buffer->at(0);
@@ -165,7 +191,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	}
 
 	// TODO: Figure out what this actually is.
-	buffer->push_back(0x03);
+	buffer->push_back(UNK_RESP_BYTE);
 
 	// Write the checksum to the last byte
 	buffer->push_back(packet_checksum);

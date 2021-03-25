@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 class CardIo
 {
@@ -21,8 +23,11 @@ public:
 
 private:
 	const uint8_t SYNC_BYTE = 0x02;
+	const uint8_t UNK_RESP_BYTE = 0x03;
 	const uint8_t SERVER_WAITING_BYTE = 0x05;
 	const uint8_t RESPONSE_ACK = 0x06;
+
+	const uint8_t CARD_SIZE = 0x45;
 
 	// 1/3 in the RPS reply.
 	enum CardStatus {
@@ -63,6 +68,12 @@ private:
 
 	uint8_t GetByte(std::vector<uint8_t> *buffer);
 	void HandlePacket(std::vector<uint8_t> *packet);
+
+	const std::string card_name = "test.bin";
+	std::vector<uint8_t> *card_data;
+
+	void LoadCardFromFS(std::string card_name);
+	void SaveCardToFS(std::string card_name);
 
 	void PutStatusInBuffer();
 
