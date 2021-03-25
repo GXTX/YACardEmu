@@ -38,21 +38,21 @@ SerIo::StatusCode SerIo::Write(std::vector<uint8_t> *buffer)
 #endif
 
 	if (buffer->size() == 0) {
-		return StatusCode::ZeroSizeError;
+		return ZeroSizeError;
 	}
 
 	int ret = sp_nonblocking_write(Port, buffer->data(), buffer->size());
 
 	if (ret <= 0) {
-		return StatusCode::WriteError;
+		return WriteError;
 	} else if (ret != (int)buffer->size()) {
 #ifdef DEBUG_SERIAL
 		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, (int)buffer.size());
 #endif
-		return StatusCode::WriteError;
+		return WriteError;
 	}
 
-	return StatusCode::Okay;
+	return Okay;
 }
 
 SerIo::StatusCode SerIo::Read(std::vector<uint8_t> *buffer)
@@ -60,9 +60,9 @@ SerIo::StatusCode SerIo::Read(std::vector<uint8_t> *buffer)
 	int bytes = sp_input_waiting(Port);
 
 	if (bytes == 0) {
-		return StatusCode::ZeroSizeError;
+		return ZeroSizeError;
 	} else if (bytes < 0) {
-		return StatusCode::ReadError;
+		return ReadError;
 	}
 
 	buffer->resize(bytes);
@@ -70,7 +70,7 @@ SerIo::StatusCode SerIo::Read(std::vector<uint8_t> *buffer)
 	int ret = sp_nonblocking_read(Port, buffer->data(), buffer->size());
 
 	if (ret <= 0) {
-		return StatusCode::ReadError;
+		return ReadError;
 	}
 
 #ifdef DEBUG_SERIAL
@@ -81,5 +81,5 @@ SerIo::StatusCode SerIo::Read(std::vector<uint8_t> *buffer)
 	std::cout << std::endl;
 #endif
 
-	return StatusCode::Okay;
+	return Okay;
 }

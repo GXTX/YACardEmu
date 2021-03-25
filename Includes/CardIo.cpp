@@ -116,13 +116,11 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 {
-	// If the packet we're trying to process is the waiting byte then just return.
-	// We should've already created the reply.
-	// TODO: Broken logic, we shouldn't clear rework to just send the reply instead, maybe.
+	// If the packet we're trying to process is the waiting byte
+	// then just return, we should've already created the reply.
 	if (buffer->at(0) == SERVER_WAITING_BYTE) {
 		buffer->clear();
-		buffer->push_back(RESPONSE_ACK);
-		return StatusCode::ServerWaitingReply;
+		return ServerWaitingReply;
 	}
 
 	// First, read the sync byte
@@ -131,7 +129,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 #endif
 	if (GetByte(buffer) != SYNC_BYTE) {
 		std::cerr << " Missing SYNC_BYTE!";
-		return StatusCode::SyncError;
+		return SyncError;
 	}
 
 	uint8_t count = GetByte(buffer);
@@ -156,7 +154,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 #ifdef DEBUG_CARD_PACKETS
 		std::cerr << " Checksum error!";
 #endif
-		return StatusCode::ChecksumError;
+		return ChecksumError;
 	}
 
 	HandlePacket(&packet);
@@ -165,14 +163,19 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 	std::cout << std::endl;
 #endif
 
-	return StatusCode::Okay;
+	// TODO: check that HandlePacket() can actually handle what we're eventually going to send.
+	buffer->clear();
+	buffer->push_back(RESPONSE_ACK);
+
+	return Okay;
 }
 
+// TODO: We expect buffer to be .empty(), is this safe to assume?
 CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 {
 	// Should not happen?
 	if (ResponseBuffer.empty()) {
-		return StatusCode::EmptyResponseError;
+		return EmptyResponseError;
 	}
 
 	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
@@ -206,5 +209,5 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	std::cout << std::endl;
 #endif
 
-	return StatusCode::Okay;
+	return Okay;
 }

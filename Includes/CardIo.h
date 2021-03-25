@@ -20,7 +20,6 @@ public:
 	CardIo();
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> *buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> *buffer);
-
 private:
 	const uint8_t SYNC_BYTE = 0x02;
 	const uint8_t UNK_RESP_BYTE = 0x03;

@@ -29,22 +29,23 @@ int main()
 		SerialBuffer->clear();
 
 		serialStatus = SerialHandler->Read(SerialBuffer);
-		if (serialStatus != SerIo::StatusCode::Okay) {
+		if (serialStatus != SerIo::Okay) {
 			continue;
 		}
 
 		cardStatus = CardHandler->ReceivePacket(SerialBuffer);
-		if (cardStatus == CardIo::StatusCode::ServerWaitingReply) {
-			// Server expects the ACK *before* we send our real reply.
+		if (cardStatus == CardIo::Okay) {
+			// Write our ACK
 			serialStatus = SerialHandler->Write(SerialBuffer);
-		} else if (cardStatus != CardIo::StatusCode::Okay) {
+		} else if (cardStatus == CardIo::ServerWaitingReply) {
+			// Write our actual reply once we get the signal the host is waiting.
+			cardStatus = CardHandler->BuildPacket(SerialBuffer);
+			if (cardStatus == CardIo::Okay) {
+				serialStatus = SerialHandler->Write(SerialBuffer);
+			}
+		} else {
 			// TODO: Could mean a couple of differnet things, should we consider exiting for some?
 			continue;
-		}
-
-		cardStatus = CardHandler->BuildPacket(SerialBuffer);
-		if (cardStatus == CardIo::StatusCode::Okay) {
-			serialStatus = SerialHandler->Write(SerialBuffer);
 		}
 
 		// Reading too quickly from the port causes my test system to lockup, so we wait. (Pi3b+)
