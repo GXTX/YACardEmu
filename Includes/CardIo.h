@@ -28,42 +28,36 @@ private:
 
 	const uint8_t CARD_SIZE = 0x45;
 
-	// 1/3 in the RPS reply.
-	enum CardStatus {
+	enum class ReaderStatus {
 		NoCard = 30,
 		HasCard = 31,
-		//UNK_32 = 32,
-		//UNK_33 = 33,
-		UNK_34 = 34, // Seen when cleaning the card right before we reply 30/30/30? Reply as a empty card?
+		UNK_34 = 34,
 	};
 
-	// 2/3 in the reply, we always return 30.
-	enum UNKStatus {
-		UNK_30 = 30,
-	};
-
-	// 3/3 in the reply, assumption is read status.
-	enum RWStatus {
+	enum class PrinterStatus {
 		Idle = 30,
-		//UNK_31 = 31,
+		Print = 31,
+	};
+
+	enum class UNK_Status {
+		Idle = 30,
 		UNK_32 = 32, // Used during LoadCard, assumption is - reading.
-		UNK_33 = 33, // 
 		UKN_34 = 34, // Only seen in ReadCard if we don't have a card?
 	};
 
 	typedef struct {
-		CardStatus unk_1 = CardStatus::NoCard;
-		uint8_t unk_2 = UNKStatus::UNK_30;
-		RWStatus unk_3 = RWStatus::Idle;
+		ReaderStatus Reader = ReaderStatus::NoCard;
+		PrinterStatus Printer = PrinterStatus::Idle;
+		UNK_Status Status = UNK_Status::Idle;
 
-		void Init() {
-			unk_1 = CardStatus::NoCard;
-			unk_2 = UNKStatus::UNK_30;
-			unk_3 = RWStatus::Idle;
+		void Reset() {
+			Reader = ReaderStatus::NoCard;
+			Printer = PrinterStatus::Idle;
+			Status = UNK_Status::Idle;
 		}
-	} wmmt_status_t;
+	} machine_status;
 
-	wmmt_status_t Status;
+	machine_status RPS;
 
 	uint8_t GetByte(std::vector<uint8_t> *buffer);
 	void HandlePacket(std::vector<uint8_t> *packet);

@@ -7,16 +7,9 @@ CardIo::CardIo()
 
 }
 
-void CardIo::PutStatusInBuffer()
-{
-	ResponseBuffer.push_back(Status.unk_1);
-	ResponseBuffer.push_back(Status.unk_2);
-	ResponseBuffer.push_back(Status.unk_3);
-}
-
 int CardIo::WMMT_Command_10_Init()
 {
-	Status.Init();
+	RPS.Reset();
 	PutStatusInBuffer();
 	return 6;
 }
@@ -39,7 +32,7 @@ int CardIo::WMMT_Command_33_Read_Card()
 
 int CardIo::WMMT_Command_40_Is_Card_Present()
 {
-	Status.Init();
+	RPS.Reset();
 	PutStatusInBuffer();
 	return 6;
 }
@@ -98,18 +91,24 @@ int CardIo::WMMT_Command_B0_Load_Card()
 {
 	// Extra: 31
 
-	if (Status.unk_1 == CardStatus::NoCard) {
-		Status.unk_1 = CardStatus::HasCard;
+	if (RPS.Reader == ReaderStatus::NoCard) {
+		RPS.Reader = ReaderStatus::HasCard;
+	} else if (RPS.Reader == ReaderStatus::HasCard) {
+		RPS.Status = UNK_Status::UNK_32;
 	}
-	else if (Status.unk_1 == CardStatus::HasCard) {
-		Status.unk_3 = RWStatus::UNK_32;
-	}
-	
+
 	PutStatusInBuffer();
 
-	Status.unk_3 = RWStatus::Idle;
+	RPS.Status = UNK_Status::Idle;
 
 	return 6;
+}
+
+void CardIo::PutStatusInBuffer()
+{
+	ResponseBuffer.push_back(static_cast<uint8_t>(RPS.Reader));
+	ResponseBuffer.push_back(static_cast<uint8_t>(RPS.Printer));
+	ResponseBuffer.push_back(static_cast<uint8_t>(RPS.Status));
 }
 
 void CardIo::LoadCardFromFS(std::string card_name)
