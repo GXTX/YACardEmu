@@ -272,6 +272,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	}
 
 	buffer->push_back(END_OF_TEXT);
+	packet_checksum ^= END_OF_TEXT;
 
 	// Write the checksum to the last byte
 	buffer->push_back(packet_checksum);

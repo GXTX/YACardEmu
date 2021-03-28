@@ -29,20 +29,20 @@ private:
 	const uint8_t CARD_SIZE = 0x45;
 
 	enum class ReaderStatus {
-		NoCard = 30,
-		HasCard = 31,
-		UNK_34 = 34,
+		NoCard = 0x30,
+		HasCard = 0x31,
+		UNK_34 = 0x34,
 	};
 
 	enum class PrinterStatus {
-		Idle = 30,
-		Print = 31,
+		Idle = 0x30,
+		Print = 0x31,
 	};
 
 	enum class UNK_Status {
-		Idle = 30,
-		UNK_32 = 32, // Used during LoadCard, assumption is - reading.
-		UKN_34 = 34, // Only seen in ReadCard if we don't have a card?
+		Idle = 0x30,
+		UNK_32 = 0x32, // Used during LoadCard, assumption is - reading.
+		UKN_34 = 0x34, // Only seen in ReadCard if we don't have a card?
 	};
 
 	typedef struct {
