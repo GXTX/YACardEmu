@@ -60,6 +60,7 @@ Real data:
 int CardIo::WMMT_Command_78_UNK()
 {
 	// Extra: 37 31 34 30 30 30
+	PutStatusInBuffer();
 	return 1;
 }
 
@@ -162,6 +163,7 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 		case 0x40: WMMT_Command_40_Is_Card_Present(); break;
 		case 0x53: WMMT_Command_53_Write_Card(packet); break;
 		//case 0x73: WMMT_Command_73_UNK(); break;
+		case 0x78: WMMT_Command_78_UNK(); break;
 		//case 0x7A: WMMT_Command_7A_UNK(); break;
 		//case 0x7B: WMMT_Command_7B_UNK(); break;
 		//case 0x7C: WMMT_Command_7C_UNK(); break;
@@ -225,7 +227,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 	}
 
 #ifdef DEBUG_CARD_PACKETS
-	for (size_t i = 0; i < packet.size(); i++) {
+	for (size_t i = 0; i < packet.size() - 1; i++) {
 		std::printf(" %02X", packet.at(i));
 	}
 	std::cout << std::endl;

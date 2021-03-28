@@ -76,16 +76,13 @@ private:
 	int WMMT_Command_33_Read_Card();
 	int WMMT_Command_40_Is_Card_Present();
 	int WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet);
-
 	int WMMT_Command_73_UNK();
-	
 	int WMMT_Command_78_UNK(); // Important;
 	int WMMT_Command_7A_UNK();
 	int WMMT_Command_7B_UNK(); // card inserted?
 	int WMMT_Command_7C_Write_Card_Text();
 	int WMMT_Command_7D_UNK();
 	int WMMT_Command_80_Eject_Card();
-
 	int WMMT_Command_A0_Clean_Card();
 	int WMMT_Command_B0_Load_Card();
 	int WMMT_Command_D0_UNK();
