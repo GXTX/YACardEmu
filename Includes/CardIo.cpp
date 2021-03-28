@@ -48,7 +48,7 @@ Real data:
 00 00 00 00 00 00 00 00 00 00 77 48 44 05 00 00 47 
 */
 
-	for (auto i : *packet) {
+	for (uint8_t i = 0; i < packet->size(); i++) {
 		card_data->at(i) = packet->at(i);
 	}
 
@@ -179,17 +179,20 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 {
+#ifdef DEBUG_CARD_PACKETS
+	std::cout << "CardIo::ReceivePacket:";
+#endif
 	// If the packet we're trying to process is the waiting byte
 	// then just return, we should've already created the reply.
 	if (buffer->at(0) == ENQUIRY) {
 		buffer->clear();
+#ifdef DEBUG_CARD_PACKETS
+		std::cout << " ENQUIRY" << std::endl;
+#endif
 		return ServerWaitingReply;
 	}
 
 	// First, read the sync byte
-#ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::ReceivePacket:";
-#endif
 	if (GetByte(buffer) != START_OF_TEXT) {
 		std::cerr << " Missing SYNC_BYTE!";
 		return SyncError;
@@ -221,14 +224,19 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 		return ChecksumError;
 	}
 
-	HandlePacket(&packet);
-
 #ifdef DEBUG_CARD_PACKETS
+	for (size_t i = 0; i < packet.size(); i++) {
+		std::printf(" %02X", packet.at(i));
+	}
 	std::cout << std::endl;
 #endif
 
+	HandlePacket(&packet);
+
 	// TODO: check that HandlePacket() can actually handle what we're eventually going to send.
-	buffer->clear();
+	if (!buffer->empty()) {
+		buffer->clear();
+	}
 	buffer->push_back(ACK);
 
 	return Okay;
@@ -236,8 +244,15 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 
 CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 {
+#ifdef DEBUG_CARD_PACKETS
+	std::cout << "CardIo::SendPacket:";
+#endif
+
 	// Should not happen?
 	if (ResponseBuffer.empty()) {
+#ifdef DEBUG_CARD_PACKETS
+		std::cout << " Empty response???" << std::endl;
+#endif
 		return EmptyResponseError;
 	}
 
@@ -251,7 +266,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	uint8_t packet_checksum = count;
 
 	// Encode the payload data
-	for (auto i : ResponseBuffer) {
+	for (uint8_t i = 0; i < ResponseBuffer.size(); i++) {
 		buffer->push_back(ResponseBuffer.at(i));
 		packet_checksum ^= ResponseBuffer.at(i);
 	}
@@ -264,8 +279,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	ResponseBuffer.clear();
 
 #ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::SendPacket:";
-	for (auto i : *buffer) {
+	for (uint8_t i = 0; i < buffer->size(); i++) {
 		std::printf(" %02X", buffer->at(i));
 	}
 	std::cout << std::endl;

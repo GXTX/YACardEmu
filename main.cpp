@@ -5,7 +5,7 @@
 #include "CardIo.h"
 #include "SerIo.h"
 
-static const std::string serialName = "/dev/ttyS1";
+static const std::string serialName = "/dev/ttyS0";
 
 int main()
 {
@@ -19,25 +19,26 @@ int main()
 
 	CardIo::StatusCode cardStatus;
 	SerIo::StatusCode serialStatus;
-	std::vector<uint8_t> *SerialBuffer = 0;
+	std::vector<uint8_t> SerialBuffer = {0};
 
 	while (true) {
-		SerialBuffer->clear();
+		if (!SerialBuffer.empty())
+			SerialBuffer.clear();
 
-		serialStatus = SerialHandler->Read(SerialBuffer);
+		serialStatus = SerialHandler->Read(&SerialBuffer);
 		if (serialStatus != SerIo::Okay) {
 			continue;
 		}
 
-		cardStatus = CardHandler->ReceivePacket(SerialBuffer);
+		cardStatus = CardHandler->ReceivePacket(&SerialBuffer);
 		if (cardStatus == CardIo::Okay) {
 			// Write our ACK
-			serialStatus = SerialHandler->Write(SerialBuffer);
+			serialStatus = SerialHandler->Write(&SerialBuffer);
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Write our actual reply once we get the signal the host is waiting.
-			cardStatus = CardHandler->BuildPacket(SerialBuffer);
+			cardStatus = CardHandler->BuildPacket(&SerialBuffer);
 			if (cardStatus == CardIo::Okay) {
-				serialStatus = SerialHandler->Write(SerialBuffer);
+				serialStatus = SerialHandler->Write(&SerialBuffer);
 			}
 		} else {
 			// TODO: Could mean a couple of differnet things, should we consider exiting for some?

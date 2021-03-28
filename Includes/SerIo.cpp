@@ -1,5 +1,7 @@
 #include "SerIo.h"
 
+#define DEBUG_SERIAL 1
+
 SerIo::SerIo(const std::string devicePath)
 {
 	sp_new_config(&PortConfig);
@@ -47,7 +49,7 @@ SerIo::StatusCode SerIo::Write(std::vector<uint8_t> *buffer)
 		return WriteError;
 	} else if (ret != (int)buffer->size()) {
 #ifdef DEBUG_SERIAL
-		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, (int)buffer.size());
+		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, (int)buffer->size());
 #endif
 		return WriteError;
 	}
