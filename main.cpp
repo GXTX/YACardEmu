@@ -1,6 +1,4 @@
 #include <iostream>
-#include <memory>
-#include <atomic>
 #include <chrono>
 #include <thread>
 
@@ -11,19 +9,17 @@ static const std::string serialName = "/dev/ttyS1";
 
 int main()
 {
-	std::vector<uint8_t> *SerialBuffer = 0;
-	SerialBuffer->reserve(255 * 2); //max packet * 2, not required, really..
-
 	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>());
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName));
 	if (!SerialHandler->IsInitialized) {
-		std::cerr << "Coudln't initialize the serial controller.";
+		std::cerr << "Coudln't initialize the serial controller.\n";
 		return 1;
 	}
 
 	CardIo::StatusCode cardStatus;
 	SerIo::StatusCode serialStatus;
+	std::vector<uint8_t> *SerialBuffer = 0;
 
 	while (true) {
 		SerialBuffer->clear();

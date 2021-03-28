@@ -110,6 +110,9 @@ uint8_t CardIo::GetByte(std::vector<uint8_t> *buffer)
 
 void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 {
+	// We need to relay the command that we're replying to.
+	ResponseBuffer.push_back(packet->at(0));
+
 	// At this point [0] should be our command, we've already processed the header in CardIo::ReceivePacket()
 	switch (packet->at(0)) {
 		case 0x10: WMMT_Command_10_Init(); break;
@@ -151,6 +154,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 		return SyncError;
 	}
 
+	// TODO: Verify length.
 	uint8_t count = GetByte(buffer);
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
@@ -200,8 +204,8 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
 
 	// Send the header bytes
-	buffer->push_back(SYNC_BYTE);
-	buffer->push_back(count);
+	buffer->insert(buffer->begin(), SYNC_BYTE);
+	buffer->insert(buffer->begin() + 1, count);
 
 	// Calculate the checksum
 	uint8_t packet_checksum = count;

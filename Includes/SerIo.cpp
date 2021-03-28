@@ -18,7 +18,7 @@ SerIo::SerIo(const std::string devicePath)
 		sp_set_config(Port, PortConfig);
 	} else {
 		IsInitialized = false;
-		std::cerr << "SerIo::Init: Failed to open the port!";
+		std::cerr << "SerIo::Init: Failed to open the port!\n";
 	}
 }
 
