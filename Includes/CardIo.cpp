@@ -24,11 +24,12 @@ int CardIo::WMMT_Command_10_Init()
 int CardIo::WMMT_Command_20_Get_Card_State()
 {
 	PutStatusInBuffer();
-	return 6;
+	return 0;
 }
 
 int CardIo::WMMT_Command_33_Read_Card()
 {
+	// Extra: 32 31 30
 	for (uint8_t i = 0; i < CARD_SIZE; i++) {
 		ResponseBuffer.push_back(card_data->at(i));
 	}
@@ -45,6 +46,15 @@ int CardIo::WMMT_Command_40_Is_Card_Present()
 
 int CardIo::WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet)
 {
+/*
+Extra: 30 31 30 
+
+Real data:
+52 76 00 00 7C 8A 7A 88 89 0A 01 17 00 00 20 22 00 00 00 00 00 C8 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 77 48 44 05 00 00 47 
+*/
+
 	for (auto i : *packet) {
 		card_data->at(i) = packet->at(i);
 	}
@@ -54,8 +64,40 @@ int CardIo::WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet)
 	return 0;
 }
 
+int CardIo::WMMT_Command_78_UNK()
+{
+	// Extra: 37 31 34 30 30 30
+	return 1;
+}
+
+int CardIo::WMMT_Command_7C_Write_Card_Text()
+{
+/*
+Extra: 30 30
+
+Real data:
+Encoding is SHIFT-JIS, SOH is start of line, DC1 BOLD AND BIG, DC4 TINY
+
+01 11 82 66 82 74 82 64 82 72 82 73 0D 4D 41 5A 44 41 0D 52 58 2D 37 20 5B 46 
+44 33 53 5D 0D 11 82 6D 8B 89 0D 11 82 51 82 57 82 4F 94 6E 97 CD 81 5E 14 42 
+0D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 20 20 20 20 20 20 20 20 20 20 
+20 20 20 20 20 20 0D 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 20 20 
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 0D 20 41 50 51 36 4E 4C 48 45 32 38 
+37 39 5A 57 53
+*/
+	return 1;
+}
+
+int CardIo::WMMT_Command_7D_UNK()
+{
+	// Extra: 01 17
+	return 1;
+}
+
 int CardIo::WMMT_Command_B0_Load_Card()
 {
+	// Extra: 31
+
 	if (Status.unk_1 == CardStatus::NoCard) {
 		Status.unk_1 = CardStatus::HasCard;
 	}
@@ -140,7 +182,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 {
 	// If the packet we're trying to process is the waiting byte
 	// then just return, we should've already created the reply.
-	if (buffer->at(0) == SERVER_WAITING_BYTE) {
+	if (buffer->at(0) == ENQUIRY) {
 		buffer->clear();
 		return ServerWaitingReply;
 	}
@@ -149,7 +191,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
 #endif
-	if (GetByte(buffer) != SYNC_BYTE) {
+	if (GetByte(buffer) != START_OF_TEXT) {
 		std::cerr << " Missing SYNC_BYTE!";
 		return SyncError;
 	}
@@ -188,12 +230,11 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 
 	// TODO: check that HandlePacket() can actually handle what we're eventually going to send.
 	buffer->clear();
-	buffer->push_back(RESPONSE_ACK);
+	buffer->push_back(ACK);
 
 	return Okay;
 }
 
-// TODO: We expect buffer to be .empty(), is this safe to assume?
 CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 {
 	// Should not happen?
@@ -204,7 +245,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
 
 	// Send the header bytes
-	buffer->insert(buffer->begin(), SYNC_BYTE);
+	buffer->insert(buffer->begin(), START_OF_TEXT);
 	buffer->insert(buffer->begin() + 1, count);
 
 	// Calculate the checksum
@@ -216,8 +257,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 		packet_checksum ^= ResponseBuffer.at(i);
 	}
 
-	// TODO: Figure out what this actually is.
-	buffer->push_back(UNK_RESP_BYTE);
+	buffer->push_back(END_OF_TEXT);
 
 	// Write the checksum to the last byte
 	buffer->push_back(packet_checksum);

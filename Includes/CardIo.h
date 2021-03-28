@@ -21,10 +21,10 @@ public:
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> *buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> *buffer);
 private:
-	const uint8_t SYNC_BYTE = 0x02;
-	const uint8_t UNK_RESP_BYTE = 0x03;
-	const uint8_t SERVER_WAITING_BYTE = 0x05;
-	const uint8_t RESPONSE_ACK = 0x06;
+	const uint8_t START_OF_TEXT = 0x02;
+	const uint8_t END_OF_TEXT = 0x03;
+	const uint8_t ENQUIRY = 0x05;
+	const uint8_t ACK = 0x06;
 
 	const uint8_t CARD_SIZE = 0x45;
 
@@ -84,11 +84,13 @@ private:
 	int WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet);
 
 	int WMMT_Command_73_UNK();
+	
+	int WMMT_Command_78_UNK(); // Important;
 	int WMMT_Command_7A_UNK();
 	int WMMT_Command_7B_UNK(); // card inserted?
-	int WMMT_Command_7C_UNK(); // Write text?
+	int WMMT_Command_7C_Write_Card_Text();
 	int WMMT_Command_7D_UNK();
-	int WMMT_Command_80_UNK(); // Eject?
+	int WMMT_Command_80_Eject_Card();
 
 	int WMMT_Command_A0_Clean_Card();
 	int WMMT_Command_B0_Load_Card();

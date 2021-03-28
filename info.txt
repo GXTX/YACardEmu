@@ -1,4 +1,6 @@
-[SYNC][COMMAND LENGTH][COMMAND][30][30][30][unk (always 03)?][checksum8 xor without sync]
+Server: [STX][SIZE][COMMAND][NULL][NULL][NULL]<command data>[ETX][CHECKSUM]
+Client: [STX][SIZE][COMMAND][30][30][30]<command data>[ETX][CHECKSUM (XOR without start byte)]
+
 
 Sync: 0x02
 Chihiro waiting/ACK: 0x05
