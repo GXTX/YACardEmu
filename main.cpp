@@ -29,6 +29,7 @@ int main()
 
 		serialStatus = SerialHandler->Read(&SerialBuffer);
 		if (serialStatus != SerIo::Okay) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(250));
 			continue;
 		}
 
@@ -45,7 +46,7 @@ int main()
 		}
 
 		// TODO: Experiment with longer waits.
-		std::this_thread::sleep_for(std::chrono::microseconds(25000));
+		std::this_thread::sleep_for(std::chrono::milliseconds(250));
 	}
 
 	return 0;

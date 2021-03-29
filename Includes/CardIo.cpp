@@ -144,10 +144,6 @@ uint8_t CardIo::GetByte(std::vector<uint8_t> *buffer)
 	uint8_t value = buffer->at(0);
 	buffer->erase(buffer->begin());
 
-#ifdef DEBUG_CARD_PACKETS
-	//std::printf(" %02X", value);
-#endif
-
 	return value;
 }
 
@@ -156,7 +152,6 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 	// We need to relay the command that we're replying to.
 	ResponseBuffer.push_back(packet->at(0));
 
-	// At this point [0] should be our command, we've already processed the header in CardIo::ReceivePacket()
 	switch (GetByte(packet)) {
 		case 0x10: WMMT_Command_10_Init(); break;
 		case 0x20: WMMT_Command_20_Get_Card_State(); break;
