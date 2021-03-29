@@ -184,21 +184,18 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
 #endif
-	// If the packet we're trying to process is the waiting byte
-	// then just return, we should've already created the reply.
-	if (buffer->at(0) == ENQUIRY) {
-		buffer->clear();
-#ifdef DEBUG_CARD_PACKETS
-		std::cout << " ENQUIRY" << std::endl;
-#endif
-		return ServerWaitingReply;
-	}
 
 	// First, read the sync byte
-	if (GetByte(buffer) != START_OF_TEXT) {
-		std::cerr << " Missing SYNC_BYTE!";
+	uint8_t sync = GetByte(buffer);
+	if (sync == ENQUIRY) {
+#ifdef DEBUG_CARD_PACKETS
+		std::cout << " ENQ" << std::endl;
+#endif
+		return ServerWaitingReply;
+	} else if (sync != START_OF_TEXT) {
+		std::cerr << " Missing STX!" << std::endl;;
 		return SyncError;
-	}
+	} 
 
 	// TODO: Verify length.
 	uint8_t count = GetByte(buffer);
@@ -218,10 +215,9 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 	uint8_t packet_checksum = GetByte(buffer);
 
 	// Verify checksum - skip packet if invalid
-	ResponseBuffer.clear();
 	if (packet_checksum != actual_checksum) {
 #ifdef DEBUG_CARD_PACKETS
-		std::cerr << " Checksum error!";
+		std::cerr << " Checksum error!" << std::endl;
 #endif
 		return ChecksumError;
 	}
@@ -233,9 +229,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 	std::cout << std::endl;
 #endif
 
+	// Clear out ResponseBuffer before fully processing the packet.
+	ResponseBuffer.clear();
+
 	HandlePacket(&packet);
 
-	// TODO: check that HandlePacket() can actually handle what we're eventually going to send.
+	// Put the ACK into the buffer, code above sends this to the server.
 	if (!buffer->empty()) {
 		buffer->clear();
 	}
@@ -247,7 +246,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
 CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 {
 #ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::SendPacket:";
+	std::cout << "CardIo::BuildPacket:";
 #endif
 
 	// Should not happen?
@@ -259,6 +258,11 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	}
 
 	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
+
+	// Ensure our buffer is empty.
+	if (!buffer->empty()) {
+		buffer->clear();
+	}
 
 	// Send the header bytes
 	buffer->insert(buffer->begin(), START_OF_TEXT);

@@ -19,11 +19,13 @@ int main()
 
 	CardIo::StatusCode cardStatus;
 	SerIo::StatusCode serialStatus;
-	std::vector<uint8_t> SerialBuffer = {0};
+	std::vector<uint8_t> SerialBuffer;
+	std::vector<uint8_t> OutgoingBuffer;
 
 	while (true) {
-		if (!SerialBuffer.empty())
+		if (!SerialBuffer.empty()) {
 			SerialBuffer.clear();
+		}
 
 		serialStatus = SerialHandler->Read(&SerialBuffer);
 		if (serialStatus != SerIo::Okay) {
@@ -32,20 +34,17 @@ int main()
 
 		cardStatus = CardHandler->ReceivePacket(&SerialBuffer);
 		if (cardStatus == CardIo::Okay) {
-			// Write our ACK
-			serialStatus = SerialHandler->Write(&SerialBuffer);
+			// Build our reply packet in preperation for the ENQ byte from the server.
+			cardStatus = CardHandler->BuildPacket(&OutgoingBuffer);
+			
+			// ReceivePacket should've cleared out this buffer and appended ACK to it.
+			SerialHandler->Write(&SerialBuffer);
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
-			// Write our actual reply once we get the signal the host is waiting.
-			cardStatus = CardHandler->BuildPacket(&SerialBuffer);
-			if (cardStatus == CardIo::Okay) {
-				serialStatus = SerialHandler->Write(&SerialBuffer);
-			}
-		} else {
-			// TODO: Could mean a couple of differnet things, should we consider exiting for some?
-			continue;
+			// Our reply should've already been generated in BuildPacket();
+			SerialHandler->Write(&OutgoingBuffer);
 		}
 
-		// Reading too quickly from the port causes my test system to lockup, so we wait. (Pi3b+)
+		// TODO: Experiment with longer waits.
 		std::this_thread::sleep_for(std::chrono::microseconds(1000));
 	}
 
