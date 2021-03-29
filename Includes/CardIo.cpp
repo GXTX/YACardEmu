@@ -9,6 +9,7 @@ CardIo::CardIo()
 
 int CardIo::WMMT_Command_10_Init()
 {
+	// This command only seems to care about the "S" byte being 0x30.
 	RPS.Reset();
 	PutStatusInBuffer();
 	return 6;
@@ -23,7 +24,7 @@ int CardIo::WMMT_Command_20_Get_Card_State()
 int CardIo::WMMT_Command_33_Read_Card()
 {
 	// Extra: 32 31 30
-	for (uint8_t i = 0; i < CARD_SIZE; i++) {
+	for (uint8_t i = 0; i < card_data->size(); i++) {
 		ResponseBuffer.push_back(card_data->at(i));
 	}
 
@@ -174,6 +175,7 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 		//case 0xD0: WMMT_Command_D0_UNK(); break;
 		default:
 			std::printf("CardIo::HandlePacket: Unhandled Command %02X", packet->at(0));
+			PutStatusInBuffer(); // Fail-safe.
 			std::cout << std::endl;
 			return;
 	}

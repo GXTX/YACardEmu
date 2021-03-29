@@ -31,18 +31,28 @@ private:
 	enum class ReaderStatus {
 		NoCard = 0x30,
 		HasCard = 0x31,
+		UNK_32 = 0x32,
+		UNK_33 = 0x33,
 		UNK_34 = 0x34,
 	};
 
 	enum class PrinterStatus {
 		Idle = 0x30,
 		Print = 0x31,
+		UNK_32 = 0x32,
+		UNK_33 = 0x33,
+		UNK_34 = 0x34,
+		UNK_35 = 0x35,
+		UNK_3A = 0x3A,
+		JAM = 0x3B,
 	};
 
 	enum class UNK_Status {
 		Idle = 0x30,
 		UNK_32 = 0x32, // Used during LoadCard, assumption is - reading.
+		UNK_33 = 0x33,
 		UKN_34 = 0x34, // Only seen in ReadCard if we don't have a card?
+		UNK_35 = 0x35,
 	};
 
 	typedef struct {

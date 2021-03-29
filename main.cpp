@@ -45,7 +45,7 @@ int main()
 		}
 
 		// TODO: Experiment with longer waits.
-		std::this_thread::sleep_for(std::chrono::microseconds(1000));
+		std::this_thread::sleep_for(std::chrono::microseconds(25000));
 	}
 
 	return 0;
