@@ -10,7 +10,7 @@ CardIo::CardIo()
 int CardIo::WMMT_Command_10_Init()
 {
 	// This command only seems to care about the "S" byte being 0x30.
-	RPS.Reset();
+	RPS.Status = UNK_Status::Idle;
 	PutStatusInBuffer();
 	return 6;
 }
@@ -157,7 +157,7 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 	ResponseBuffer.push_back(packet->at(0));
 
 	// At this point [0] should be our command, we've already processed the header in CardIo::ReceivePacket()
-	switch (packet->at(0)) {
+	switch (GetByte(packet)) {
 		case 0x10: WMMT_Command_10_Init(); break;
 		case 0x20: WMMT_Command_20_Get_Card_State(); break;
 		case 0x33: WMMT_Command_33_Read_Card(); break;
