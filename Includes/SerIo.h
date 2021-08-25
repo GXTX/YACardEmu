@@ -9,7 +9,7 @@
 class SerIo
 {
 public:
-	enum StatusCode {
+	enum class Status {
 		Okay,
 		Timeout,
 		ReadError,
@@ -17,16 +17,16 @@ public:
 		ZeroSizeError,
 	};
 
-	bool IsInitialized;
+	bool IsInitialized{};
 
-	SerIo(const std::string devicePath);
+	SerIo(const char *devicePath);
 	~SerIo();
 
-	SerIo::StatusCode Read(std::vector<uint8_t> *buffer);
-	SerIo::StatusCode Write(std::vector<uint8_t> *buffer);
+	SerIo::Status Read(std::vector<uint8_t> &buffer);
+	SerIo::Status Write(std::vector<uint8_t> &buffer);
 private:
-	sp_port *Port;
-	sp_port_config *PortConfig;
+	sp_port *Port{nullptr};
+	sp_port_config *PortConfig{nullptr};
 };
 
 #endif

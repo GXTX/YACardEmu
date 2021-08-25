@@ -18,8 +18,8 @@ public:
 	};
 
 	CardIo();
-	CardIo::StatusCode BuildPacket(std::vector<uint8_t> *buffer);
-	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> *buffer);
+	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &buffer);
+	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
 private:
 	const uint8_t START_OF_TEXT = 0x02;
 	const uint8_t END_OF_TEXT = 0x03;
@@ -69,11 +69,11 @@ private:
 
 	machine_status RPS;
 
-	uint8_t GetByte(std::vector<uint8_t> *buffer);
-	void HandlePacket(std::vector<uint8_t> *packet);
+	uint8_t GetByte(uint8_t **buffer);
+	void HandlePacket(std::vector<uint8_t> &packet);
 
 	const std::string card_name = "test.bin";
-	std::vector<uint8_t> *card_data;
+	std::vector<uint8_t>card_data{};
 
 	void LoadCardFromFS(std::string card_name);
 	void SaveCardToFS(std::string card_name);
@@ -85,7 +85,7 @@ private:
 	int WMMT_Command_20_Get_Card_State();
 	int WMMT_Command_33_Read_Card();
 	int WMMT_Command_40_Is_Card_Present();
-	int WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet);
+	int WMMT_Command_53_Write_Card(std::vector<uint8_t> &packet);
 	int WMMT_Command_73_UNK();
 	int WMMT_Command_78_UNK(); // Important;
 	int WMMT_Command_7A_UNK();
@@ -97,7 +97,8 @@ private:
 	int WMMT_Command_B0_Load_Card();
 	int WMMT_Command_D0_UNK();
 
-	std::vector<uint8_t> ResponseBuffer;	// Command Response
+	std::vector<uint8_t> ResponseBuffer{}; // Command Response
+	std::vector<uint8_t> ProcessedPacket{};
 };
 
 #endif

@@ -4,7 +4,8 @@
 
 CardIo::CardIo()
 {
-
+	ResponseBuffer.reserve(255);
+	ProcessedPacket.reserve(255);
 }
 
 int CardIo::WMMT_Command_10_Init()
@@ -24,9 +25,7 @@ int CardIo::WMMT_Command_20_Get_Card_State()
 int CardIo::WMMT_Command_33_Read_Card()
 {
 	// Extra: 32 31 30
-	for (uint8_t i = 0; i < card_data->size(); i++) {
-		ResponseBuffer.push_back(card_data->at(i));
-	}
+	std::copy(card_data.begin(), card_data.end(), std::back_inserter(ResponseBuffer));
 
 	return 0;
 }
@@ -38,7 +37,7 @@ int CardIo::WMMT_Command_40_Is_Card_Present()
 	return 6;
 }
 
-int CardIo::WMMT_Command_53_Write_Card(std::vector<uint8_t> *packet)
+int CardIo::WMMT_Command_53_Write_Card(std::vector<uint8_t> &packet)
 {
 /*
 Extra: 30 31 30 
@@ -49,8 +48,8 @@ Real data:
 00 00 00 00 00 00 00 00 00 00 77 48 44 05 00 00 47 
 */
 
-	for (uint8_t i = 0; i < packet->size(); i++) {
-		card_data->at(i) = packet->at(i);
+	for (uint8_t i = 0; i < packet.size(); i++) {
+		card_data.at(i) = packet.at(i);
 	}
 
 	SaveCardToFS(card_name);
@@ -115,44 +114,38 @@ void CardIo::PutStatusInBuffer()
 
 void CardIo::LoadCardFromFS(std::string card_name)
 {
+	constexpr const uintmax_t maxSizeCard = 0x45;
 	std::ifstream card;
 
-	if (std::filesystem::exists(card_name) && std::filesystem::file_size(card_name) == CARD_SIZE) {
+	if (std::filesystem::exists(card_name) && std::filesystem::file_size(card_name) == maxSizeCard) {
 		card.open(card_name, std::ifstream::in | std::ifstream::binary);
-		card.read(reinterpret_cast<char*>(card_data->data()), std::filesystem::file_size(card_name));
+		card.read(reinterpret_cast<char *>(&card_data[0]), std::filesystem::file_size(card_name));
 		card.close();
-	} else {
-		// TODO: If the card supplied is larger than 0x45 we might want to open a *new* card with a new name
-		// otherwise we might be overwriting the card data. Oops.
+		return;
 	}
+
+	// FIXME: Create a card if one doesn't exist.
 }
 
 void CardIo::SaveCardToFS(std::string card_name)
 {
 	std::ofstream card;
 
-	// TODO: Is there ever a time when the system would give us a zero sized card?
-	if (!card_data->empty()) {
+	if (!card_data.empty()) {
 		card.open(card_name, std::ofstream::out | std::ofstream::binary);
-		card.write(reinterpret_cast<char*>(card_data->data()), card_data->size());
+		card.write(reinterpret_cast<char *>(&card_data[0]), card_data.size());
 		card.close();
 	}
 } 
 
-uint8_t CardIo::GetByte(std::vector<uint8_t> *buffer)
-{
-	uint8_t value = buffer->at(0);
-	buffer->erase(buffer->begin());
-
-	return value;
-}
-
-void CardIo::HandlePacket(std::vector<uint8_t> *packet)
+void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
 	// We need to relay the command that we're replying to.
-	ResponseBuffer.push_back(packet->at(0));
+	ResponseBuffer.push_back(packet.at(0));
 
-	switch (GetByte(packet)) {
+	uint8_t *buf = &packet[0];
+
+	switch (GetByte(&buf)) {
 		case 0x10: WMMT_Command_10_Init(); break;
 		case 0x20: WMMT_Command_20_Get_Card_State(); break;
 		case 0x33: WMMT_Command_33_Read_Card(); break;
@@ -169,78 +162,93 @@ void CardIo::HandlePacket(std::vector<uint8_t> *packet)
 		case 0xB0: WMMT_Command_B0_Load_Card(); break;
 		//case 0xD0: WMMT_Command_D0_UNK(); break;
 		default:
-			std::printf("CardIo::HandlePacket: Unhandled Command %02X", packet->at(0));
-			PutStatusInBuffer(); // Fail-safe.
-			std::cout << std::endl;
+			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet.at(0));
+			PutStatusInBuffer(); // FIXME: We probably shouldn't reply at all.
 			return;
 	}
 }
 
-CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> *buffer)
+uint8_t CardIo::GetByte(uint8_t **buffer)
 {
+	uint8_t value = (*buffer)[0];
+	*buffer += 1;
+
+	return value;
+}
+
+CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
+{
+	if (buffer.empty()) {
+		return StatusCode::EmptyResponseError;
+	}
+
+	uint8_t *buf = &buffer[0];
+
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
 #endif
 
 	// First, read the sync byte
-	uint8_t sync = GetByte(buffer);
+	uint8_t sync = GetByte(&buf);
 	if (sync == ENQUIRY) {
 #ifdef DEBUG_CARD_PACKETS
-		std::cout << " ENQ" << std::endl;
+		std::cout << " ENQ\n";
 #endif
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
-		std::cerr << " Missing STX!" << std::endl;;
+#ifdef DEBUG_CARD_PACKETS
+		std::cerr << " Missing STX!\n";
+#endif
 		return SyncError;
 	} 
 
-	// TODO: Verify length.
-	uint8_t count = GetByte(buffer);
+	// FIXME: Verify length.
+	uint8_t count = GetByte(&buf) - 3; // -1 to ignore sum, -2 to ignore the 2 other bytes before this
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
 	uint8_t actual_checksum = count;
 
 	// Decode the payload data
-	std::vector<uint8_t> packet;
-	for (int i = 0; i < count - 1; i++) { // NOTE: -1 to avoid adding the checksum byte to the packet
-		uint8_t value = GetByte(buffer);
-		packet.push_back(value);
+	ProcessedPacket.clear();
+	for (int i = 0; i < count; i++) {
+		uint8_t value = GetByte(&buf);
+		ProcessedPacket.push_back(value);
 		actual_checksum ^= value;
 	}
 
 	// Read the checksum from the last byte
-	uint8_t packet_checksum = GetByte(buffer);
+	uint8_t packet_checksum = GetByte(&buf);
 
 	// Verify checksum - skip packet if invalid
 	if (packet_checksum != actual_checksum) {
 #ifdef DEBUG_CARD_PACKETS
-		std::cerr << " Checksum error!" << std::endl;
+		std::cerr << " Checksum error!\n";
 #endif
 		return ChecksumError;
 	}
 
 #ifdef DEBUG_CARD_PACKETS
-	for (size_t i = 0; i < packet.size() - 1; i++) {
-		std::printf(" %02X", packet.at(i));
+	for (const uint8_t n : ProcessedPacket) {
+		std::printf(" %02X", n);
 	}
-	std::cout << std::endl;
+	std::cout << "\n";
 #endif
 
 	// Clear out ResponseBuffer before fully processing the packet.
 	ResponseBuffer.clear();
 
-	HandlePacket(&packet);
+	HandlePacket(ProcessedPacket);
 
 	// Put the ACK into the buffer, code above sends this to the server.
-	if (!buffer->empty()) {
-		buffer->clear();
+	if (!buffer.empty()) {
+		buffer.clear();
 	}
-	buffer->push_back(ACK);
+	buffer.push_back(ACK);
 
 	return Okay;
 }
 
-CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
+CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &buffer)
 {
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::BuildPacket:";
@@ -249,7 +257,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	// Should not happen?
 	if (ResponseBuffer.empty()) {
 #ifdef DEBUG_CARD_PACKETS
-		std::cout << " Empty response???" << std::endl;
+		std::cout << " Empty response.\n";
 #endif
 		return EmptyResponseError;
 	}
@@ -257,36 +265,36 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> *buffer)
 	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
 
 	// Ensure our buffer is empty.
-	if (!buffer->empty()) {
-		buffer->clear();
+	if (!buffer.empty()) {
+		buffer.clear();
 	}
 
 	// Send the header bytes
-	buffer->insert(buffer->begin(), START_OF_TEXT);
-	buffer->insert(buffer->begin() + 1, count);
+	buffer.emplace_back(START_OF_TEXT);
+	buffer.emplace_back(count);
 
 	// Calculate the checksum
 	uint8_t packet_checksum = count;
 
 	// Encode the payload data
-	for (uint8_t i = 0; i < ResponseBuffer.size(); i++) {
-		buffer->push_back(ResponseBuffer.at(i));
-		packet_checksum ^= ResponseBuffer.at(i);
+	for (const uint8_t n : ResponseBuffer) {
+		buffer.emplace_back(n);
+		packet_checksum ^= n;
 	}
 
-	buffer->push_back(END_OF_TEXT);
+	buffer.emplace_back(END_OF_TEXT);
 	packet_checksum ^= END_OF_TEXT;
 
 	// Write the checksum to the last byte
-	buffer->push_back(packet_checksum);
+	buffer.emplace_back(packet_checksum);
 
 	ResponseBuffer.clear();
 
 #ifdef DEBUG_CARD_PACKETS
-	for (uint8_t i = 0; i < buffer->size(); i++) {
-		std::printf(" %02X", buffer->at(i));
+	for (const uint8_t n : buffer) {
+		std::printf(" %02X", n);
 	}
-	std::cout << std::endl;
+	std::cout << "\n";
 #endif
 
 	return Okay;

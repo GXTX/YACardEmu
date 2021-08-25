@@ -1,8 +1,8 @@
 #include "SerIo.h"
 
-#define DEBUG_SERIAL 1
+//#define DEBUG_SERIAL
 
-SerIo::SerIo(const std::string devicePath)
+SerIo::SerIo(const char *devicePath)
 {
 	sp_new_config(&PortConfig);
 	sp_set_config_baudrate(PortConfig, 9600);
@@ -11,16 +11,16 @@ SerIo::SerIo(const std::string devicePath)
 	sp_set_config_stopbits(PortConfig, 1);
 	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
 
-	sp_get_port_by_name(devicePath.c_str(), &Port);
+	sp_get_port_by_name(devicePath, &Port);
 
 	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
 
-	if (ret == SP_OK) {
-		IsInitialized = true;
-		sp_set_config(Port, PortConfig);
-	} else {
+	if (ret != SP_OK) {
+		std::cerr << "SerIo::Init: Failed to open " << devicePath << "\n";
 		IsInitialized = false;
-		std::cerr << "SerIo::Init: Failed to open the port!\n";
+	} else {
+		sp_set_config(Port, PortConfig);
+		IsInitialized = true;
 	}
 }
 
@@ -29,59 +29,58 @@ SerIo::~SerIo()
 	sp_close(Port);
 }
 
-SerIo::StatusCode SerIo::Write(std::vector<uint8_t> *buffer)
+SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 {
+	if (buffer.empty()) {
+		return Status::ZeroSizeError;
+	}
+
 #ifdef DEBUG_SERIAL
 	std::cout << "SerIo::Write:";
-	for(uint8_t i = 0; i < buffer->size(); i++) {
-		std::printf(" %02X", buffer->at(i));
+	for (uint8_t c : buffer) {
+		std::printf(" %02X", c);
 	}
-	std::cout << std::endl;
+	std::cout << "\n";
 #endif
 
-	if (buffer->size() == 0) {
-		return ZeroSizeError;
-	}
+	int ret = sp_nonblocking_write(Port, &buffer[0], buffer.size());
 
-	int ret = sp_nonblocking_write(Port, buffer->data(), buffer->size());
-
+	// TODO: Should we care about write errors?
 	if (ret <= 0) {
-		return WriteError;
-	} else if (ret != (int)buffer->size()) {
+		return Status::WriteError;
+	} else if (ret != static_cast<int>(buffer.size())) {
 #ifdef DEBUG_SERIAL
-		std::printf("SerIo::Write: Only wrote %02X of %02X to the port!\n", ret, (int)buffer->size());
+		std::cerr << "SerIo::Write: Only wrote " << std::hex << ret << " of " << std::hex << static_cast<int>(buffer.size()) << " to the port!\n";
 #endif
-		return WriteError;
+		return Status::WriteError;
 	}
 
-	return Okay;
+	return Status::Okay;
 }
 
-SerIo::StatusCode SerIo::Read(std::vector<uint8_t> *buffer)
+SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 {
 	int bytes = sp_input_waiting(Port);
 
-	if (bytes == 0) {
-		return ZeroSizeError;
-	} else if (bytes < 0) {
-		return ReadError;
+	if (bytes <= 4) { // FIXME: Dirty hack, smallest size packet is 5 bytes
+		return Status::ReadError;
 	}
 
-	buffer->resize(bytes);
+	buffer.resize(static_cast<size_t>(bytes));
 
-	int ret = sp_nonblocking_read(Port, buffer->data(), buffer->size());
+	int ret = sp_nonblocking_read(Port, &buffer[0], buffer.size());
 
 	if (ret <= 0) {
-		return ReadError;
+		return Status::ReadError;
 	}
 
 #ifdef DEBUG_SERIAL
 	std::cout << "SerIo::Read:";
-	for (size_t i = 0; i < buffer->size(); i++) {
-		std::printf(" %02X", buffer->at(i));
+	for (uint8_t c : buffer) {
+		std::printf(" %02X", c);
 	}
-	std::cout << std::endl;
+	std::cout << "\n";
 #endif
 
-	return Okay;
+	return Status::Okay;
 }
