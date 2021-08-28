@@ -16,13 +16,13 @@ int CardIo::WMMT_Command_10_Init()
 	return 6;
 }
 
-int CardIo::WMMT_Command_20_Get_Card_State()
+int CardIo::WMMT_Command_20_GetStatus()
 {
 	PutStatusInBuffer();
 	return 0;
 }
 
-int CardIo::WMMT_Command_33_Read_Card()
+int CardIo::WMMT_Command_33_Read()
 {
 	// Extra: 32 31 30
 	std::copy(card_data.begin(), card_data.end(), std::back_inserter(ResponseBuffer));
@@ -30,14 +30,14 @@ int CardIo::WMMT_Command_33_Read_Card()
 	return 0;
 }
 
-int CardIo::WMMT_Command_40_Is_Card_Present()
+int CardIo::WMMT_Command_40_Cancel()
 {
 	RPS.Reset();
 	PutStatusInBuffer();
 	return 6;
 }
 
-int CardIo::WMMT_Command_53_Write_Card(std::vector<uint8_t> &packet)
+int CardIo::WMMT_Command_53_Write()
 {
 /*
 Extra: 30 31 30 
@@ -48,23 +48,23 @@ Real data:
 00 00 00 00 00 00 00 00 00 00 77 48 44 05 00 00 47 
 */
 
-	for (uint8_t i = 0; i < packet.size(); i++) {
-		card_data.at(i) = packet.at(i);
-	}
+	//for (uint8_t i = 0; i < packet.size(); i++) {
+	//	card_data.at(i) = packet.at(i);
+	//}
 
 	SaveCardToFS(card_name);
 
 	return 0;
 }
 
-int CardIo::WMMT_Command_78_UNK()
+int CardIo::WMMT_Command_78_PrintSetting()
 {
-	// Extra: 37 31 34 30 30 30
+	// Extra: 37 31 (var: 30/33/34) 30 30 30
 	PutStatusInBuffer();
 	return 1;
 }
 
-int CardIo::WMMT_Command_7C_Write_Card_Text()
+int CardIo::WMMT_Command_7C_String()
 {
 /*
 Extra: 30 30
@@ -82,13 +82,13 @@ Encoding is SHIFT-JIS, SOH is start of line, DC1 BOLD AND BIG, DC4 TINY
 	return 1;
 }
 
-int CardIo::WMMT_Command_7D_UNK()
+int CardIo::WMMT_Command_7D_Erase()
 {
 	// Extra: 01 17
 	return 1;
 }
 
-int CardIo::WMMT_Command_B0_Load_Card()
+int CardIo::WMMT_Command_B0_GetCard()
 {
 	// Extra: 31
 
@@ -147,23 +147,21 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 
 	switch (GetByte(&buf)) {
 		case 0x10: WMMT_Command_10_Init(); break;
-		case 0x20: WMMT_Command_20_Get_Card_State(); break;
-		case 0x33: WMMT_Command_33_Read_Card(); break;
-		case 0x40: WMMT_Command_40_Is_Card_Present(); break;
-		case 0x53: WMMT_Command_53_Write_Card(packet); break;
-		//case 0x73: WMMT_Command_73_UNK(); break;
-		case 0x78: WMMT_Command_78_UNK(); break;
-		//case 0x7A: WMMT_Command_7A_UNK(); break;
-		//case 0x7B: WMMT_Command_7B_UNK(); break;
-		//case 0x7C: WMMT_Command_7C_UNK(); break;
-		//case 0x7D: WMMT_Command_7D_UNK(); break;
-		//case 0x80: WMMT_Command_80_UNK(); break;
-		//case 0xA0: WMMT_Command_A0_Clean_Card(); break;
-		case 0xB0: WMMT_Command_B0_Load_Card(); break;
-		//case 0xD0: WMMT_Command_D0_UNK(); break;
+		case 0x20: WMMT_Command_20_GetStatus(); break;
+		case 0x33: WMMT_Command_33_Read(); break;
+		case 0x40: WMMT_Command_40_Cancel(); break;
+		case 0x53: WMMT_Command_53_Write(); break;
+		case 0x78: WMMT_Command_78_PrintSetting(); break;
+		//case 0x7A: WMMT_Command_7A_ExtraCharacter(); break;
+		case 0x7C: WMMT_Command_7C_String(); break;
+		case 0x7D: WMMT_Command_7D_Erase(); break;
+		//case 0x80: WMMT_Command_80_Eject(); break;
+		//case 0xA0: WMMT_Command_A0_Clean(); break;
+		case 0xB0: WMMT_Command_B0_GetCard(); break;
+		//case 0xF5: WMMT_Command_F5_BatteryCheck(); break; // Not used in WMMT2
 		default:
 			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet.at(0));
-			PutStatusInBuffer(); // FIXME: We probably shouldn't reply at all.
+			//PutStatusInBuffer(); // FIXME: We probably shouldn't reply at all.
 			return;
 	}
 }

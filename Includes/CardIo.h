@@ -28,6 +28,35 @@ private:
 
 	const uint8_t CARD_SIZE = 0x45;
 
+	// RPS is really 3 bitmasks
+
+	// R: 
+	enum class ResultStatus {
+		UNK_30 = 0x30,
+		UNK_31 = 0x31,
+		UNK_32 = 0x32,
+		UNK_33 = 0x33,
+		UNK_34 = 0x34,
+	};
+
+	enum class MechanismStatus {
+		UNK_30 = 0x30,
+		UNK_31 = 0x31,
+		UNK_32 = 0x32,
+		UNK_33 = 0x33,
+		UNK_34 = 0x34,
+		UNK_35 = 0x35,
+		UNK_3A = 0x3A,
+		JAM = 0x3B, // We know this is a jam from WMMT
+	};
+
+
+
+
+
+
+
+
 	enum class ReaderStatus {
 		NoCard = 0x30,
 		HasCard = 0x31,
@@ -82,20 +111,18 @@ private:
 
 	// Commands
 	int WMMT_Command_10_Init();
-	int WMMT_Command_20_Get_Card_State();
-	int WMMT_Command_33_Read_Card();
-	int WMMT_Command_40_Is_Card_Present();
-	int WMMT_Command_53_Write_Card(std::vector<uint8_t> &packet);
-	int WMMT_Command_73_UNK();
-	int WMMT_Command_78_UNK(); // Important;
-	int WMMT_Command_7A_UNK();
-	int WMMT_Command_7B_UNK(); // card inserted?
-	int WMMT_Command_7C_Write_Card_Text();
-	int WMMT_Command_7D_UNK();
-	int WMMT_Command_80_Eject_Card();
-	int WMMT_Command_A0_Clean_Card();
-	int WMMT_Command_B0_Load_Card();
-	int WMMT_Command_D0_UNK();
+	int WMMT_Command_20_GetStatus();
+	int WMMT_Command_33_Read();
+	int WMMT_Command_40_Cancel();
+	int WMMT_Command_53_Write(); // Write the mag strip
+	int WMMT_Command_78_PrintSetting();
+	int WMMT_Command_7A_ExtraCharacter();
+	int WMMT_Command_7C_String(); // Write the text on the card
+	int WMMT_Command_7D_Erase();
+	int WMMT_Command_80_Eject();
+	int WMMT_Command_A0_Clean(); // Clean print head
+	int WMMT_Command_B0_GetCard();
+	//int WMMT_Command_F5_BatteryCheck(); // Not used in WMMT2
 
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 	std::vector<uint8_t> ProcessedPacket{};
