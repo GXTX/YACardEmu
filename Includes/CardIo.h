@@ -28,32 +28,42 @@ private:
 
 	const uint8_t CARD_SIZE = 0x45;
 
-	// RPS is really 3 bitmasks
-
-	// R: 
-	enum class ResultStatus {
-		UNK_30 = 0x30,
-		UNK_31 = 0x31,
-		UNK_32 = 0x32,
-		UNK_33 = 0x33,
-		UNK_34 = 0x34,
+	// Status bytes:
+	//////////////////////////////////////////////
+	enum class R {
+		NO_CARD       = 0x30,
+		HAS_CARD      = 0x31,
+		UNK_32        = 0x32,
+		UNK_33        = 0x33,
+		EJECTING_CARD = 0x34,
 	};
 
-	enum class MechanismStatus {
-		UNK_30 = 0x30,
-		UNK_31 = 0x31,
-		UNK_32 = 0x32,
-		UNK_33 = 0x33,
+	// This seems wrong?
+	enum class P {
+		NO_ERR = 0x30,
+		READ_ERR = 0x31, // ?
+		WRITE_ERR = 0x32,
+		BLOCK_ERR = 0x33, // ?
 		UNK_34 = 0x34,
-		UNK_35 = 0x35,
-		UNK_3A = 0x3A,
-		JAM = 0x3B, // We know this is a jam from WMMT
+		PRINT_ERR = 0x35,
+		UNK_36 = 0x36,
+		UKN_37 = 0x37,
+		ILLEGAL_ERR = 0x38,
+		UNK_39 = 0x39,
+		BATTERY_ERR = 0x40,
+		SYSTEM_ERR = 0x41,
+		//UNK_51,52,53,54,55
 	};
 
-
-
-
-
+	enum class S {
+		JOB_END         = 0x30,
+		UNK_31          = 0x31,
+		UNKNOWN_COMMAND = 0x32,
+		UNK_33          = 0x33, // Running?
+		UNK_34          = 0x34,
+		DISPENSER_EMPTY = 0x35,
+	};
+	//////////////////////////////////////////////
 
 
 
