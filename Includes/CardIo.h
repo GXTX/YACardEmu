@@ -18,25 +18,25 @@ enum class R {
 
 // This seems wrong?
 enum class P {
-	NO_ERR = 0x30,
-	READ_ERR = 0x31, // ?
-	WRITE_ERR = 0x32,
-	BLOCK_ERR = 0x33, // ?
-	UNK_34 = 0x34,
-	PRINT_ERR = 0x35,
-	UNK_36 = 0x36,
-	UKN_37 = 0x37,
+	NO_ERR      = 0x30,
+	READ_ERR    = 0x31, // ?
+	WRITE_ERR   = 0x32,
+	BLOCK_ERR   = 0x33, // ?
+	UNK_34      = 0x34,
+	PRINT_ERR   = 0x35,
+	UNK_36      = 0x36,
+	UKN_37      = 0x37,
 	ILLEGAL_ERR = 0x38,
-	UNK_39 = 0x39,
+	UNK_39      = 0x39,
 	BATTERY_ERR = 0x40,
-	SYSTEM_ERR = 0x41,
+	SYSTEM_ERR  = 0x41,
 	//UNK_51,52,53,54,55
 };
 
 enum class S {
 	NO_JOB          = 0x30, // JOB_END
 	UNK_31          = 0x31,
-	UNKNOWN_COMMAND = 0x32,
+	UNKNOWN_COMMAND = 0x32, // Is this correct?
 	UNK_33          = 0x33, // Running?
 	UNK_34          = 0x34,
 	DISPENSER_EMPTY = 0x35,
@@ -61,6 +61,7 @@ class CardIo
 public:
 	enum StatusCode {
 		Okay,
+		SizeError,
 		SyncError,
 		ChecksumError,
 		EmptyResponseError,
@@ -70,6 +71,9 @@ public:
 	CardIo();
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
+	
+	void LoadCardFromFS();
+	void SaveCardToFS();
 private:
 	const uint8_t START_OF_TEXT = 0x02;
 	const uint8_t END_OF_TEXT = 0x03;
@@ -81,12 +85,9 @@ private:
 	uint8_t GetByte(std::vector<uint8_t> &buffer);
 	void HandlePacket(std::vector<uint8_t> &packet);
 
-	const std::string cardName = "test.bin";
+	const std::string cardName = "card.bin";
 	std::vector<uint8_t>cardData{};
 	std::vector<uint8_t>backupCardData{}; // Filled with the data when we first loaded the card.
-
-	void LoadCardFromFS();
-	void SaveCardToFS();
 
 	void PutStatusInBuffer();
 
@@ -114,19 +115,19 @@ private:
 	void WMMT_Command_53_Write(std::vector<uint8_t> &packet); // Write the mag strip
 	void WMMT_Command_78_PrintSetting();
 	void WMMT_Command_7A_ExtraCharacter();
-	void WMMT_Command_7C_String(); // Write the text on the card
+	void WMMT_Command_7C_String(std::vector<uint8_t> &packet); // Write the text on the card
 	void WMMT_Command_7D_Erase();
 	void WMMT_Command_80_Eject();
 	void WMMT_Command_A0_Clean(); // Clean print head
 	void WMMT_Command_B0_GetCard();
 	//int WMMT_Command_F5_BatteryCheck(); // Not used in WMMT2
 
-
+	bool insertedCard{false};
+	bool multiActionCommand{false};
 	Commands currentCommand{Commands::NoCommand};
 	Status RPS;
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 	std::vector<uint8_t> ProcessedPacket{};
-
 };
 
 #endif

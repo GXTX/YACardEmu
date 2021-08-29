@@ -1,6 +1,6 @@
 #include "SerIo.h"
 
-//#define DEBUG_SERIAL
+#define DEBUG_SERIAL
 
 SerIo::SerIo(const char *devicePath)
 {
@@ -43,7 +43,7 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 	std::cout << "\n";
 #endif
 
-	int ret = sp_nonblocking_write(Port, &buffer[0], buffer.size());
+	int ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
 
 	// TODO: Should we care about write errors?
 	if (ret <= 0) {
@@ -62,7 +62,7 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 {
 	int bytes = sp_input_waiting(Port);
 
-	if (bytes <= 4) { // FIXME: Dirty hack, smallest size packet is 5 bytes
+	if (bytes < 1) { // FIXME: Dirty hack, smallest size packet is 1
 		return Status::ReadError;
 	}
 

@@ -23,17 +23,24 @@ void CardIo::WMMT_Command_20_GetStatus()
 
 void CardIo::WMMT_Command_33_Read()
 {
-	// NOTE: We may need to update a status if we receive this command and we don't have a card.
+	// TODO: What do we do if we get this command and there's no card? Set a read error?
 
 	// Extra: 32 31 30
-	std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
+	if (insertedCard) {
+		std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
+	} else {
+		RPS.s = S::UNK_34;
+	}
+
 	return;
 }
 
 void CardIo::WMMT_Command_40_Cancel()
 {
 	// TODO: Does cancel eject the card or just stops the current job?
-	RPS.Reset();
+	//RPS.Reset();
+	RPS.p = P::NO_ERR;
+	RPS.s = S::NO_JOB;
 	return;
 }
 
@@ -45,6 +52,14 @@ void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
 		cardData.at(i) = packet[i];
 	}
 
+#ifdef DEBUG_CARD_PACKETS
+	std::cout << "CardIo::WMMT_Command_53_Write: ";
+	for (const uint8_t n : packet) {
+		std::printf(" %X", n);
+	}
+	std::cout << "\n";
+#endif
+
 	SaveCardToFS();
 	return;
 }
@@ -55,9 +70,17 @@ void CardIo::WMMT_Command_78_PrintSetting()
 	return;
 }
 
-void CardIo::WMMT_Command_7C_String()
+void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
 {
 	// Extra: 30 30
+#ifdef DEBUG_CARD_PACKETS
+	std::cout << "CardIo::WMMT_Command_7C_String: ";
+	for (const uint8_t n : packet) {
+		std::printf(" %X", n);
+	}
+	std::cout << "\n";
+#endif
+
 	return;
 }
 
@@ -69,44 +92,71 @@ void CardIo::WMMT_Command_7D_Erase()
 	return;
 }
 
+void CardIo::WMMT_Command_80_Eject()
+{
+	//RPS.r = R::EJECTING_CARD;
+	RPS.r = R::NO_CARD;
+	//RPS.r = R::HAS_CARD;
+	//RPS.s = S::UNKNOWN_COMMAND;
+	insertedCard = false;
+	return;
+}
+
 void CardIo::WMMT_Command_B0_GetCard()
 {
 	// Extra: 31
 
-	if (RPS.r == R::NO_CARD) {
-		RPS.r = R::HAS_CARD;
-	} else if (RPS.r == R::HAS_CARD) {
-		//RPS.Status = UNK_Status::UNK_32;
+	if (insertedCard) {
+		// What do we do if we have a card in the tray already?
+		RPS.s = S::UNKNOWN_COMMAND; // FIXME:
+	} else {
+		RPS.r = R::HAS_CARD; // Is there a status for 'dispensing card'?
+		insertedCard = true;
 	}
 
-	//PutStatusInBuffer();
-
-	RPS.s = S::NO_JOB;
 	return;
 }
 
 void CardIo::PutStatusInBuffer()
 {
-	ResponseBuffer.push_back(static_cast<uint8_t>(RPS.r));
-	ResponseBuffer.push_back(static_cast<uint8_t>(RPS.p));
-	ResponseBuffer.push_back(static_cast<uint8_t>(RPS.s));
+	ResponseBuffer.insert(ResponseBuffer.begin(), static_cast<uint8_t>(currentCommand));
+	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(RPS.r));
+	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(RPS.p));
+	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(RPS.s));
+
+	if (insertedCard) {
+		RPS.r = R::HAS_CARD;
+	}
+
+	if (!multiActionCommand) {
+		RPS.p = P::NO_ERR;
+		RPS.s = S::NO_JOB;
+	}
 }
 
 void CardIo::LoadCardFromFS()
 {
 	constexpr const uintmax_t maxSizeCard = 0x45;
-	std::ifstream card;
+	std::ifstream card(cardName.c_str(), std::ifstream::in | std::ifstream::binary | std::ifstream::ate);
 
-	std::string readBack;
-	readBack.reserve(CARD_SIZE+1);
+	std::string readBack(CARD_SIZE, 0);
 
-	if (std::filesystem::exists(cardName) && std::filesystem::file_size(cardName) == maxSizeCard) {
-		card.open(cardName, std::ifstream::in | std::ifstream::binary);
-		card.read(&readBack[0], std::filesystem::file_size(cardName));
+	int size = 0;
+
+	if (card.good() && card.tellg() == maxSizeCard) {
+		size = card.tellg();
+		card.seekg(std::ifstream::beg);
+		card.read(&readBack[0], size);
 		card.close();
 		std::copy(readBack.begin(), readBack.end(), std::back_inserter(cardData));
 		std::copy(readBack.begin(), readBack.end(), std::back_inserter(backupCardData));
 	}
+
+	//std::printf("HERE, %d\n", size);
+	//std::filesystem::file_size(cardName)
+	//for (const char c : readBack) {
+	//	std::printf(" %c", c);
+	//}
 
 	// FIXME: Create a card if one doesn't exist.
 	return;
@@ -131,28 +181,25 @@ void CardIo::SaveCardToFS()
 
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
-	// We need to relay the command that we're replying to.
-	ResponseBuffer.push_back(packet[0]);
-
 	currentCommand = static_cast<Commands>(GetByte(packet));
 
 	switch (static_cast<uint8_t>(currentCommand)) {
-		case 0x10: WMMT_Command_10_Init(); break;
-		case 0x20: WMMT_Command_20_GetStatus(); break;
-		case 0x33: WMMT_Command_33_Read(); break;
-		case 0x40: WMMT_Command_40_Cancel(); break;
-		case 0x53: WMMT_Command_53_Write(packet); break;
-		case 0x78: WMMT_Command_78_PrintSetting(); break;
-		//case 0x7A: WMMT_Command_7A_ExtraCharacter(); break;
-		case 0x7C: WMMT_Command_7C_String(); break;
-		case 0x7D: WMMT_Command_7D_Erase(); break;
-		//case 0x80: WMMT_Command_80_Eject(); break;
-		//case 0xA0: WMMT_Command_A0_Clean(); break;
-		case 0xB0: WMMT_Command_B0_GetCard(); break;
-		//case 0xF5: WMMT_Command_F5_BatteryCheck(); break; // Not used in WMMT2
+		case 0x10: WMMT_Command_10_Init(); return;
+		case 0x20: WMMT_Command_20_GetStatus(); return;
+		case 0x33: WMMT_Command_33_Read(); return;
+		case 0x40: WMMT_Command_40_Cancel(); return;
+		case 0x53: WMMT_Command_53_Write(packet); return;
+		case 0x78: WMMT_Command_78_PrintSetting(); return;
+		//case 0x7A: WMMT_Command_7A_ExtraCharacter(); return;
+		case 0x7C: WMMT_Command_7C_String(packet); return;
+		case 0x7D: WMMT_Command_7D_Erase(); return;
+		case 0x80: WMMT_Command_80_Eject(); return;
+		//case 0xA0: WMMT_Command_A0_Clean(); return;
+		case 0xB0: WMMT_Command_B0_GetCard(); return;
+		//case 0xF5: WMMT_Command_F5_BatteryCheck(); return; // WMMT3 specific?
 		default:
-			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet.at(0));
-			//PutStatusInBuffer(); // FIXME: We probably shouldn't reply at all.
+			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet[0]);
+			RPS.s = S::UNKNOWN_COMMAND;
 			return;
 	}
 }
@@ -189,15 +236,17 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 		return SyncError;
 	} 
 
-	// FIXME: Verify length.
-	uint8_t count = GetByte(buffer) - 1; // -1 to ignore sum
+	uint8_t count = GetByte(buffer);
+	if (count != buffer.size() - 1) {
+		return SizeError;
+	}
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
 	uint8_t actual_checksum = count;
 
 	// Decode the payload data
 	ProcessedPacket.clear();
-	for (int i = 0; i < count; i++) {
+	for (int i = 0; i < count - 1; i++) { // NOTE: -1 to ignore sum byte.
 		uint8_t value = GetByte(buffer);
 		ProcessedPacket.push_back(value);
 		actual_checksum ^= value;
@@ -211,7 +260,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 #ifdef DEBUG_CARD_PACKETS
 		std::cerr << " Checksum error!\n";
 #endif
-		return ChecksumError;
+		//return ChecksumError;
 	}
 
 #ifdef DEBUG_CARD_PACKETS
@@ -241,17 +290,11 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &buffer)
 	std::cout << "CardIo::BuildPacket:";
 #endif
 
-	// Should not happen?
-	if (ResponseBuffer.empty()) {
-#ifdef DEBUG_CARD_PACKETS
-		std::cout << " Empty response.\n";
-#endif
-		return EmptyResponseError;
-	}
+	PutStatusInBuffer();
 
-	uint8_t count = (ResponseBuffer.size() + 1) & 0xFF;
+	uint8_t count = (ResponseBuffer.size() + 2) & 0xFF; // FIXME: +2 why?
 
-	// Ensure our buffer is empty.
+	// Ensure our outgoing buffer is empty.
 	if (!buffer.empty()) {
 		buffer.clear();
 	}

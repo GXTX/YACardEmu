@@ -1,16 +1,31 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <atomic>
+#include <csignal>
 
 #include "CardIo.h"
 #include "SerIo.h"
 
-static const std::string serialName = "/dev/ttyS0";
+static const std::string serialName = "/dev/ttyUSB1";
 
-constexpr const auto delay = std::chrono::milliseconds(250);
+constexpr const auto delay = std::chrono::microseconds(500);
+
+std::atomic<bool> running{true};
+
+void sig_handle(int sig)
+{
+	if (sig == SIGINT || sig == SIGTERM) {
+		running = false;
+	}
+}
 
 int main()
 {
+	// Handle quitting gracefully via signals
+	std::signal(SIGINT, sig_handle);
+	std::signal(SIGTERM, sig_handle);
+
 	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>());
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName.c_str()));
@@ -24,7 +39,9 @@ int main()
 	std::vector<uint8_t> SerialBuffer;
 	std::vector<uint8_t> OutgoingBuffer;
 
-	while (true) {
+	CardHandler->LoadCardFromFS();
+
+	while (running) {
 		if (!SerialBuffer.empty()) {
 			SerialBuffer.clear();
 		}
@@ -42,8 +59,10 @@ int main()
 			
 			// ReceivePacket should've cleared out this buffer and appended ACK to it.
 			SerialHandler->Write(SerialBuffer);
+			std::this_thread::sleep_for(delay);
+			SerialHandler->Write(OutgoingBuffer);
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
-			// Our reply should've already been generated in BuildPacket();
+			// Our reply should've already been generated in BuildPacket(); as part of a multi-response command.
 			SerialHandler->Write(OutgoingBuffer);
 		}
 
