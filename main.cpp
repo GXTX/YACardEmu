@@ -59,8 +59,8 @@ int main()
 			
 			// ReceivePacket should've cleared out this buffer and appended ACK to it.
 			SerialHandler->Write(SerialBuffer);
-			std::this_thread::sleep_for(delay);
-			SerialHandler->Write(OutgoingBuffer);
+			std::this_thread::sleep_for(delay / 2);
+			//SerialHandler->Write(OutgoingBuffer);
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Our reply should've already been generated in BuildPacket(); as part of a multi-response command.
 			SerialHandler->Write(OutgoingBuffer);

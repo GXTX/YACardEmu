@@ -80,9 +80,9 @@ private:
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
 
-	const uint8_t CARD_SIZE = 0x45;
+	const uint8_t CARD_SIZE = 0x46;
 
-	uint8_t GetByte(std::vector<uint8_t> &buffer);
+	uint8_t GetByte(uint8_t **buffer);
 	void HandlePacket(std::vector<uint8_t> &packet);
 
 	const std::string cardName = "card.bin";
@@ -122,10 +122,12 @@ private:
 	void WMMT_Command_B0_GetCard();
 	//int WMMT_Command_F5_BatteryCheck(); // Not used in WMMT2
 
+	Status RPS;
 	bool insertedCard{false};
 	bool multiActionCommand{false};
+	bool waitingForMoreData{false};
 	Commands currentCommand{Commands::NoCommand};
-	Status RPS;
+	std::vector<uint8_t> ReceiveBuffer{};
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 	std::vector<uint8_t> ProcessedPacket{};
 };

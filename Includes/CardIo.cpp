@@ -46,15 +46,14 @@ void CardIo::WMMT_Command_40_Cancel()
 
 void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
 {
-	// Extra: 30 31 30 
-
-	for (size_t i = 0; i != packet.size(); i++) {
-		cardData.at(i) = packet[i];
+	// Extra: 30 31 30
+	for (size_t i = 0; i != packet.size() - 3; i++) {
+		cardData.at(i) = packet[i+3];
 	}
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::WMMT_Command_53_Write: ";
-	for (const uint8_t n : packet) {
+	for (const uint8_t n : cardData) {
 		std::printf(" %X", n);
 	}
 	std::cout << "\n";
@@ -181,7 +180,12 @@ void CardIo::SaveCardToFS()
 
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
-	currentCommand = static_cast<Commands>(GetByte(packet));
+	currentCommand = static_cast<Commands>(packet[0]);
+
+	// This removes the current command and the master's RPS bytes.
+	for (uint8_t i = 0; i != 4; i++) {
+		packet.erase(packet.begin());
+	}
 
 	switch (static_cast<uint8_t>(currentCommand)) {
 		case 0x10: WMMT_Command_10_Init(); return;
@@ -204,30 +208,34 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 	}
 }
 
-uint8_t CardIo::GetByte(std::vector<uint8_t> &buffer)
+uint8_t CardIo::GetByte(uint8_t **buffer)
 {
-	uint8_t value = buffer[0];
-	buffer.erase(buffer.begin());
+	uint8_t value = (*buffer)[0];
+	*buffer += 1;
 
 	return value;
 }
 
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 {
-	if (buffer.empty()) {
-		return StatusCode::EmptyResponseError;
-	}
+	uint8_t count{};
+	uint8_t actual_checksum{};
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
 #endif
 
+	std::copy(buffer.begin(), buffer.end(), std::back_inserter(ReceiveBuffer));
+
+	uint8_t *buf = &ReceiveBuffer[0];
+
 	// First, read the sync byte
-	uint8_t sync = GetByte(buffer);
+	uint8_t sync = GetByte(&buf);
 	if (sync == ENQUIRY) {
 #ifdef DEBUG_CARD_PACKETS
 		std::cout << " ENQ\n";
 #endif
+		ReceiveBuffer.clear(); // We don't need this anymore, empty it out.
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
 #ifdef DEBUG_CARD_PACKETS
@@ -236,31 +244,39 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 		return SyncError;
 	} 
 
-	uint8_t count = GetByte(buffer);
-	if (count != buffer.size() - 1) {
+	// FIXME: Can still get odd results.
+	count = GetByte(&buf);
+	if (count > ReceiveBuffer.size() - 1) {
+		//waitingForMoreData = true;
+#ifdef DEBUG_CARD_PACKETS
+		std::cout << " Waiting for more data\n";
+#endif
 		return SizeError;
 	}
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
-	uint8_t actual_checksum = count;
+	actual_checksum = count;
 
 	// Decode the payload data
 	ProcessedPacket.clear();
-	for (int i = 0; i < count - 1; i++) { // NOTE: -1 to ignore sum byte.
-		uint8_t value = GetByte(buffer);
+	for (int i = 0; i < count - 1; i++) { // NOTE: -1 to ignore sum byte
+		uint8_t value = GetByte(&buf);
 		ProcessedPacket.push_back(value);
 		actual_checksum ^= value;
 	}
 
 	// Read the checksum from the last byte
-	uint8_t packet_checksum = GetByte(buffer);
+	uint8_t packet_checksum = GetByte(&buf);
+
+	ProcessedPacket.pop_back(); // Remove the END_OF_TEXT
+	ReceiveBuffer.clear(); // We've processed enough, we can clear the receive buffer now.
 
 	// Verify checksum - skip packet if invalid
 	if (packet_checksum != actual_checksum) {
 #ifdef DEBUG_CARD_PACKETS
 		std::cerr << " Checksum error!\n";
 #endif
-		//return ChecksumError;
+		return ChecksumError;
 	}
 
 #ifdef DEBUG_CARD_PACKETS
