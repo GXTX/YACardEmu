@@ -47,19 +47,21 @@ void CardIo::WMMT_Command_40_Cancel()
 void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
 {
 	// Extra: 30 31 30
+	cardData.clear();
 	for (size_t i = 0; i != packet.size() - 3; i++) {
-		cardData.at(i) = packet[i+3];
+		//cardData.at(i) = packet[i+3];
+		cardData.emplace_back(packet[i+3]);
 	}
 
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::WMMT_Command_53_Write: ";
 	for (const uint8_t n : cardData) {
-		std::printf(" %X", n);
+		std::printf(" %02X", n);
 	}
 	std::cout << "\n";
 #endif
 
-	SaveCardToFS();
+	//SaveCardToFS();
 	return;
 }
 
@@ -74,8 +76,8 @@ void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
 	// Extra: 30 30
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::WMMT_Command_7C_String: ";
-	for (const uint8_t n : packet) {
-		std::printf(" %X", n);
+	for (size_t i = 2; i != packet.size(); i++){ // Skip the extra bytes.
+		std::printf(" %02X", packet[i]);
 	}
 	std::cout << "\n";
 #endif
@@ -147,8 +149,8 @@ void CardIo::LoadCardFromFS()
 		card.seekg(std::ifstream::beg);
 		card.read(&readBack[0], size);
 		card.close();
-		std::copy(readBack.begin(), readBack.end(), std::back_inserter(cardData));
-		std::copy(readBack.begin(), readBack.end(), std::back_inserter(backupCardData));
+		std::copy(readBack.begin(), readBack.end()-1, std::back_inserter(cardData)); // Ignore the end null byte
+		std::copy(readBack.begin(), readBack.end()-1, std::back_inserter(backupCardData));
 	}
 
 	//std::printf("HERE, %d\n", size);
@@ -167,7 +169,7 @@ void CardIo::SaveCardToFS()
 	std::ofstream card;
 
 	std::string writeBack;
-	std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
+	//std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
 
 	if (!cardData.empty()) {
 		card.open(cardName, std::ofstream::out | std::ofstream::binary);
@@ -241,6 +243,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 #ifdef DEBUG_CARD_PACKETS
 		std::cerr << " Missing STX!\n";
 #endif
+		ReceiveBuffer.clear(); // We don't need this anymore, empty it out.
 		return SyncError;
 	} 
 

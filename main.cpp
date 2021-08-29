@@ -9,7 +9,7 @@
 
 static const std::string serialName = "/dev/ttyUSB1";
 
-constexpr const auto delay = std::chrono::microseconds(500);
+constexpr const auto delay = std::chrono::milliseconds(5);
 
 std::atomic<bool> running{true};
 
@@ -39,7 +39,7 @@ int main()
 	std::vector<uint8_t> SerialBuffer;
 	std::vector<uint8_t> OutgoingBuffer;
 
-	CardHandler->LoadCardFromFS();
+	//CardHandler->LoadCardFromFS();
 
 	while (running) {
 		if (!SerialBuffer.empty()) {
