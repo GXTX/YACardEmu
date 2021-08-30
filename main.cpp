@@ -9,7 +9,7 @@
 
 static const std::string serialName = "/dev/ttyUSB1";
 
-constexpr const auto delay = std::chrono::milliseconds(5);
+constexpr const auto delay = std::chrono::milliseconds(10);
 
 std::atomic<bool> running{true};
 
@@ -20,13 +20,32 @@ void sig_handle(int sig)
 	}
 }
 
+// FIXME: Doesn't function as I expect, CardHandler doesn't reflect this.
+std::atomic<bool> insert{false};
+
+void cin_handler()
+{
+	std::string in{};
+
+	while (1) {
+		in.clear();
+		std::getline(std::cin, in);
+		if (in.compare("i") == 0) {
+			insert = true;
+		} else if (in.compare("o") == 0) {
+			insert = false;
+		}
+		std::this_thread::sleep_for(delay);
+	}
+}
+
 int main()
 {
 	// Handle quitting gracefully via signals
 	std::signal(SIGINT, sig_handle);
 	std::signal(SIGTERM, sig_handle);
 
-	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>());
+	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>(insert));
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName.c_str()));
 	if (!SerialHandler->IsInitialized) {
@@ -39,7 +58,8 @@ int main()
 	std::vector<uint8_t> SerialBuffer;
 	std::vector<uint8_t> OutgoingBuffer;
 
-	//CardHandler->LoadCardFromFS();
+	// Handle card inserting.
+	std::thread(cin_handler).detach();
 
 	while (running) {
 		if (!SerialBuffer.empty()) {

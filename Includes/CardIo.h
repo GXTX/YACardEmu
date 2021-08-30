@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <atomic>
 
 // Status bytes:
 //////////////////////////////////////////////
@@ -68,10 +69,13 @@ public:
 		ServerWaitingReply,
 	};
 
-	CardIo();
+	CardIo(std::atomic<bool> &insert);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
 	
+	//std::atomic<bool> insertedCard{false};
+	bool insertedCard{false};
+	std::string cardName = "card.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
 private:
@@ -85,7 +89,6 @@ private:
 	uint8_t GetByte(uint8_t **buffer);
 	void HandlePacket(std::vector<uint8_t> &packet);
 
-	const std::string cardName = "card.bin";
 	std::vector<uint8_t>cardData{};
 	std::vector<uint8_t>backupCardData{}; // Filled with the data when we first loaded the card.
 
@@ -123,7 +126,6 @@ private:
 	//int WMMT_Command_F5_BatteryCheck(); // Not used in WMMT2
 
 	Status RPS;
-	bool insertedCard{false};
 	bool multiActionCommand{false};
 	bool waitingForMoreData{false};
 	Commands currentCommand{Commands::NoCommand};

@@ -2,8 +2,9 @@
 
 #define DEBUG_CARD_PACKETS
 
-CardIo::CardIo()
+CardIo::CardIo(std::atomic<bool> &insert)
 {
+	insertedCard = insert;
 	ResponseBuffer.reserve(255);
 	ProcessedPacket.reserve(255);
 }
@@ -54,7 +55,7 @@ void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
 	}
 
 #ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::WMMT_Command_53_Write: ";
+	std::cout << "CardIo::WMMT_Command_53_Write:";
 	for (const uint8_t n : cardData) {
 		std::printf(" %02X", n);
 	}
@@ -75,9 +76,9 @@ void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
 {
 	// Extra: 30 30
 #ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::WMMT_Command_7C_String: ";
-	for (size_t i = 2; i != packet.size(); i++){ // Skip the extra bytes.
-		std::printf(" %02X", packet[i]);
+	std::cout << "CardIo::WMMT_Command_7C_String:";
+	for (size_t i = 0; i != packet.size() - 2; i++){ // Skip the extra bytes.
+		std::printf(" %02X", packet[i+2]);
 	}
 	std::cout << "\n";
 #endif
@@ -127,6 +128,13 @@ void CardIo::PutStatusInBuffer()
 
 	if (insertedCard) {
 		RPS.r = R::HAS_CARD;
+		if (cardData.empty()) {
+			LoadCardFromFS();
+		}
+	} else {
+		if (!cardData.empty()) {
+			cardData.clear();
+		}
 	}
 
 	if (!multiActionCommand) {
@@ -137,20 +145,19 @@ void CardIo::PutStatusInBuffer()
 
 void CardIo::LoadCardFromFS()
 {
-	constexpr const uintmax_t maxSizeCard = 0x45;
 	std::ifstream card(cardName.c_str(), std::ifstream::in | std::ifstream::binary | std::ifstream::ate);
 
 	std::string readBack(CARD_SIZE, 0);
 
 	int size = 0;
 
-	if (card.good() && card.tellg() == maxSizeCard) {
+	if (card.good() && card.tellg() == CARD_SIZE) {
 		size = card.tellg();
 		card.seekg(std::ifstream::beg);
 		card.read(&readBack[0], size);
 		card.close();
-		std::copy(readBack.begin(), readBack.end()-1, std::back_inserter(cardData)); // Ignore the end null byte
-		std::copy(readBack.begin(), readBack.end()-1, std::back_inserter(backupCardData));
+		std::copy(readBack.begin(), readBack.end(), std::back_inserter(cardData));
+		std::copy(readBack.begin(), readBack.end(), std::back_inserter(backupCardData));
 	}
 
 	//std::printf("HERE, %d\n", size);
@@ -237,6 +244,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 #ifdef DEBUG_CARD_PACKETS
 		std::cout << " ENQ\n";
 #endif
+		// FIXME: We shouldn't nessicarily delete this..
 		ReceiveBuffer.clear(); // We don't need this anymore, empty it out.
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
