@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.10)
 
 project(YACardEmu)
 
-
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SERIAL REQUIRED libserialport)

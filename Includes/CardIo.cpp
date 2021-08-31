@@ -74,11 +74,11 @@ void CardIo::WMMT_Command_78_PrintSetting()
 
 void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
 {
-	// Extra: 30 30
+	// Extra: 30 30 01
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::WMMT_Command_7C_String:";
-	for (size_t i = 0; i != packet.size() - 2; i++){ // Skip the extra bytes.
-		std::printf(" %02X", packet[i+2]);
+	for (size_t i = 0; i != packet.size() - 3; i++){ // Skip the extra bytes.
+		std::printf(" %02X", packet[i+3]);
 	}
 	std::cout << "\n";
 #endif
