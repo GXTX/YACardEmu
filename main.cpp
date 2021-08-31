@@ -45,7 +45,7 @@ int main()
 	std::signal(SIGINT, sig_handle);
 	std::signal(SIGTERM, sig_handle);
 
-	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>(insert));
+	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>(&insert));
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName.c_str()));
 	if (!SerialHandler->IsInitialized) {
@@ -80,7 +80,7 @@ int main()
 			// ReceivePacket should've cleared out this buffer and appended ACK to it.
 			SerialHandler->Write(SerialBuffer);
 			std::this_thread::sleep_for(delay / 2);
-			//SerialHandler->Write(OutgoingBuffer);
+			SerialHandler->Write(OutgoingBuffer); // Is this correct, should we send our reply directly after ACKing?
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Our reply should've already been generated in BuildPacket(); as part of a multi-response command.
 			SerialHandler->Write(OutgoingBuffer);

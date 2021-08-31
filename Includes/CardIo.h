@@ -69,12 +69,11 @@ public:
 		ServerWaitingReply,
 	};
 
-	CardIo(std::atomic<bool> &insert);
+	CardIo(std::atomic<bool> *insert);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
 	
-	//std::atomic<bool> insertedCard{false};
-	bool insertedCard{false};
+	std::atomic<bool> *insertedCard;
 	std::string cardName = "card.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
@@ -127,7 +126,6 @@ private:
 
 	Status RPS;
 	bool multiActionCommand{false};
-	bool waitingForMoreData{false};
 	Commands currentCommand{Commands::NoCommand};
 	std::vector<uint8_t> ReceiveBuffer{};
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
