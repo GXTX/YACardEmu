@@ -13,7 +13,8 @@ CardIo::CardIo(std::atomic<bool> *insert)
 void CardIo::WMMT_Command_10_Init()
 {
 	// Game only cares if S is NO_JOB, but we should reset all anyway.
-	RPS.Reset();
+	*insertedCard = false;
+	currentRPS.Reset();
 	return;
 }
 
@@ -29,10 +30,12 @@ void CardIo::WMMT_Command_33_Read()
 
 	// TODO: What do we do if we get this command and there's no card? Set a read error?
 	if (insertedCard) {
+		ResponseBuffer.emplace_back(START_OF_CARD);
 		std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
-	} else {
-		RPS.s = S::UNK_34;
-	}
+		ResponseBuffer.emplace_back(END_OF_CARD);
+	} /*else {
+		currentRPS.s = S::UNK_34;
+	}*/
 
 	return;
 }
@@ -40,14 +43,15 @@ void CardIo::WMMT_Command_33_Read()
 void CardIo::WMMT_Command_40_Cancel()
 {
 	// TODO: Does cancel eject the card or just stops the current job?
-	RPS.p = P::NO_ERR;
-	RPS.s = S::NO_JOB;
+	currentRPS.p = P::NO_ERR;
+	currentRPS.s = S::NO_JOB;
 	return;
 }
 
 void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
 {
 	// Extra: 30 31 30
+
 	if (!cardData.empty()) {
 		cardData.clear();
 	}
@@ -64,19 +68,20 @@ void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
 	std::cout << "\n";
 #endif
 
-	//SaveCardToFS();
+	SaveCardToFS();
 	return;
 }
 
 void CardIo::WMMT_Command_78_PrintSetting()
 {
-	// Extra: 37 31 30/33/34 30 30 30
+	// Extra: 37 31 [30/33/34] 30 30 30
 	return;
 }
 
 void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
 {
 	// Extra: 30 30 01
+
 #ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::WMMT_Command_7C_String:";
 	for (size_t i = 0; i != packet.size() - 3; i++){ // Skip the extra bytes.
@@ -91,17 +96,19 @@ void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
 void CardIo::WMMT_Command_7D_Erase()
 {
 	// Extra: 01 17
-	// FIXME: Game caused a E51 after ~20 seconds from starting a game, this was the last command.
+	// FIXME: Game caused a E51 after ~20 seconds from starting a game, this was the last command, we did not get any ENQ after first response.
 	return;
 }
 
 void CardIo::WMMT_Command_80_Eject()
 {
-	//RPS.r = R::EJECTING_CARD;
-	RPS.r = R::NO_CARD;
-	//RPS.r = R::HAS_CARD;
-	//RPS.s = S::UNKNOWN_COMMAND;
-	*insertedCard = false;
+	if (currentRPS.r == R::HAS_CARD || currentRPS.r == R::EJECTING_CARD) {
+		*insertedCard = false;
+		currentRPS.r = R::NO_CARD;
+	} else {
+		currentRPS.s = S::UNK_34;
+	}
+
 	return;
 }
 
@@ -109,12 +116,14 @@ void CardIo::WMMT_Command_B0_GetCard()
 {
 	// Extra: 31
 
-	if (*insertedCard) {
-		// What do we do if we have a card in the tray already?
-		RPS.s = S::UNKNOWN_COMMAND; // FIXME: What is this status really?
+	if (*insertedCard && currentStep == 0) {
+		currentRPS.s = S::UNK_34;
+	} else if (*insertedCard && currentStep != 0) {
+		currentRPS.s = S::UNK_33;
 	} else {
-		RPS.r = R::HAS_CARD; // Is there a status for 'dispensing card'?
 		*insertedCard = true;
+		currentRPS.r = R::EJECTING_CARD;
+		currentStep++;
 	}
 
 	return;
@@ -123,12 +132,12 @@ void CardIo::WMMT_Command_B0_GetCard()
 void CardIo::PutStatusInBuffer()
 {
 	ResponseBuffer.insert(ResponseBuffer.begin(), static_cast<uint8_t>(currentCommand));
-	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(RPS.r));
-	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(RPS.p));
-	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(RPS.s));
+	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(currentRPS.r));
+	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(currentRPS.p));
+	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(currentRPS.s));
 
 	if (*insertedCard) {
-		RPS.r = R::HAS_CARD;
+		currentRPS.r = R::HAS_CARD;
 		if (cardData.empty()) {
 			LoadCardFromFS();
 		}
@@ -139,8 +148,15 @@ void CardIo::PutStatusInBuffer()
 	}
 
 	if (!multiActionCommand) {
-		RPS.p = P::NO_ERR;
-		RPS.s = S::NO_JOB;
+		currentRPS.p = P::NO_ERR;
+		currentRPS.s = S::NO_JOB;
+	}
+}
+
+void CardIo::Loop()
+{
+	if (currentRPS != lastRPS) {
+		// Update then regenerate
 	}
 }
 
@@ -166,11 +182,12 @@ void CardIo::LoadCardFromFS()
 
 void CardIo::SaveCardToFS()
 {
-	// TODO: Actually impliment this.
 	std::ofstream card;
-	std::string writeBack;
+	std::string writeBack{};
 
-	if (!cardData.empty()) {
+	std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
+
+	if (!writeBack.empty()) {
 		card.open(cardName, std::ofstream::out | std::ofstream::binary);
 		card.write(writeBack.c_str(), writeBack.size());
 		card.close();
@@ -202,7 +219,7 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 		//case 0xF5: WMMT_Command_F5_BatteryCheck(); return; // WMMT3 specific?
 		default:
 			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet[0]);
-			RPS.s = S::UNKNOWN_COMMAND;
+			currentRPS.s = S::UNKNOWN_COMMAND;
 			return;
 	}
 }

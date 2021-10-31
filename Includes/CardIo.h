@@ -14,31 +14,31 @@ enum class R {
 	HAS_CARD      = 0x31,
 	UNK_32        = 0x32,
 	UNK_33        = 0x33,
-	EJECTING_CARD = 0x34,
+	EJECTING_CARD = 0x34, // Dispensed?
 };
 
 // This seems wrong?
 enum class P {
 	NO_ERR      = 0x30,
-	READ_ERR    = 0x31, // ?
+	READ_ERR    = 0x31,
 	WRITE_ERR   = 0x32,
-	BLOCK_ERR   = 0x33, // ?
+	BLOCK_ERR   = 0x33, // 
 	UNK_34      = 0x34,
 	PRINT_ERR   = 0x35,
 	UNK_36      = 0x36,
 	UKN_37      = 0x37,
 	ILLEGAL_ERR = 0x38,
 	UNK_39      = 0x39,
-	BATTERY_ERR = 0x40,
-	SYSTEM_ERR  = 0x41,
-	//UNK_51,52,53,54,55
+	//BATTERY_ERR = 0x40,
+	//SYSTEM_ERR  = 0x41,
+	//UNK_51,52,53,54,55,56
 };
 
 enum class S {
 	NO_JOB          = 0x30, // JOB_END
 	UNK_31          = 0x31,
-	UNKNOWN_COMMAND = 0x32, // Is this correct?
-	UNK_33          = 0x33, // Running?
+	UNKNOWN_COMMAND = 0x32, // Is this correct? Running?
+	UNK_33          = 0x33, // Busy?
 	UNK_34          = 0x34,
 	DISPENSER_EMPTY = 0x35,
 };
@@ -54,6 +54,10 @@ struct Status{
 		r = R::NO_CARD;
 		p = P::NO_ERR;
 		s = S::NO_JOB;
+	}
+	
+	bool operator!=(const Status& other) const {
+		return r != other.r || p != other.p || s != other.s;
 	}
 };
 
@@ -72,18 +76,22 @@ public:
 	CardIo(std::atomic<bool> *insert);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &buffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
-	
+
 	std::atomic<bool> *insertedCard;
 	std::string cardName = "card.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
+
+	void Loop();
 private:
 	const uint8_t START_OF_TEXT = 0x02;
 	const uint8_t END_OF_TEXT = 0x03;
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
 
-	const uint8_t CARD_SIZE = 0x46;
+	const uint8_t CARD_SIZE = 0x44;
+	const uint8_t START_OF_CARD = 0x30;
+	const uint8_t END_OF_CARD = 0x40;
 
 	uint8_t GetByte(uint8_t **buffer);
 	void HandlePacket(std::vector<uint8_t> &packet);
@@ -124,7 +132,9 @@ private:
 	void WMMT_Command_B0_GetCard();
 	//int WMMT_Command_F5_BatteryCheck(); // Not used in WMMT2
 
-	Status RPS;
+	int currentStep{};
+	Status lastRPS;
+	Status currentRPS;
 	bool multiActionCommand{false};
 	Commands currentCommand{Commands::NoCommand};
 	std::vector<uint8_t> ReceiveBuffer{};

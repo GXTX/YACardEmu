@@ -12,6 +12,7 @@ static const std::string serialName = "/dev/ttyUSB1";
 constexpr const auto delay = std::chrono::milliseconds(10);
 
 std::atomic<bool> running{true};
+std::atomic<bool> insertCard{false};
 
 void sig_handle(int sig)
 {
@@ -19,9 +20,6 @@ void sig_handle(int sig)
 		running = false;
 	}
 }
-
-// FIXME: Doesn't function as I expect, CardHandler doesn't reflect this.
-std::atomic<bool> insert{false};
 
 void cin_handler()
 {
@@ -31,9 +29,9 @@ void cin_handler()
 		in.clear();
 		std::getline(std::cin, in);
 		if (in.compare("i") == 0) {
-			insert = true;
+			insertCard = true;
 		} else if (in.compare("o") == 0) {
-			insert = false;
+			insertCard = false;
 		}
 		std::this_thread::sleep_for(delay);
 	}
@@ -45,7 +43,7 @@ int main()
 	std::signal(SIGINT, sig_handle);
 	std::signal(SIGTERM, sig_handle);
 
-	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>(&insert));
+	std::unique_ptr<CardIo> CardHandler (std::make_unique<CardIo>(&insertCard));
 
 	std::unique_ptr<SerIo> SerialHandler (std::make_unique<SerIo>(serialName.c_str()));
 	if (!SerialHandler->IsInitialized) {
@@ -80,7 +78,7 @@ int main()
 			// ReceivePacket should've cleared out this buffer and appended ACK to it.
 			SerialHandler->Write(SerialBuffer);
 			std::this_thread::sleep_for(delay / 2);
-			SerialHandler->Write(OutgoingBuffer); // Is this correct, should we send our reply directly after ACKing?
+			//SerialHandler->Write(OutgoingBuffer); // Is this correct, should we send our reply directly after ACKing?
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Our reply should've already been generated in BuildPacket(); as part of a multi-response command.
 			SerialHandler->Write(OutgoingBuffer);
