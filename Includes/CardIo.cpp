@@ -1,3 +1,24 @@
+/*
+    YACardEmu
+    ----------------
+    Copyright (C) 2020-2022 wutno (https://github.com/GXTX)
+
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+*/
+
 #include "CardIo.h"
 
 #define DEBUG_CARD_PACKETS
@@ -10,123 +31,232 @@ CardIo::CardIo(std::atomic<bool> *insert)
 	ProcessedPacket.reserve(255);
 }
 
-void CardIo::WMMT_Command_10_Init()
+void CardIo::Command_10_Initalize(std::vector<uint8_t> &packet)
 {
-	// Game only cares if S is NO_JOB, but we should reset all anyway.
-	*insertedCard = false;
+	enum Mode {
+		Standard = 0x30,
+		EjectAfter = 0x31,
+		ResetSpecifications = 0x32,
+	};
+
+	// A31 / S31 only
+	//enum AbortMode {
+	//	NoBadResponses = 0x30,
+	//	AllowBadResponses = 0x31,
+	//};
+
+	Mode mode = static_cast<Mode>(packet[0]);
+	//AbortMode abortMode = static_cast<AbortMode>(packet[1]);
+
+	if (mode == 31) {
+		*insertedCard = false;
+	}
+
 	currentRPS.Reset();
+
 	return;
 }
 
-void CardIo::WMMT_Command_20_GetStatus()
+void CardIo::Command_20_ReadStatus()
 {
-	// BuildPacket already puts this in the buffer, we don't need to do custom handling.
+	// Return current RPS
 	return;
 }
 
-void CardIo::WMMT_Command_33_Read()
+void CardIo::Command_33_ReadData2(std::vector<uint8_t> &packet)
 {
-	// Extra: 32 31 30
+	enum Mode {
+		Standard     = 30, // read 69-bytes
+		ReadVariable = 31, // variable length read, 1-47 bytes
+		CardCapture  = 32, // pull in card?
+	};
 
-	// TODO: What do we do if we get this command and there's no card? Set a read error?
-	if (insertedCard) {
-		ResponseBuffer.emplace_back(START_OF_CARD);
+	enum BitMode {
+		SevenBitParity   = 30,
+		EightBitNoParity = 31,
+	};
+
+	enum Track {
+		Track_1 = 30,
+		Track_2 = 31,
+		Track_3 = 32,
+		Track_1_And_2 = 33,
+		Track_1_And_3 = 34,
+		Track_2_And_3 = 35,
+		Track_1_2_And_3 = 36,
+	};
+
+	Mode mode = static_cast<Mode>(packet[0]);
+	BitMode bitMode = static_cast<BitMode>(packet[1]);
+	Track trackMode = static_cast<Track>(packet[2]);
+
+	if (currentRPS.r == R::NO_CARD) {
+		currentRPS.s == S::WAITING_FOR_CARD;
+	} else {
 		std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
-		ResponseBuffer.emplace_back(END_OF_CARD);
-	} /*else {
-		currentRPS.s = S::UNK_34;
-	}*/
+	}
 
 	return;
 }
 
-void CardIo::WMMT_Command_40_Cancel()
+void CardIo::Command_40_Cancel()
 {
-	// TODO: Does cancel eject the card or just stops the current job?
-	currentRPS.p = P::NO_ERR;
 	currentRPS.s = S::NO_JOB;
 	return;
 }
 
-void CardIo::WMMT_Command_53_Write(std::vector<uint8_t> &packet)
+void CardIo::Command_53_WriteData2(std::vector<uint8_t> &packet)
 {
-	// Extra: 30 31 30
+	enum Mode {
+		Standard     = 30, // write 69-bytes
+		ReadVariable = 31, // variable length write, 1-47 bytes
+		CardCapture  = 32, // pull in card?
+	};
 
-	if (!cardData.empty()) {
-		cardData.clear();
-	}
+	enum BitMode {
+		SevenBitParity   = 30,
+		EightBitNoParity = 31,
+	};
 
-	for (size_t i = 0; i != packet.size() - 3; i++) {
-		cardData.emplace_back(packet[i+3]);
-	}
+	enum Track {
+		Track_1 = 30,
+		Track_2 = 31,
+		Track_3 = 32,
+		Track_1_And_2 = 33,
+		Track_1_And_3 = 34,
+		Track_2_And_3 = 35,
+		Track_1_2_And_3 = 36,
+	};
 
-#ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::WMMT_Command_53_Write:";
-	for (const uint8_t n : cardData) {
-		std::printf(" %02X", n);
-	}
-	std::cout << "\n";
-#endif
+	Mode mode = static_cast<Mode>(packet[0]);
+	BitMode bitMode = static_cast<BitMode>(packet[1]);
+	Track trackMode = static_cast<Track>(packet[2]);
 
-	SaveCardToFS();
+	// TODO: transmit card data
 	return;
 }
 
-void CardIo::WMMT_Command_78_PrintSetting()
+void CardIo::Command_78_PrintSettings2(std::vector<uint8_t> &packet)
 {
-	// Extra: 37 31 [30/33/34] 30 30 30
+	// TODO: Have these be Printer class members
+	enum CardType {
+		LeucoRewrite_Blue = 0x37,
+	};
+
+	enum PrintMethod {
+		Overwrite = 0x30,
+		Overlay = 0x31,
+	};
+
+	enum FontWidth {
+		Normal = 0x30,
+		Half = 0x31,
+	};
+
+	enum PrintCoordinates {
+		Standard = 0x30,
+		// 31, 32
+		LeftRotate = 0x33,
+		RightRotate = 0x34,
+	};
+
 	return;
 }
 
-void CardIo::WMMT_Command_7C_String(std::vector<uint8_t> &packet)
+void CardIo::Command_7C_PrintL(std::vector<uint8_t> &packet)
 {
-	// Extra: 30 30 01
+	enum Mode {
+		Both = 0x30, // process and print
+		ProcessOnly = 0x31,
+	};
 
-#ifdef DEBUG_CARD_PACKETS
-	std::cout << "CardIo::WMMT_Command_7C_String:";
-	for (size_t i = 0; i != packet.size() - 3; i++){ // Skip the extra bytes.
-		std::printf(" %02X", packet[i+3]);
+	enum Buffer {
+		Clear = 0x30,
+		DoNotClear = 0x31,
+	};
+
+	enum PrintCoord {
+		Standard = 0x01,
+	};
+
+	Mode mode  = static_cast<Mode>(packet[0]);
+	Buffer bufferControl = static_cast<Buffer>(packet[1]);
+	PrintCoord coords = static_cast<PrintCoord>(packet[2]);
+
+	// TODO: Generate image, document control codes
+
+	return;
+}
+
+void CardIo::Command_80_EjectCard()
+{
+	currentRPS.Reset();
+	*insertedCard = false;
+}
+
+void CardIo::Command_A0_Clean()
+{
+	switch (currentStep) {
+		case 0: 
+			*insertedCard = false;
+			currentRPS.Reset();
+			currentRPS.s = S::WAITING_FOR_CARD;
+			break;
+		case 1:
+			*insertedCard = true;
+			currentRPS.r = R::HAS_CARD_1;
+			currentRPS.s = S::RUNNING_COMMAND;
+			break;
+		case 2:
+			*insertedCard = false;
+			currentRPS.r = R::EJECTING_CARD;
+			break;
+		case 3:
+			currentRPS.r = R::NO_CARD;
+			break;
+		default: 
+			break;
 	}
-	std::cout << "\n";
-#endif
+
+	currentStep++;
+
+	if (currentStep > 3) {
+		currentStep = 0;
+		multiActionCommand = false;
+	}
 
 	return;
 }
 
-void CardIo::WMMT_Command_7D_Erase()
+void CardIo::Command_B0_DispenseCardS31(std::vector<uint8_t> &packet)
 {
-	// Extra: 01 17
-	// FIXME: Game caused a E51 after ~20 seconds from starting a game, this was the last command, we did not get any ENQ after first response.
+	enum Mode {
+		Dispenser = 0x31,
+		CheckOnly = 0x32, // check status of dispenser
+	};
+
+	Mode mode = static_cast<Mode>(packet[0]);
+
+	if (mode == Mode::Dispenser) {
+		currentRPS.r = R::HAS_CARD_1;
+	} else if (mode == Mode::CheckOnly) {
+		currentRPS.s = S::CARD_FULL;
+	}
+
 	return;
 }
 
-void CardIo::WMMT_Command_80_Eject()
+void CardIo::UpdateStatusBytes()
 {
-	if (currentRPS.r == R::HAS_CARD || currentRPS.r == R::EJECTING_CARD) {
-		*insertedCard = false;
+	if (currentCommand == 0xA0 && multiActionCommand == true) {
+		Command_A0_Clean();
+	}
+
+	if (*insertedCard == true) {
+		currentRPS.r = R::HAS_CARD_1;
+	} else {
 		currentRPS.r = R::NO_CARD;
-	} else {
-		currentRPS.s = S::UNK_34;
 	}
-
-	return;
-}
-
-void CardIo::WMMT_Command_B0_GetCard()
-{
-	// Extra: 31
-
-	if (*insertedCard && currentStep == 0) {
-		currentRPS.s = S::UNK_34;
-	} else if (*insertedCard && currentStep != 0) {
-		currentRPS.s = S::UNK_33;
-	} else {
-		*insertedCard = true;
-		currentRPS.r = R::EJECTING_CARD;
-		currentStep++;
-	}
-
-	return;
 }
 
 void CardIo::PutStatusInBuffer()
@@ -137,7 +267,7 @@ void CardIo::PutStatusInBuffer()
 	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(currentRPS.s));
 
 	if (*insertedCard) {
-		currentRPS.r = R::HAS_CARD;
+		currentRPS.r = R::HAS_CARD_1;
 		if (cardData.empty()) {
 			LoadCardFromFS();
 		}
@@ -150,13 +280,6 @@ void CardIo::PutStatusInBuffer()
 	if (!multiActionCommand) {
 		currentRPS.p = P::NO_ERR;
 		currentRPS.s = S::NO_JOB;
-	}
-}
-
-void CardIo::Loop()
-{
-	if (currentRPS != lastRPS) {
-		// Update then regenerate
 	}
 }
 
@@ -198,25 +321,27 @@ void CardIo::SaveCardToFS()
 
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
-	currentCommand = static_cast<Commands>(packet[0]);
+	if (currentCommand != packet[0]) {
+		currentRPS.Reset();
+	}
 
-	// This removes the current command and the master's RPS bytes.
+	currentCommand = packet[0];
+
+	// This removes the current command and the master's status bytes.
 	packet.erase(packet.begin(), packet.begin()+4);
 
-	switch (static_cast<uint8_t>(currentCommand)) {
-		case 0x10: WMMT_Command_10_Init(); return;
-		case 0x20: WMMT_Command_20_GetStatus(); return;
-		case 0x33: WMMT_Command_33_Read(); return;
-		case 0x40: WMMT_Command_40_Cancel(); return;
-		case 0x53: WMMT_Command_53_Write(packet); return;
-		case 0x78: WMMT_Command_78_PrintSetting(); return;
-		//case 0x7A: WMMT_Command_7A_ExtraCharacter(); return;
-		case 0x7C: WMMT_Command_7C_String(packet); return;
-		case 0x7D: WMMT_Command_7D_Erase(); return;
-		case 0x80: WMMT_Command_80_Eject(); return;
-		//case 0xA0: WMMT_Command_A0_Clean(); return;
-		case 0xB0: WMMT_Command_B0_GetCard(); return;
-		//case 0xF5: WMMT_Command_F5_BatteryCheck(); return; // WMMT3 specific?
+	switch (currentCommand) {
+		case 0x10: Command_10_Initalize(packet); return;
+		case 0x20: Command_20_ReadStatus(); return;
+		case 0x33: Command_33_ReadData2(packet); return;
+		case 0x40: Command_40_Cancel(); return;
+		case 0x53: Command_53_WriteData2(packet); return;
+		case 0x78: Command_78_PrintSettings2(packet); return;
+		case 0x7C: Command_7C_PrintL(packet); return;
+		//case 0x7D: Command_7D_Erase(); return; // FIXME: Custom case
+		case 0x80: Command_80_EjectCard(); return;
+		case 0xA0: multiActionCommand = true; Command_A0_Clean(); return;
+		case 0xB0: Command_B0_DispenseCardS31(packet); return;
 		default:
 			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet[0]);
 			currentRPS.s = S::UNKNOWN_COMMAND;
@@ -251,8 +376,8 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 #ifdef DEBUG_CARD_PACKETS
 		std::cout << " ENQ\n";
 #endif
-		// FIXME: We should update the response RPS bytes when we get this.
 		ReceiveBuffer.erase(ReceiveBuffer.begin());
+		UpdateStatusBytes();
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
 #ifdef DEBUG_CARD_PACKETS
@@ -269,6 +394,8 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 #endif
 		return SizeError;
 	}
+
+	UpdateStatusBytes();
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
 	actual_checksum = count;

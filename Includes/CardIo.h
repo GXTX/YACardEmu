@@ -1,3 +1,24 @@
+/*
+    YACardEmu
+    ----------------
+    Copyright (C) 2020-2022 wutno (https://github.com/GXTX)
+
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+*/
+
 #ifndef CARDIO_H
 #define CARDIO_H
 
@@ -10,37 +31,43 @@
 // Status bytes:
 //////////////////////////////////////////////
 enum class R {
-	NO_CARD       = 0x30,
-	HAS_CARD      = 0x31,
-	UNK_32        = 0x32,
-	UNK_33        = 0x33,
-	EJECTING_CARD = 0x34, // Dispensed?
+	NO_CARD           = 0x30,
+	HAS_CARD_1        = 0x31,
+	CARD_STATUS_ERROR = 0x32,
+	HAS_CARD_2        = 0x33,
+	EJECTING_CARD     = 0x34,
 };
 
-// This seems wrong?
 enum class P {
-	NO_ERR      = 0x30,
-	READ_ERR    = 0x31,
-	WRITE_ERR   = 0x32,
-	BLOCK_ERR   = 0x33, // 
-	UNK_34      = 0x34,
-	PRINT_ERR   = 0x35,
-	UNK_36      = 0x36,
-	UKN_37      = 0x37,
-	ILLEGAL_ERR = 0x38,
-	UNK_39      = 0x39,
-	//BATTERY_ERR = 0x40,
-	//SYSTEM_ERR  = 0x41,
-	//UNK_51,52,53,54,55,56
+	NO_ERR                 = 0x30,
+	READ_ERR               = 0x31,
+	WRITE_ERR              = 0x32,
+	CARD_JAM               = 0x33,
+	MOTOR_ERR              = 0x34, // transport system motor error
+	PRINT_ERR              = 0x35,
+	//UNK_36 = 0x36,
+	//UKN_37 = 0x37,
+	ILLEGAL_ERR            = 0x38, // generic error
+	//UNK_39 = 0x39,
+	BATTERY_ERR            = 0x40, // low battery voltage
+	SYSTEM_ERR             = 0x41, // reader/writer system err
+	TRACK_1_READ_ERR       = 0x51,
+	TRACK_2_READ_ERR       = 0x52,
+	TRACK_3_READ_ERR       = 0x53,
+	TRACK_1_AND_2_READ_ERR = 0x54,
+	TRACK_1_AND_3_READ_ERR = 0x55,
+	TRACK_2_AND_3_READ_ERR = 0x56,
 };
 
 enum class S {
-	NO_JOB          = 0x30, // JOB_END
-	UNK_31          = 0x31,
-	UNKNOWN_COMMAND = 0x32, // Is this correct? Running?
-	UNK_33          = 0x33, // Busy?
-	UNK_34          = 0x34,
-	DISPENSER_EMPTY = 0x35,
+	NO_JOB           = 0x30,
+	//UNK_31 = 0x31,
+	UNKNOWN_COMMAND  = 0x32,
+	RUNNING_COMMAND  = 0x33,
+	WAITING_FOR_CARD = 0x34,
+	DISPENSER_EMPTY  = 0x35,
+	NO_DISPENSER     = 0x36,
+	CARD_FULL        = 0x37,
 };
 //////////////////////////////////////////////
 
@@ -54,10 +81,6 @@ struct Status{
 		r = R::NO_CARD;
 		p = P::NO_ERR;
 		s = S::NO_JOB;
-	}
-	
-	bool operator!=(const Status& other) const {
-		return r != other.r || p != other.p || s != other.s;
 	}
 };
 
@@ -81,15 +104,13 @@ public:
 	std::string cardName = "card.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
-
-	void Loop();
 private:
 	const uint8_t START_OF_TEXT = 0x02;
 	const uint8_t END_OF_TEXT = 0x03;
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
 
-	const uint8_t CARD_SIZE = 0x44;
+	const uint8_t CARD_SIZE = 0x46;
 	const uint8_t START_OF_CARD = 0x30;
 	const uint8_t END_OF_CARD = 0x40;
 
@@ -99,6 +120,7 @@ private:
 	std::vector<uint8_t>cardData{};
 	std::vector<uint8_t>backupCardData{}; // Filled with the data when we first loaded the card.
 
+	void UpdateStatusBytes();
 	void PutStatusInBuffer();
 
 	enum class Commands {
@@ -118,25 +140,46 @@ private:
 	};
 
 	// Commands
-	void WMMT_Command_10_Init();
-	void WMMT_Command_20_GetStatus();
-	void WMMT_Command_33_Read();
-	void WMMT_Command_40_Cancel();
-	void WMMT_Command_53_Write(std::vector<uint8_t> &packet); // Write the mag strip
-	void WMMT_Command_78_PrintSetting();
-	void WMMT_Command_7A_ExtraCharacter();
-	void WMMT_Command_7C_String(std::vector<uint8_t> &packet); // Write the text on the card
-	void WMMT_Command_7D_Erase();
-	void WMMT_Command_80_Eject();
-	void WMMT_Command_A0_Clean(); // Clean print head
-	void WMMT_Command_B0_GetCard();
-	//int WMMT_Command_F5_BatteryCheck(); // Not used in WMMT2
+	void Command_10_Initalize(std::vector<uint8_t> &packet); // there's 2 methods here
+	void Command_20_ReadStatus();
+	//void Command_30_ReadData(); // marked "old"
+	//void Command_33_ReadDataL();
+	void Command_33_ReadData2(std::vector<uint8_t> &packet); // multi-track read
+	//void Command_35_GetData();
+	void Command_40_Cancel();
+	//void Command_50_WriteData(); // marked "old" 7-bit
+	//void Command_53_WriteDataL();
+	void Command_53_WriteData2(std::vector<uint8_t> &packet); // multi-track write
+	//void Command_55_WriteAndDischarge(); // marked "old"
+	//void Command_5C_WriteBinaryData(); // marked "old"
+	//void Command_70_Print(); // marked "old"
+	//void Command_73_Print20Lines(); // marked "old"
+	//void Command_75_PrintAndDischarge(); // marked "old"
+	//void Command_78_PrintSettings();
+	void Command_78_PrintSettings2(std::vector<uint8_t> &packet);
+	void Command_7A_RegisterFont(); // "foreign characters"
+	void Command_7B_PrintImage();
+	void Command_7C_PrintL(std::vector<uint8_t> &packet);
+	void Command_7E_PrintBarcode();
+	void Command_80_EjectCard();
+	//void Command_90_EmptyCardDispenser(); // eject all cards?
+	void Command_A0_Clean(); // requires multi-step replies
+	//void Command_B0_DispenseCard();
+	void Command_B0_DispenseCardS31(std::vector<uint8_t> &packet);
+	//void Command_C0_ControlLED(); // marked "old"
+	//void Command_C1_SetRetry(); // marked "old"
+	//void Command_E1_SetRTC(); // Req for WMMT3
+	//void Command_F0_GetVersion();
+	//void Command_F1_GetRTC(); // Req for WMMT3
+	//void Command_F5_CheckBattery(); // Req for WMMT3
 
-	int currentStep{};
-	Status lastRPS;
 	Status currentRPS;
+	uint8_t currentCommand{};
+
+	// For cleaning
+	int currentStep{};
 	bool multiActionCommand{false};
-	Commands currentCommand{Commands::NoCommand};
+
 	std::vector<uint8_t> ReceiveBuffer{};
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 	std::vector<uint8_t> ProcessedPacket{};
