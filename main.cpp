@@ -28,9 +28,9 @@
 #include "CardIo.h"
 #include "SerIo.h"
 
-static const std::string serialName = "/dev/ttyUSB1";
+static const std::string serialName = "/dev/ttyUSB0";
 
-static const auto delay = std::chrono::milliseconds(10);
+static const auto delay = std::chrono::milliseconds(5);
 
 std::atomic<bool> running{true};
 std::atomic<bool> insertCard{false};
@@ -92,16 +92,22 @@ int main()
 		}
 
 		cardStatus = CardHandler->ReceivePacket(SerialBuffer);
+
+		if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply) {
+			SerialHandler->SendAck();
+		}
+
 		if (cardStatus == CardIo::Okay) {
 			// Build our reply packet in preperation for the ENQ byte from the server.
-			cardStatus = CardHandler->BuildPacket(OutgoingBuffer);
+			//cardStatus = CardHandler->BuildPacket(OutgoingBuffer);
 			
 			// ReceivePacket should've cleared out this buffer and appended ACK to it.
-			SerialHandler->Write(SerialBuffer);
+			//SerialHandler->Write(SerialBuffer);
 			std::this_thread::sleep_for(delay / 2);
 			//SerialHandler->Write(OutgoingBuffer); // Is this correct, should we send our reply directly after ACKing?
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
-			// Our reply should've already been generated in BuildPacket(); as part of a multi-response command.
+			// Rebuild the packet
+			cardStatus = CardHandler->BuildPacket(OutgoingBuffer);
 			SerialHandler->Write(OutgoingBuffer);
 		}
 

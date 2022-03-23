@@ -183,6 +183,7 @@ private:
 	std::vector<uint8_t> ReceiveBuffer{};
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 	std::vector<uint8_t> ProcessedPacket{};
+	std::vector<uint8_t> emptyBuffer{};
 };
 
 #endif

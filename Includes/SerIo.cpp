@@ -50,6 +50,23 @@ SerIo::~SerIo()
 	sp_close(Port);
 }
 
+SerIo::Status SerIo::SendAck()
+{
+	const std::vector<uint8_t> ack{0x06};
+
+#ifdef DEBUG_SERIAL
+	std::cout << "SerIo::SendAck:";
+	for (uint8_t c : ack) {
+		std::printf(" %02X", c);
+	}
+	std::cout << "\n";
+#endif
+
+	int ret = sp_blocking_write(Port, &ack[0], ack.size(), 0);
+
+	return Status::Okay;
+}
+
 SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 {
 	if (buffer.empty()) {

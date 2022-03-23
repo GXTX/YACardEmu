@@ -33,26 +33,38 @@ CardIo::CardIo(std::atomic<bool> *insert)
 
 void CardIo::Command_10_Initalize(std::vector<uint8_t> &packet)
 {
-	enum Mode {
-		Standard = 0x30,
-		EjectAfter = 0x31,
-		ResetSpecifications = 0x32,
-	};
-
-	// A31 / S31 only
-	//enum AbortMode {
-	//	NoBadResponses = 0x30,
-	//	AllowBadResponses = 0x31,
+	//enum Mode {
+	//	Standard = 0x30,
+	//	EjectAfter = 0x31,
+	//	ResetSpecifications = 0x32,
 	//};
 
-	Mode mode = static_cast<Mode>(packet[0]);
-	//AbortMode abortMode = static_cast<AbortMode>(packet[1]);
-
-	if (mode == 31) {
-		*insertedCard = false;
+	if (multiActionCommand == true) {
+		switch (currentCommand) {
+			case 0:
+				if (currentRPS.r == R::HAS_CARD_1) {
+					currentRPS.r = R::EJECTING_CARD;
+				}
+				currentRPS.s = S::RUNNING_COMMAND;
+				break;
+			case 1:
+				if (currentRPS.r == R::EJECTING_CARD) {
+					currentRPS.r = R::NO_CARD;
+				}
+				currentRPS.s = S::NO_JOB;
+				break;
+			default:
+				break;
+		}
+		currentStep++;
+		if (currentStep > 1) {
+			multiActionCommand = false;
+			currentStep = 0;
+		}
+	} else {
+		multiActionCommand = true;
+		currentStep = 0;
 	}
-
-	currentRPS.Reset();
 
 	return;
 }
@@ -65,27 +77,54 @@ void CardIo::Command_20_ReadStatus()
 
 void CardIo::Command_33_ReadData2(std::vector<uint8_t> &packet)
 {
-	enum Mode {
-		Standard     = 30, // read 69-bytes
-		ReadVariable = 31, // variable length read, 1-47 bytes
-		CardCapture  = 32, // pull in card?
-	};
+	//enum Mode {
+	//	Standard     = 30, // read 69-bytes
+	//	ReadVariable = 31, // variable length read, 1-47 bytes
+	//	CardCapture  = 32, // pull in card?
+	//};
 
-	enum BitMode {
-		SevenBitParity   = 30,
-		EightBitNoParity = 31,
-	};
+	//enum BitMode {
+	//	SevenBitParity   = 30,
+	//	EightBitNoParity = 31,
+	//};
 
-	enum Track {
-		Track_1 = 30,
-		Track_2 = 31,
-		Track_3 = 32,
-		Track_1_And_2 = 33,
-		Track_1_And_3 = 34,
-		Track_2_And_3 = 35,
-		Track_1_2_And_3 = 36,
-	};
+	//enum Track {
+	//	Track_1 = 30,
+	//	Track_2 = 31,
+	//	Track_3 = 32,
+	//	Track_1_And_2 = 33,
+	//	Track_1_And_3 = 34,
+	//	Track_2_And_3 = 35,
+	//	Track_1_2_And_3 = 36,
+	//};
+	
+	if (multiActionCommand) {
+		if (currentRPS.r != R::HAS_CARD_1) {
+			switch (currentCommand) {
+				case 0:
+					currentRPS.s = S::RUNNING_COMMAND;
+					break;
+				case 1:
+					currentRPS.s = S::WAITING_FOR_CARD;
+					break;
+				default:
+					break;
+			}
+			currentCommand++;
+			if (currentCommand > 1) {
+				multiActionCommand = false;
+				currentCommand = 0;
+			}
+		}
+	} else {
+		multiActionCommand = true;
+		currentCommand = 0;
+	}
 
+
+
+
+/*
 	Mode mode = static_cast<Mode>(packet[0]);
 	BitMode bitMode = static_cast<BitMode>(packet[1]);
 	Track trackMode = static_cast<Track>(packet[2]);
@@ -95,13 +134,15 @@ void CardIo::Command_33_ReadData2(std::vector<uint8_t> &packet)
 	} else {
 		std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
 	}
-
+*/
 	return;
 }
 
 void CardIo::Command_40_Cancel()
 {
 	currentRPS.s = S::NO_JOB;
+	multiActionCommand = false;
+	currentStep = 0;
 	return;
 }
 
@@ -190,25 +231,45 @@ void CardIo::Command_7C_PrintL(std::vector<uint8_t> &packet)
 
 void CardIo::Command_80_EjectCard()
 {
-	currentRPS.Reset();
-	*insertedCard = false;
+	if (multiActionCommand) {
+		switch (currentStep) {
+			case 0:
+				currentRPS.r = R::EJECTING_CARD;
+				currentRPS.s = S::RUNNING_COMMAND;
+				break;
+			case 1:
+				currentRPS.r = R::NO_CARD;
+				break;
+		}
+		currentStep++;
+		if (currentStep > 2) {
+			multiActionCommand = false;
+			currentStep = 0;
+		}
+	}
+
+	if (currentRPS.r == R::HAS_CARD_1) {
+		multiActionCommand = true;
+	}
+	//currentRPS.Reset();
+	//*insertedCard = false;
 }
 
 void CardIo::Command_A0_Clean()
 {
 	switch (currentStep) {
 		case 0: 
-			*insertedCard = false;
+			//*insertedCard = false;
 			currentRPS.Reset();
 			currentRPS.s = S::WAITING_FOR_CARD;
 			break;
 		case 1:
-			*insertedCard = true;
+			//*insertedCard = true;
 			currentRPS.r = R::HAS_CARD_1;
 			currentRPS.s = S::RUNNING_COMMAND;
 			break;
 		case 2:
-			*insertedCard = false;
+			//*insertedCard = false;
 			currentRPS.r = R::EJECTING_CARD;
 			break;
 		case 3:
@@ -235,12 +296,47 @@ void CardIo::Command_B0_DispenseCardS31(std::vector<uint8_t> &packet)
 		CheckOnly = 0x32, // check status of dispenser
 	};
 
-	Mode mode = static_cast<Mode>(packet[0]);
+	if (multiActionCommand) {
+		switch (currentStep) {
+			case 0:
+				currentRPS.r = R::EJECTING_CARD;
+				currentRPS.s = S::RUNNING_COMMAND;
+				break;
+			case 1:
+				currentRPS.r = R::NO_CARD;
+				break;
+			case 2:
+				currentRPS.r = R::HAS_CARD_1;
+				break;
+			case 3:
+				currentRPS.r = R::EJECTING_CARD;
+				break;
+			case 4:
+				currentRPS.r = R::NO_CARD;
+				break;
+			default:
+				break;
+		}
+		currentStep++;
+		if (currentStep > 4) {
+			multiActionCommand = false;
+			currentStep = 0;
+		}
+	} else {
+		Mode mode = static_cast<Mode>(packet[0]);
 
-	if (mode == Mode::Dispenser) {
-		currentRPS.r = R::HAS_CARD_1;
-	} else if (mode == Mode::CheckOnly) {
-		currentRPS.s = S::CARD_FULL;
+		if (mode == Mode::Dispenser) {
+			if (currentRPS.r == R::HAS_CARD_1) {
+				multiActionCommand = true;
+				currentStep = 0;
+				//currentRPS.s = S::UNKNOWN_COMMAND;
+			} else {
+				currentRPS.r = R::HAS_CARD_1;
+				//*insertedCard = true;
+			}
+		} else if (mode == Mode::CheckOnly) {
+			currentRPS.s = S::CARD_FULL;
+		}
 	}
 
 	return;
@@ -248,15 +344,33 @@ void CardIo::Command_B0_DispenseCardS31(std::vector<uint8_t> &packet)
 
 void CardIo::UpdateStatusBytes()
 {
+	if (currentCommand == 0x10 && multiActionCommand == true) {
+		Command_10_Initalize(emptyBuffer);
+	}
+
 	if (currentCommand == 0xA0 && multiActionCommand == true) {
 		Command_A0_Clean();
 	}
 
+	if (currentCommand == 0xB0 && multiActionCommand == true) {
+		Command_B0_DispenseCardS31(emptyBuffer);
+	}
+
+	if (currentCommand == 0x80 && multiActionCommand == true) {
+		Command_80_EjectCard();
+	}
+/*
 	if (*insertedCard == true) {
 		currentRPS.r = R::HAS_CARD_1;
 	} else {
 		currentRPS.r = R::NO_CARD;
 	}
+*/
+	bool t = *insertedCard;
+
+	std::printf("\ncurrentCommand: %X, insertedCard: %d, currentRPS.r: %X, currentRPS.p: %X, currentRPS.s: %X, multiActionCommand: %d\n",
+		currentCommand, t, static_cast<uint8_t>(currentRPS.r), 
+		static_cast<uint8_t>(currentRPS.p), static_cast<uint8_t>(currentRPS.s), multiActionCommand);
 }
 
 void CardIo::PutStatusInBuffer()
@@ -266,6 +380,7 @@ void CardIo::PutStatusInBuffer()
 	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(currentRPS.p));
 	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(currentRPS.s));
 
+/*
 	if (*insertedCard) {
 		currentRPS.r = R::HAS_CARD_1;
 		if (cardData.empty()) {
@@ -276,7 +391,7 @@ void CardIo::PutStatusInBuffer()
 			cardData.clear();
 		}
 	}
-
+*/
 	if (!multiActionCommand) {
 		currentRPS.p = P::NO_ERR;
 		currentRPS.s = S::NO_JOB;
@@ -438,7 +553,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
 	if (!buffer.empty()) {
 		buffer.clear();
 	}
-	buffer.push_back(ACK);
+	//buffer.push_back(ACK);
 
 	return Okay;
 }
