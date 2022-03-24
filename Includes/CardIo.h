@@ -82,6 +82,14 @@ struct Status{
 		p = P::NO_ERR;
 		s = S::NO_JOB;
 	}
+
+	void SoftReset()
+	{
+		if (r != R::HAS_CARD_1) {
+			r = R::NO_CARD;
+		}
+		p = P::NO_ERR;
+	}
 };
 
 class CardIo

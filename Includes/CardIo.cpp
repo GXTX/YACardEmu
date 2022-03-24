@@ -151,7 +151,7 @@ void CardIo::Command_7D_Erase()
 {
 	switch (currentStep) {
 		case 1:
-			if (status.r != R::HAS_CARD_1 && status.r != R::HAS_CARD_2) {
+			if (status.r != R::HAS_CARD_1) {
 				status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
 			}
 			break;
@@ -168,7 +168,7 @@ void CardIo::Command_80_EjectCard()
 {
 	switch (currentStep) {
 		case 1:
-			if (status.r == R::HAS_CARD_1 || status.r == R::HAS_CARD_2) {
+			if (status.r == R::HAS_CARD_1) {
 				status.r = R::EJECTING_CARD;
 			} else {
 				status.s = S::ILLEGAL_COMMAND; // FIXME: Is this correct?
@@ -215,16 +215,18 @@ void CardIo::Command_B0_DispenseCardS31()
 	};
 
 	if (mode == static_cast<uint8_t>(Mode::Dispense)) {
-		switch (currentStep) {
-			case 1:
-				if (status.r == R::HAS_CARD_1 && status.r == R::HAS_CARD_2) {
-					status.s = S::ILLEGAL_COMMAND;
-				} else {
-					status.r = R::HAS_CARD_1;
-				}
-				break;
-			default:
-				break;
+		if (status.s != S::ILLEGAL_COMMAND) {
+			switch (currentStep) {
+				case 1:
+					if (status.r == R::HAS_CARD_1) {
+						status.s = S::ILLEGAL_COMMAND;
+					} else {
+						status.r = R::HAS_CARD_1;
+					}
+					break;
+				default:
+					break;
+			}
 		}
 
 		if (currentStep > 1) {
@@ -286,20 +288,23 @@ void CardIo::SaveCardToFS()
 
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
-	if (status.r == R::EJECTING_CARD) {
-		status.r = R::NO_CARD;
-	}
+	if (!runningCommand) {
+		if (status.r == R::EJECTING_CARD) {
+			status.r = R::NO_CARD;
+		}
 
-	if (!runningCommand && status.s == S::RUNNING_COMMAND) {
-		status.s = S::NO_JOB;
-	} else if (!runningCommand && status.s == S::ILLEGAL_COMMAND) {
-		// FIXME: We're overwriting this if we've set it due to a reason in ReceivePacket()
-		status.s = S::NO_JOB;
+		if (status.s != S::NO_JOB && status.s != S::ILLEGAL_COMMAND) {
+			status.s = S::NO_JOB;
+		}
 	}
 
 	if (runningCommand && currentStep == 0) {
 		// Get S::RUNNING_COMMAND to be the first response always
 		currentStep++;
+
+			std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d\n",
+	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
+	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
 		return;
 	} else if (runningCommand) {
 		switch (currentCommand) {
@@ -308,8 +313,8 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 			case 0x33: Command_33_ReadData2(packet); break;
 			case 0x40: runningCommand = false; break; // We don't need to do anything special here
 			case 0x53: Command_53_WriteData2(packet); break;
-			case 0x78: runningCommand = false; break; // We don't need to do anything special here
-			case 0x7C: runningCommand = false; break; // TODO: Implement some type of 'printer'
+			case 0x78: runningCommand = false; break; // TODO: Implement, reply status is fine
+			case 0x7C: runningCommand = false; break; // TODO: Implement, reply status is fine
 			case 0x7D: Command_7D_Erase(); return;
 			case 0x80: Command_80_EjectCard(); break;
 			case 0xA0: Command_A0_Clean(); break;
@@ -408,6 +413,8 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	// Remove the current command and the masters status bytes, we don't need it
 	currentPacket.erase(currentPacket.begin(), currentPacket.begin()+4);
+
+	//status.SoftReset();
 
 	status.s = S::RUNNING_COMMAND;
 	runningCommand = true;
