@@ -26,52 +26,30 @@
 CardIo::CardIo(std::atomic<bool> *insert)
 {
 	insertedCard = insert;
-	ReceiveBuffer.reserve(512);
-	ResponseBuffer.reserve(255);
-	ProcessedPacket.reserve(255);
 }
 
-void CardIo::Command_10_Initalize(std::vector<uint8_t> &packet)
+void CardIo::Command_10_Initalize()
 {
-	//enum Mode {
-	//	Standard = 0x30,
-	//	EjectAfter = 0x31,
-	//	ResetSpecifications = 0x32,
-	//};
+	enum Mode {
+		Standard = 0x30,
+		EjectAfter = 0x31,
+		ResetSpecifications = 0x32,
+	};
 
-	if (multiActionCommand == true) {
-		switch (currentCommand) {
-			case 0:
-				if (currentRPS.r == R::HAS_CARD_1) {
-					currentRPS.r = R::EJECTING_CARD;
-				}
-				currentRPS.s = S::RUNNING_COMMAND;
-				break;
-			case 1:
-				if (currentRPS.r == R::EJECTING_CARD) {
-					currentRPS.r = R::NO_CARD;
-				}
-				currentRPS.s = S::NO_JOB;
-				break;
-			default:
-				break;
-		}
-		currentStep++;
-		if (currentStep > 1) {
-			multiActionCommand = false;
-			currentStep = 0;
-		}
-	} else {
-		multiActionCommand = true;
-		currentStep = 0;
+	switch (currentStep) {
+		case 1:
+			if (status.r == R::HAS_CARD_1) {
+				status.r = R::EJECTING_CARD;
+			}
+			break;
+		default:
+			break;
 	}
 
-	return;
-}
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
 
-void CardIo::Command_20_ReadStatus()
-{
-	// Return current RPS
 	return;
 }
 
@@ -98,26 +76,26 @@ void CardIo::Command_33_ReadData2(std::vector<uint8_t> &packet)
 	//	Track_1_2_And_3 = 36,
 	//};
 	
-	if (multiActionCommand) {
-		if (currentRPS.r != R::HAS_CARD_1) {
+	if (runningCommand) {
+		if (status.r != R::HAS_CARD_1) {
 			switch (currentCommand) {
 				case 0:
-					currentRPS.s = S::RUNNING_COMMAND;
+					status.s = S::RUNNING_COMMAND;
 					break;
 				case 1:
-					currentRPS.s = S::WAITING_FOR_CARD;
+					status.s = S::WAITING_FOR_CARD;
 					break;
 				default:
 					break;
 			}
 			currentCommand++;
 			if (currentCommand > 1) {
-				multiActionCommand = false;
+				runningCommand = false;
 				currentCommand = 0;
 			}
 		}
 	} else {
-		multiActionCommand = true;
+		runningCommand = true;
 		currentCommand = 0;
 	}
 
@@ -129,20 +107,12 @@ void CardIo::Command_33_ReadData2(std::vector<uint8_t> &packet)
 	BitMode bitMode = static_cast<BitMode>(packet[1]);
 	Track trackMode = static_cast<Track>(packet[2]);
 
-	if (currentRPS.r == R::NO_CARD) {
-		currentRPS.s == S::WAITING_FOR_CARD;
+	if (status.r == R::NO_CARD) {
+		status.s == S::WAITING_FOR_CARD;
 	} else {
 		std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
 	}
 */
-	return;
-}
-
-void CardIo::Command_40_Cancel()
-{
-	currentRPS.s = S::NO_JOB;
-	multiActionCommand = false;
-	currentStep = 0;
 	return;
 }
 
@@ -177,225 +147,105 @@ void CardIo::Command_53_WriteData2(std::vector<uint8_t> &packet)
 	return;
 }
 
-void CardIo::Command_78_PrintSettings2(std::vector<uint8_t> &packet)
+void CardIo::Command_7D_Erase()
 {
-	// TODO: Have these be Printer class members
-	enum CardType {
-		LeucoRewrite_Blue = 0x37,
-	};
+	switch (currentStep) {
+		case 1:
+			if (status.r != R::HAS_CARD_1 && status.r != R::HAS_CARD_2) {
+				status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
+			}
+			break;
+		default:
+			break;
+	}
 
-	enum PrintMethod {
-		Overwrite = 0x30,
-		Overlay = 0x31,
-	};
-
-	enum FontWidth {
-		Normal = 0x30,
-		Half = 0x31,
-	};
-
-	enum PrintCoordinates {
-		Standard = 0x30,
-		// 31, 32
-		LeftRotate = 0x33,
-		RightRotate = 0x34,
-	};
-
-	return;
-}
-
-void CardIo::Command_7C_PrintL(std::vector<uint8_t> &packet)
-{
-	enum Mode {
-		Both = 0x30, // process and print
-		ProcessOnly = 0x31,
-	};
-
-	enum Buffer {
-		Clear = 0x30,
-		DoNotClear = 0x31,
-	};
-
-	enum PrintCoord {
-		Standard = 0x01,
-	};
-
-	Mode mode  = static_cast<Mode>(packet[0]);
-	Buffer bufferControl = static_cast<Buffer>(packet[1]);
-	PrintCoord coords = static_cast<PrintCoord>(packet[2]);
-
-	// TODO: Generate image, document control codes
-
-	return;
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
 }
 
 void CardIo::Command_80_EjectCard()
 {
-	if (multiActionCommand) {
-		switch (currentStep) {
-			case 0:
-				currentRPS.r = R::EJECTING_CARD;
-				currentRPS.s = S::RUNNING_COMMAND;
-				break;
-			case 1:
-				currentRPS.r = R::NO_CARD;
-				break;
-		}
-		currentStep++;
-		if (currentStep > 2) {
-			multiActionCommand = false;
-			currentStep = 0;
-		}
+	switch (currentStep) {
+		case 1:
+			if (status.r == R::HAS_CARD_1 || status.r == R::HAS_CARD_2) {
+				status.r = R::EJECTING_CARD;
+			} else {
+				status.s = S::ILLEGAL_COMMAND; // FIXME: Is this correct?
+			}
+			break;
+		default:
+			break;
 	}
 
-	if (currentRPS.r == R::HAS_CARD_1) {
-		multiActionCommand = true;
+	if (currentStep > 1) {
+		runningCommand = false;
 	}
-	//currentRPS.Reset();
-	//*insertedCard = false;
 }
 
 void CardIo::Command_A0_Clean()
 {
 	switch (currentStep) {
-		case 0: 
-			//*insertedCard = false;
-			currentRPS.Reset();
-			currentRPS.s = S::WAITING_FOR_CARD;
-			break;
 		case 1:
-			//*insertedCard = true;
-			currentRPS.r = R::HAS_CARD_1;
-			currentRPS.s = S::RUNNING_COMMAND;
+			status.s = S::WAITING_FOR_CARD;
 			break;
 		case 2:
-			//*insertedCard = false;
-			currentRPS.r = R::EJECTING_CARD;
+			status.r = R::HAS_CARD_1;
+			status.s = S::RUNNING_COMMAND;
 			break;
 		case 3:
-			currentRPS.r = R::NO_CARD;
+			status.r = R::EJECTING_CARD;
 			break;
 		default: 
 			break;
 	}
 
-	currentStep++;
-
 	if (currentStep > 3) {
-		currentStep = 0;
-		multiActionCommand = false;
+		runningCommand = false;
 	}
 
 	return;
 }
 
-void CardIo::Command_B0_DispenseCardS31(std::vector<uint8_t> &packet)
+void CardIo::Command_B0_DispenseCardS31()
 {
 	enum Mode {
-		Dispenser = 0x31,
+		Dispense = 0x31,
 		CheckOnly = 0x32, // check status of dispenser
 	};
 
-	if (multiActionCommand) {
+	if (mode == static_cast<uint8_t>(Mode::Dispense)) {
 		switch (currentStep) {
-			case 0:
-				currentRPS.r = R::EJECTING_CARD;
-				currentRPS.s = S::RUNNING_COMMAND;
-				break;
 			case 1:
-				currentRPS.r = R::NO_CARD;
-				break;
-			case 2:
-				currentRPS.r = R::HAS_CARD_1;
-				break;
-			case 3:
-				currentRPS.r = R::EJECTING_CARD;
-				break;
-			case 4:
-				currentRPS.r = R::NO_CARD;
+				if (status.r == R::HAS_CARD_1 && status.r == R::HAS_CARD_2) {
+					status.s = S::ILLEGAL_COMMAND;
+				} else {
+					status.r = R::HAS_CARD_1;
+				}
 				break;
 			default:
 				break;
 		}
-		currentStep++;
-		if (currentStep > 4) {
-			multiActionCommand = false;
-			currentStep = 0;
+
+		if (currentStep > 1) {
+			runningCommand = false;
 		}
 	} else {
-		Mode mode = static_cast<Mode>(packet[0]);
-
-		if (mode == Mode::Dispenser) {
-			if (currentRPS.r == R::HAS_CARD_1) {
-				multiActionCommand = true;
-				currentStep = 0;
-				//currentRPS.s = S::UNKNOWN_COMMAND;
-			} else {
-				currentRPS.r = R::HAS_CARD_1;
-				//*insertedCard = true;
-			}
-		} else if (mode == Mode::CheckOnly) {
-			currentRPS.s = S::CARD_FULL;
-		}
+		// FIXME: Verify
+		status.s = S::CARD_FULL;
+		runningCommand = false;
 	}
 
 	return;
-}
-
-void CardIo::UpdateStatusBytes()
-{
-	if (currentCommand == 0x10 && multiActionCommand == true) {
-		Command_10_Initalize(emptyBuffer);
-	}
-
-	if (currentCommand == 0xA0 && multiActionCommand == true) {
-		Command_A0_Clean();
-	}
-
-	if (currentCommand == 0xB0 && multiActionCommand == true) {
-		Command_B0_DispenseCardS31(emptyBuffer);
-	}
-
-	if (currentCommand == 0x80 && multiActionCommand == true) {
-		Command_80_EjectCard();
-	}
-/*
-	if (*insertedCard == true) {
-		currentRPS.r = R::HAS_CARD_1;
-	} else {
-		currentRPS.r = R::NO_CARD;
-	}
-*/
-	bool t = *insertedCard;
-
-	std::printf("\ncurrentCommand: %X, insertedCard: %d, currentRPS.r: %X, currentRPS.p: %X, currentRPS.s: %X, multiActionCommand: %d\n",
-		currentCommand, t, static_cast<uint8_t>(currentRPS.r), 
-		static_cast<uint8_t>(currentRPS.p), static_cast<uint8_t>(currentRPS.s), multiActionCommand);
 }
 
 void CardIo::PutStatusInBuffer()
 {
 	ResponseBuffer.insert(ResponseBuffer.begin(), static_cast<uint8_t>(currentCommand));
-	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(currentRPS.r));
-	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(currentRPS.p));
-	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(currentRPS.s));
 
-/*
-	if (*insertedCard) {
-		currentRPS.r = R::HAS_CARD_1;
-		if (cardData.empty()) {
-			LoadCardFromFS();
-		}
-	} else {
-		if (!cardData.empty()) {
-			cardData.clear();
-		}
-	}
-*/
-	if (!multiActionCommand) {
-		currentRPS.p = P::NO_ERR;
-		currentRPS.s = S::NO_JOB;
-	}
+	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(status.r));
+	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(status.p));
+	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(status.s));
 }
 
 void CardIo::LoadCardFromFS()
@@ -436,32 +286,46 @@ void CardIo::SaveCardToFS()
 
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
-	if (currentCommand != packet[0]) {
-		currentRPS.Reset();
+	if (status.r == R::EJECTING_CARD) {
+		status.r = R::NO_CARD;
 	}
 
-	currentCommand = packet[0];
-
-	// This removes the current command and the master's status bytes.
-	packet.erase(packet.begin(), packet.begin()+4);
-
-	switch (currentCommand) {
-		case 0x10: Command_10_Initalize(packet); return;
-		case 0x20: Command_20_ReadStatus(); return;
-		case 0x33: Command_33_ReadData2(packet); return;
-		case 0x40: Command_40_Cancel(); return;
-		case 0x53: Command_53_WriteData2(packet); return;
-		case 0x78: Command_78_PrintSettings2(packet); return;
-		case 0x7C: Command_7C_PrintL(packet); return;
-		//case 0x7D: Command_7D_Erase(); return; // FIXME: Custom case
-		case 0x80: Command_80_EjectCard(); return;
-		case 0xA0: multiActionCommand = true; Command_A0_Clean(); return;
-		case 0xB0: Command_B0_DispenseCardS31(packet); return;
-		default:
-			std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet[0]);
-			currentRPS.s = S::UNKNOWN_COMMAND;
-			return;
+	if (!runningCommand && status.s == S::RUNNING_COMMAND) {
+		status.s = S::NO_JOB;
+	} else if (!runningCommand && status.s == S::ILLEGAL_COMMAND) {
+		// FIXME: We're overwriting this if we've set it due to a reason in ReceivePacket()
+		status.s = S::NO_JOB;
 	}
+
+	if (runningCommand && currentStep == 0) {
+		// Get S::RUNNING_COMMAND to be the first response always
+		currentStep++;
+		return;
+	} else if (runningCommand) {
+		switch (currentCommand) {
+			case 0x10: mode = packet[0]; Command_10_Initalize(); break;
+			case 0x20: runningCommand = false; break; // We don't need to do anything special here
+			case 0x33: Command_33_ReadData2(packet); break;
+			case 0x40: runningCommand = false; break; // We don't need to do anything special here
+			case 0x53: Command_53_WriteData2(packet); break;
+			case 0x78: runningCommand = false; break; // We don't need to do anything special here
+			case 0x7C: runningCommand = false; break; // TODO: Implement some type of 'printer'
+			case 0x7D: Command_7D_Erase(); return;
+			case 0x80: Command_80_EjectCard(); break;
+			case 0xA0: Command_A0_Clean(); break;
+			case 0xB0: mode = packet[0]; Command_B0_DispenseCardS31(); break;
+			default:
+				std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet[0]);
+				runningCommand = false;
+				status.s = S::ILLEGAL_COMMAND;
+				break;
+		}
+		currentStep++;
+	}
+
+	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d\n",
+	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
+	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
 }
 
 uint8_t CardIo::GetByte(uint8_t **buffer)
@@ -472,134 +336,125 @@ uint8_t CardIo::GetByte(uint8_t **buffer)
 	return value;
 }
 
-CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &buffer)
+CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 {
-	uint8_t count{};
-	uint8_t actual_checksum{};
-
-#ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::ReceivePacket:";
-#endif
 
-	std::copy(buffer.begin(), buffer.end(), std::back_inserter(ReceiveBuffer));
-
-	uint8_t *buf = &ReceiveBuffer[0];
+	uint8_t *buffer = &readBuffer[0];
 
 	// First, read the sync byte
-	uint8_t sync = GetByte(&buf);
+	uint8_t sync = GetByte(&buffer);
+
 	if (sync == ENQUIRY) {
-#ifdef DEBUG_CARD_PACKETS
 		std::cout << " ENQ\n";
-#endif
-		ReceiveBuffer.erase(ReceiveBuffer.begin());
-		UpdateStatusBytes();
+		readBuffer.erase(readBuffer.begin());
+		HandlePacket(currentPacket);
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
-#ifdef DEBUG_CARD_PACKETS
 		std::cerr << " Missing STX!\n";
-#endif
-		ReceiveBuffer.clear();
+		status.s = S::ILLEGAL_COMMAND;
+		readBuffer.clear();
 		return SyncError;
-	} 
+	}
 
-	count = GetByte(&buf);
-	if (count > ReceiveBuffer.size() - 1) {
-#ifdef DEBUG_CARD_PACKETS
+	uint8_t count = GetByte(&buffer);
+
+	if (count > readBuffer.size() - 1) { // Count counts itself but we still have STX
 		std::cout << " Waiting for more data\n";
-#endif
 		return SizeError;
 	}
 
-	UpdateStatusBytes();
+	if (readBuffer.at(count) != END_OF_TEXT) {
+		std::cout << " Missing ETX!\n";
+		status.s = S::ILLEGAL_COMMAND;
+		readBuffer.clear();
+		return SizeError;
+	}
 
-	// Checksum is calcuated by xoring the entire packet excluding the start and the end.
-	actual_checksum = count;
+	// Checksum is calcuated by xoring the entire packet excluding the start and the end
+	uint8_t actual_checksum = count;
+
+	// Clear previous packet
+	currentPacket.clear();
 
 	// Decode the payload data
-	ProcessedPacket.clear();
-	for (int i = 0; i < count - 1; i++) { // NOTE: -1 to ignore sum byte
-		uint8_t value = GetByte(&buf);
-		ProcessedPacket.push_back(value);
+	for (int i = 0; i < (count - 1); i++) { // NOTE: -1 to ignore sum byte
+		uint8_t value = GetByte(&buffer);
+		currentPacket.push_back(value);
 		actual_checksum ^= value;
 	}
 
 	// Read the checksum from the last byte
-	uint8_t packet_checksum = GetByte(&buf);
+	uint8_t packet_checksum = GetByte(&buffer);
 
-	ProcessedPacket.pop_back(); // Remove the END_OF_TEXT
-	ReceiveBuffer.erase(ReceiveBuffer.begin(), ReceiveBuffer.begin() + count + 2); // Clear out the part of the buffer we've handled.
+	currentPacket.pop_back(); // Remove the END_OF_TEXT
+
+	// Clear out the part of the buffer we've handled.
+	readBuffer.erase(readBuffer.begin(), readBuffer.begin() + count + 2);
 
 	// Verify checksum - skip packet if invalid
 	if (packet_checksum != actual_checksum) {
-#ifdef DEBUG_CARD_PACKETS
 		std::cerr << " Checksum error!\n";
-#endif
+		status.s = S::ILLEGAL_COMMAND;
 		return ChecksumError;
 	}
 
-#ifdef DEBUG_CARD_PACKETS
-	for (const uint8_t n : ProcessedPacket) {
+	for (const uint8_t n : currentPacket) {
 		std::printf(" %02X", n);
 	}
 	std::cout << "\n";
-#endif
 
-	// Clear out ResponseBuffer before fully processing the packet.
-	ResponseBuffer.clear();
+	currentCommand = currentPacket[0];
 
-	HandlePacket(ProcessedPacket);
+	// Remove the current command and the masters status bytes, we don't need it
+	currentPacket.erase(currentPacket.begin(), currentPacket.begin()+4);
 
-	// Put the ACK into the buffer, code above sends this to the server.
-	if (!buffer.empty()) {
-		buffer.clear();
-	}
-	//buffer.push_back(ACK);
+	status.s = S::RUNNING_COMMAND;
+	runningCommand = true;
+	currentStep = 0;
+	mode = 0x30; // FIXME: Do more with this
 
 	return Okay;
 }
 
-CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &buffer)
+CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 {
-#ifdef DEBUG_CARD_PACKETS
 	std::cout << "CardIo::BuildPacket:";
-#endif
 
 	PutStatusInBuffer();
 
 	uint8_t count = (ResponseBuffer.size() + 2) & 0xFF; // FIXME: +2 why?
 
 	// Ensure our outgoing buffer is empty.
-	if (!buffer.empty()) {
-		buffer.clear();
+	if (!writeBuffer.empty()) {
+		writeBuffer.clear();
 	}
 
 	// Send the header bytes
-	buffer.emplace_back(START_OF_TEXT);
-	buffer.emplace_back(count);
+	writeBuffer.emplace_back(START_OF_TEXT);
+	writeBuffer.emplace_back(count);
 
 	// Calculate the checksum
 	uint8_t packet_checksum = count;
 
 	// Encode the payload data
 	for (const uint8_t n : ResponseBuffer) {
-		buffer.emplace_back(n);
+		writeBuffer.emplace_back(n);
 		packet_checksum ^= n;
 	}
 
-	buffer.emplace_back(END_OF_TEXT);
+	writeBuffer.emplace_back(END_OF_TEXT);
 	packet_checksum ^= END_OF_TEXT;
 
 	// Write the checksum to the last byte
-	buffer.emplace_back(packet_checksum);
+	writeBuffer.emplace_back(packet_checksum);
 
 	ResponseBuffer.clear();
 
-#ifdef DEBUG_CARD_PACKETS
-	for (const uint8_t n : buffer) {
+	for (const uint8_t n : writeBuffer) {
 		std::printf(" %02X", n);
 	}
 	std::cout << "\n";
-#endif
 
 	return Okay;
 }

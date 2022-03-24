@@ -62,7 +62,7 @@ enum class P {
 enum class S {
 	NO_JOB           = 0x30,
 	//UNK_31 = 0x31,
-	UNKNOWN_COMMAND  = 0x32,
+	ILLEGAL_COMMAND  = 0x32,
 	RUNNING_COMMAND  = 0x33,
 	WAITING_FOR_CARD = 0x34,
 	DISPENSER_EMPTY  = 0x35,
@@ -97,8 +97,8 @@ public:
 	};
 
 	CardIo(std::atomic<bool> *insert);
-	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &buffer);
-	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &buffer);
+	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
+	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
 	std::atomic<bool> *insertedCard;
 	std::string cardName = "card.bin";
@@ -140,7 +140,7 @@ private:
 	};
 
 	// Commands
-	void Command_10_Initalize(std::vector<uint8_t> &packet); // there's 2 methods here
+	void Command_10_Initalize(); // there's 2 methods here
 	void Command_20_ReadStatus();
 	//void Command_30_ReadData(); // marked "old"
 	//void Command_33_ReadDataL();
@@ -156,16 +156,17 @@ private:
 	//void Command_73_Print20Lines(); // marked "old"
 	//void Command_75_PrintAndDischarge(); // marked "old"
 	//void Command_78_PrintSettings();
-	void Command_78_PrintSettings2(std::vector<uint8_t> &packet);
+	void Command_78_PrintSettings2();
 	void Command_7A_RegisterFont(); // "foreign characters"
 	void Command_7B_PrintImage();
 	void Command_7C_PrintL(std::vector<uint8_t> &packet);
+	void Command_7D_Erase(); // erase the printed image
 	void Command_7E_PrintBarcode();
 	void Command_80_EjectCard();
 	//void Command_90_EmptyCardDispenser(); // eject all cards?
 	void Command_A0_Clean(); // requires multi-step replies
 	//void Command_B0_DispenseCard();
-	void Command_B0_DispenseCardS31(std::vector<uint8_t> &packet);
+	void Command_B0_DispenseCardS31();
 	//void Command_C0_ControlLED(); // marked "old"
 	//void Command_C1_SetRetry(); // marked "old"
 	//void Command_E1_SetRTC(); // Req for WMMT3
@@ -173,16 +174,17 @@ private:
 	//void Command_F1_GetRTC(); // Req for WMMT3
 	//void Command_F5_CheckBattery(); // Req for WMMT3
 
-	Status currentRPS;
+	Status status;
+	int currentStep{};
 	uint8_t currentCommand{};
 
-	// For cleaning
-	int currentStep{};
-	bool multiActionCommand{false};
+	bool runningCommand{false};
 
-	std::vector<uint8_t> ReceiveBuffer{};
+	uint8_t mode{0x30};
+
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
-	std::vector<uint8_t> ProcessedPacket{};
+
+	std::vector<uint8_t> currentPacket{};
 	std::vector<uint8_t> emptyBuffer{};
 };
 

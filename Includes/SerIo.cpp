@@ -50,21 +50,17 @@ SerIo::~SerIo()
 	sp_close(Port);
 }
 
-SerIo::Status SerIo::SendAck()
+void SerIo::SendAck()
 {
-	const std::vector<uint8_t> ack{0x06};
+	constexpr static const uint8_t ack = 0x06;
 
 #ifdef DEBUG_SERIAL
-	std::cout << "SerIo::SendAck:";
-	for (uint8_t c : ack) {
-		std::printf(" %02X", c);
-	}
-	std::cout << "\n";
+	std::cout << "SerIo::SendAck: 06\n";
 #endif
 
-	int ret = sp_blocking_write(Port, &ack[0], ack.size(), 0);
+	sp_blocking_write(Port, &ack, 1, 0);
 
-	return Status::Okay;
+	return;
 }
 
 SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
@@ -100,21 +96,24 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 {
 	int bytes = sp_input_waiting(Port);
 
-	if (bytes < 1) { // FIXME: Dirty hack, smallest size packet is 1
+	if (bytes < 1) { // TODO: Should we stall instead? smallest packet size is 1
 		return Status::ReadError;
 	}
 
-	buffer.resize(static_cast<size_t>(bytes));
+	serialBuffer.clear();
+	serialBuffer.resize(static_cast<size_t>(bytes));
 
-	int ret = sp_nonblocking_read(Port, &buffer[0], buffer.size());
+	int ret = sp_nonblocking_read(Port, &serialBuffer[0], serialBuffer.size());
 
 	if (ret <= 0) {
 		return Status::ReadError;
 	}
 
+	std::copy(serialBuffer.begin(), serialBuffer.end(), std::back_inserter(buffer));
+
 #ifdef DEBUG_SERIAL
 	std::cout << "SerIo::Read:";
-	for (uint8_t c : buffer) {
+	for (uint8_t c : serialBuffer) {
 		std::printf(" %02X", c);
 	}
 	std::cout << "\n";

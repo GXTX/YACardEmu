@@ -30,7 +30,8 @@
 
 static const std::string serialName = "/dev/ttyUSB0";
 
-static const auto delay = std::chrono::milliseconds(5);
+static const auto delay = std::chrono::milliseconds(25);
+static const auto quickDelay{std::chrono::microseconds(20)};
 
 std::atomic<bool> running{true};
 std::atomic<bool> insertCard{false};
@@ -72,46 +73,38 @@ int main()
 		return 1;
 	}
 
-	CardIo::StatusCode cardStatus;
-	SerIo::Status serialStatus;
-	std::vector<uint8_t> SerialBuffer;
-	std::vector<uint8_t> OutgoingBuffer;
-
 	// Handle card inserting.
 	std::thread(cin_handler).detach();
 
-	while (running) {
-		if (!SerialBuffer.empty()) {
-			SerialBuffer.clear();
-		}
+	CardIo::StatusCode cardStatus;
+	SerIo::Status serialStatus;
+	std::vector<uint8_t> readBuffer{};
+	std::vector<uint8_t> writeBuffer{};
 
-		serialStatus = SerialHandler->Read(SerialBuffer);
+	while (running) {
+		serialStatus = SerialHandler->Read(readBuffer);
+
 		if (serialStatus != SerIo::Status::Okay) {
-			std::this_thread::sleep_for(delay);
+			std::this_thread::sleep_for(quickDelay);
 			continue;
 		}
 
-		cardStatus = CardHandler->ReceivePacket(SerialBuffer);
+		cardStatus = CardHandler->ReceivePacket(readBuffer);
 
 		if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply) {
+			// We need to send our ACK as quick as possible even if it takes us time to handle the command.
 			SerialHandler->SendAck();
-		}
-
-		if (cardStatus == CardIo::Okay) {
-			// Build our reply packet in preperation for the ENQ byte from the server.
-			//cardStatus = CardHandler->BuildPacket(OutgoingBuffer);
-			
-			// ReceivePacket should've cleared out this buffer and appended ACK to it.
-			//SerialHandler->Write(SerialBuffer);
-			std::this_thread::sleep_for(delay / 2);
-			//SerialHandler->Write(OutgoingBuffer); // Is this correct, should we send our reply directly after ACKing?
+			//std::this_thread::sleep_for(delay); // server takes slightly longer to send their ENQ
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
-			// Rebuild the packet
-			cardStatus = CardHandler->BuildPacket(OutgoingBuffer);
-			SerialHandler->Write(OutgoingBuffer);
+			// Do not reply until we get this command
+			writeBuffer.clear();
+			CardHandler->BuildPacket(writeBuffer);
+			SerialHandler->Write(writeBuffer);
 		}
 
 		std::this_thread::sleep_for(delay);
+
+		//std::this_thread::sleep_for(quickDelay);
 	}
 
 	return 0;
