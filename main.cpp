@@ -28,10 +28,9 @@
 #include "CardIo.h"
 #include "SerIo.h"
 
-static const std::string serialName = "/dev/ttyUSB0";
+static const std::string serialName = "/dev/ttyUSB1";
 
-static const auto delay = std::chrono::milliseconds(25);
-static const auto quickDelay{std::chrono::microseconds(20)};
+static const auto delay = std::chrono::milliseconds(1);
 
 std::atomic<bool> running{true};
 std::atomic<bool> insertCard{false};
@@ -85,13 +84,13 @@ int main()
 		serialStatus = SerialHandler->Read(readBuffer);
 
 		if (serialStatus != SerIo::Status::Okay) {
-			std::this_thread::sleep_for(quickDelay);
+			std::this_thread::sleep_for(delay);
 			continue;
 		}
 
 		cardStatus = CardHandler->ReceivePacket(readBuffer);
 
-		if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply) {
+		if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply && cardStatus != CardIo::SyntaxError) {
 			// We need to send our ACK as quick as possible even if it takes us time to handle the command.
 			SerialHandler->SendAck();
 			//std::this_thread::sleep_for(delay); // server takes slightly longer to send their ENQ
@@ -103,8 +102,6 @@ int main()
 		}
 
 		std::this_thread::sleep_for(delay);
-
-		//std::this_thread::sleep_for(quickDelay);
 	}
 
 	return 0;

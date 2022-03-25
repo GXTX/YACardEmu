@@ -82,14 +82,6 @@ struct Status{
 		p = P::NO_ERR;
 		s = S::NO_JOB;
 	}
-
-	void SoftReset()
-	{
-		if (r != R::HAS_CARD_1) {
-			r = R::NO_CARD;
-		}
-		p = P::NO_ERR;
-	}
 };
 
 class CardIo
@@ -99,6 +91,7 @@ public:
 		Okay,
 		SizeError,
 		SyncError,
+		SyntaxError,
 		ChecksumError,
 		EmptyResponseError,
 		ServerWaitingReply,
@@ -109,7 +102,7 @@ public:
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
 	std::atomic<bool> *insertedCard;
-	std::string cardName = "card.bin";
+	std::string cardName = "/home/wutno/Projects/YACardEmu/build/card.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
 private:
@@ -118,7 +111,7 @@ private:
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
 
-	const uint8_t CARD_SIZE = 0x46;
+	const uint8_t CARD_SIZE = 0x45;
 	const uint8_t START_OF_CARD = 0x30;
 	const uint8_t END_OF_CARD = 0x40;
 
@@ -152,7 +145,7 @@ private:
 	void Command_20_ReadStatus();
 	//void Command_30_ReadData(); // marked "old"
 	//void Command_33_ReadDataL();
-	void Command_33_ReadData2(std::vector<uint8_t> &packet); // multi-track read
+	void Command_33_ReadData2(); // multi-track read
 	//void Command_35_GetData();
 	void Command_40_Cancel();
 	//void Command_50_WriteData(); // marked "old" 7-bit
@@ -188,11 +181,12 @@ private:
 
 	bool runningCommand{false};
 
-	uint8_t mode{0x30};
+	uint8_t mode{0x30}; // FIXME: Do more with this
 
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 
 	std::vector<uint8_t> currentPacket{};
+	std::vector<uint8_t> commandBuffer{}; // 
 	std::vector<uint8_t> emptyBuffer{};
 };
 

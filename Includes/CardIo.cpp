@@ -30,12 +30,6 @@ CardIo::CardIo(std::atomic<bool> *insert)
 
 void CardIo::Command_10_Initalize()
 {
-	enum Mode {
-		Standard = 0x30,
-		EjectAfter = 0x31,
-		ResetSpecifications = 0x32,
-	};
-
 	switch (currentStep) {
 		case 1:
 			if (status.r == R::HAS_CARD_1) {
@@ -53,66 +47,43 @@ void CardIo::Command_10_Initalize()
 	return;
 }
 
-void CardIo::Command_33_ReadData2(std::vector<uint8_t> &packet)
+void CardIo::Command_33_ReadData2()
 {
-	//enum Mode {
-	//	Standard     = 30, // read 69-bytes
-	//	ReadVariable = 31, // variable length read, 1-47 bytes
-	//	CardCapture  = 32, // pull in card?
-	//};
+	enum Mode {
+		Standard = 0x30, // read 69-bytes
+		ReadVariable = 0x31, // variable length read, 1-47 bytes
+		CardCapture = 0x32, // pull in card?
+	};
 
-	//enum BitMode {
-	//	SevenBitParity   = 30,
-	//	EightBitNoParity = 31,
-	//};
-
-	//enum Track {
-	//	Track_1 = 30,
-	//	Track_2 = 31,
-	//	Track_3 = 32,
-	//	Track_1_And_2 = 33,
-	//	Track_1_And_3 = 34,
-	//	Track_2_And_3 = 35,
-	//	Track_1_2_And_3 = 36,
-	//};
-	
-	if (runningCommand) {
-		if (status.r != R::HAS_CARD_1) {
-			switch (currentCommand) {
-				case 0:
-					status.s = S::RUNNING_COMMAND;
-					break;
-				case 1:
-					status.s = S::WAITING_FOR_CARD;
-					break;
-				default:
-					break;
+	switch (currentStep) {
+	case 1:
+		if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
+			if (status.r != R::HAS_CARD_1) {
+				status.s = S::WAITING_FOR_CARD; // FIXME: is this correct?
+				currentStep--;
 			}
-			currentCommand++;
-			if (currentCommand > 1) {
-				runningCommand = false;
-				currentCommand = 0;
+		} else {
+			if (status.r != R::HAS_CARD_1) {
+				status.s = S::ILLEGAL_COMMAND; // FIXME: is this correct?
+			} else {
+				status.s = S::RUNNING_COMMAND; // clean up from above
+				if (cardData.empty()) {
+					std::puts("load\n");
+					LoadCardFromFS();
+				}
+				std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
 			}
 		}
-	} else {
-		runningCommand = true;
-		currentCommand = 0;
+		break;
+	default:
+		break;
 	}
 
 
-
-
-/*
-	Mode mode = static_cast<Mode>(packet[0]);
-	BitMode bitMode = static_cast<BitMode>(packet[1]);
-	Track trackMode = static_cast<Track>(packet[2]);
-
-	if (status.r == R::NO_CARD) {
-		status.s == S::WAITING_FOR_CARD;
-	} else {
-		std::copy(cardData.begin(), cardData.end(), std::back_inserter(ResponseBuffer));
+	if (currentStep > 1) {
+		runningCommand = false;
 	}
-*/
+
 	return;
 }
 
@@ -149,14 +120,8 @@ void CardIo::Command_53_WriteData2(std::vector<uint8_t> &packet)
 
 void CardIo::Command_7D_Erase()
 {
-	switch (currentStep) {
-		case 1:
-			if (status.r != R::HAS_CARD_1) {
-				status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
-			}
-			break;
-		default:
-			break;
+	if (currentStep == 1 && status.r != R::HAS_CARD_1) {
+		status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
 	}
 
 	if (currentStep > 1) {
@@ -187,11 +152,13 @@ void CardIo::Command_A0_Clean()
 {
 	switch (currentStep) {
 		case 1:
-			status.s = S::WAITING_FOR_CARD;
+			if (status.r == R::NO_CARD) {
+				status.s = S::WAITING_FOR_CARD;
+				currentStep--;
+			}
 			break;
 		case 2:
-			status.r = R::HAS_CARD_1;
-			status.s = S::RUNNING_COMMAND;
+			status.s = S::RUNNING_COMMAND; // TODO: don't set this here
 			break;
 		case 3:
 			status.r = R::EJECTING_CARD;
@@ -252,13 +219,13 @@ void CardIo::PutStatusInBuffer()
 
 void CardIo::LoadCardFromFS()
 {
-	// FIXME: Create a card if one doesn't exist.
+	// FIXME: Create a card if one doesn't exist. Find a better way to do this, gdb running as sudo can't find the file unless it's full path
 
 	std::ifstream card(cardName.c_str(), std::ifstream::in | std::ifstream::binary | std::ifstream::ate);
 	std::string readBack(CARD_SIZE, 0);
 	int size = 0;
 
-	if (card.good() && card.tellg() == CARD_SIZE) {
+	if (card.good() && card.tellg() == CARD_SIZE && cardData.empty()) {
 		size = card.tellg();
 		card.seekg(std::ifstream::beg);
 		card.read(&readBack[0], size);
@@ -289,28 +256,43 @@ void CardIo::SaveCardToFS()
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
 	if (!runningCommand) {
-		if (status.r == R::EJECTING_CARD) {
-			status.r = R::NO_CARD;
-		}
+		//if (status.r == R::EJECTING_CARD) {
+		//	*insertedCard = false;
+		//	status.r = R::NO_CARD;
+		//}
 
 		if (status.s != S::NO_JOB && status.s != S::ILLEGAL_COMMAND) {
 			status.s = S::NO_JOB;
 		}
 	}
+	
+	// We "grab" the card for the user
+	if (status.r == R::EJECTING_CARD) {
+		*insertedCard = false;
+		status.r = R::NO_CARD;
+	}
+
+	// We require the user to "insert" a card if we're waiting
+	if (*insertedCard && status.s == S::WAITING_FOR_CARD) {
+		status.r = R::HAS_CARD_1;
+	}
+
+	//if (status.r == R::HAS_CARD_1 && cardData.empty()) {
+	//	LoadCardFromFS();
+	//}
 
 	if (runningCommand && currentStep == 0) {
 		// Get S::RUNNING_COMMAND to be the first response always
 		currentStep++;
-
-			std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d\n",
+			std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mnode: %X\n",
 	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
+	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
 		return;
 	} else if (runningCommand) {
 		switch (currentCommand) {
 			case 0x10: mode = packet[0]; Command_10_Initalize(); break;
 			case 0x20: runningCommand = false; break; // We don't need to do anything special here
-			case 0x33: Command_33_ReadData2(packet); break;
+			case 0x33: mode = packet[0]; Command_33_ReadData2(); break;
 			case 0x40: runningCommand = false; break; // We don't need to do anything special here
 			case 0x53: Command_53_WriteData2(packet); break;
 			case 0x78: runningCommand = false; break; // TODO: Implement, reply status is fine
@@ -328,9 +310,9 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 		currentStep++;
 	}
 
-	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d\n",
+	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mode: %X\n",
 	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
+	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
 }
 
 uint8_t CardIo::GetByte(uint8_t **buffer)
@@ -373,7 +355,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 		std::cout << " Missing ETX!\n";
 		status.s = S::ILLEGAL_COMMAND;
 		readBuffer.clear();
-		return SizeError;
+		return SyntaxError;
 	}
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end
@@ -419,7 +401,8 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	status.s = S::RUNNING_COMMAND;
 	runningCommand = true;
 	currentStep = 0;
-	mode = 0x30; // FIXME: Do more with this
+	mode = 0x30;
+	commandBuffer.clear();
 
 	return Okay;
 }
@@ -427,6 +410,8 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 {
 	std::cout << "CardIo::BuildPacket:";
+
+	std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(ResponseBuffer));
 
 	PutStatusInBuffer();
 
