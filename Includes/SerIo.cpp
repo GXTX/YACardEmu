@@ -55,7 +55,7 @@ void SerIo::SendAck()
 	constexpr static const uint8_t ack = 0x06;
 
 #ifdef DEBUG_SERIAL
-	std::cout << "SerIo::SendAck: 06\n";
+	std::puts("SerIo::SendAck: 06");
 #endif
 
 	sp_blocking_write(Port, &ack, 1, 0);

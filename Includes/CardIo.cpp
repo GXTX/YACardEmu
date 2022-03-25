@@ -87,34 +87,21 @@ void CardIo::Command_33_ReadData2()
 	return;
 }
 
-void CardIo::Command_53_WriteData2(std::vector<uint8_t> &packet)
+void CardIo::Command_53_WriteData2()
 {
-	enum Mode {
-		Standard     = 30, // write 69-bytes
-		ReadVariable = 31, // variable length write, 1-47 bytes
-		CardCapture  = 32, // pull in card?
-	};
+	if (currentStep == 1) {
+		if (status.r != R::HAS_CARD_1) {
+			status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
+		} else {
+			cardData.clear();
+			// currentPacket still has the mode/bit/track bytes, we need to skip them
+			std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData));
+			SaveCardToFS();
+		}
+	}
 
-	enum BitMode {
-		SevenBitParity   = 30,
-		EightBitNoParity = 31,
-	};
+	runningCommand = false;
 
-	enum Track {
-		Track_1 = 30,
-		Track_2 = 31,
-		Track_3 = 32,
-		Track_1_And_2 = 33,
-		Track_1_And_3 = 34,
-		Track_2_And_3 = 35,
-		Track_1_2_And_3 = 36,
-	};
-
-	Mode mode = static_cast<Mode>(packet[0]);
-	BitMode bitMode = static_cast<BitMode>(packet[1]);
-	Track trackMode = static_cast<Track>(packet[2]);
-
-	// TODO: transmit card data
 	return;
 }
 
@@ -244,11 +231,17 @@ void CardIo::SaveCardToFS()
 
 	std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
 
-	if (!writeBack.empty()) {
-		card.open(cardName, std::ofstream::out | std::ofstream::binary);
-		card.write(writeBack.c_str(), writeBack.size());
-		card.close();
-	}
+	card.open(cardName, std::ofstream::out | std::ofstream::binary);
+	card.write(writeBack.c_str(), writeBack.size());
+	card.close();
+
+	writeBack.clear();
+
+	std::copy(backupCardData.begin(), backupCardData.end(), std::back_inserter(writeBack));
+
+	card.open(backupCardName, std::ofstream::out | std::ofstream::binary);
+	card.write(writeBack.c_str(), writeBack.size());
+	card.close();
 
 	return;
 } 
@@ -284,9 +277,9 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 	if (runningCommand && currentStep == 0) {
 		// Get S::RUNNING_COMMAND to be the first response always
 		currentStep++;
-			std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mnode: %X\n",
-	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
+			//std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mnode: %X\n",
+	//currentCommand, currentStep, static_cast<uint8_t>(status.r), 
+	//static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
 		return;
 	} else if (runningCommand) {
 		switch (currentCommand) {
@@ -294,7 +287,7 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 			case 0x20: runningCommand = false; break; // We don't need to do anything special here
 			case 0x33: mode = packet[0]; Command_33_ReadData2(); break;
 			case 0x40: runningCommand = false; break; // We don't need to do anything special here
-			case 0x53: Command_53_WriteData2(packet); break;
+			case 0x53: mode = packet[0]; Command_53_WriteData2(); break;
 			case 0x78: runningCommand = false; break; // TODO: Implement, reply status is fine
 			case 0x7C: runningCommand = false; break; // TODO: Implement, reply status is fine
 			case 0x7D: Command_7D_Erase(); return;
@@ -310,9 +303,9 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 		currentStep++;
 	}
 
-	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mode: %X\n",
-	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
+	//std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mode: %X\n",
+	//currentCommand, currentStep, static_cast<uint8_t>(status.r), 
+	//static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
 }
 
 uint8_t CardIo::GetByte(uint8_t **buffer)

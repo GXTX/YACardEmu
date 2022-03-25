@@ -103,6 +103,7 @@ public:
 
 	std::atomic<bool> *insertedCard;
 	std::string cardName = "/home/wutno/Projects/YACardEmu/build/card.bin";
+	std::string backupCardName = "/home/wutno/Projects/YACardEmu/build/card.bin.bak";
 	void LoadCardFromFS();
 	void SaveCardToFS();
 private:
@@ -150,7 +151,7 @@ private:
 	void Command_40_Cancel();
 	//void Command_50_WriteData(); // marked "old" 7-bit
 	//void Command_53_WriteDataL();
-	void Command_53_WriteData2(std::vector<uint8_t> &packet); // multi-track write
+	void Command_53_WriteData2(); // multi-track write
 	//void Command_55_WriteAndDischarge(); // marked "old"
 	//void Command_5C_WriteBinaryData(); // marked "old"
 	//void Command_70_Print(); // marked "old"

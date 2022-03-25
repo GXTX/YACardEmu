@@ -90,9 +90,14 @@ int main()
 
 		cardStatus = CardHandler->ReceivePacket(readBuffer);
 
-		if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply && cardStatus != CardIo::SyntaxError) {
+		if (cardStatus == CardIo::Okay) {
 			// We need to send our ACK as quick as possible even if it takes us time to handle the command.
 			SerialHandler->SendAck();
+		
+
+		//if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply && cardStatus != CardIo::SyntaxError) {
+			// We need to send our ACK as quick as possible even if it takes us time to handle the command.
+		//	SerialHandler->SendAck();
 			//std::this_thread::sleep_for(delay); // server takes slightly longer to send their ENQ
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Do not reply until we get this command
