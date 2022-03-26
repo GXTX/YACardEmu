@@ -31,6 +31,7 @@
 static const std::string serialName = "/dev/ttyUSB1";
 
 static const auto delay = std::chrono::milliseconds(1);
+//static const auto delay = std::chrono::microseconds(500);
 
 std::atomic<bool> running{true};
 std::atomic<bool> insertCard{false};
@@ -83,7 +84,8 @@ int main()
 	while (running) {
 		serialStatus = SerialHandler->Read(readBuffer);
 
-		if (serialStatus != SerIo::Status::Okay) {
+		if (serialStatus != SerIo::Status::Okay && readBuffer.empty()) {
+			// TODO: device read/write should probably be a separate thread
 			std::this_thread::sleep_for(delay);
 			continue;
 		}
@@ -93,12 +95,6 @@ int main()
 		if (cardStatus == CardIo::Okay) {
 			// We need to send our ACK as quick as possible even if it takes us time to handle the command.
 			SerialHandler->SendAck();
-		
-
-		//if (cardStatus != CardIo::SizeError && cardStatus != CardIo::ServerWaitingReply && cardStatus != CardIo::SyntaxError) {
-			// We need to send our ACK as quick as possible even if it takes us time to handle the command.
-		//	SerialHandler->SendAck();
-			//std::this_thread::sleep_for(delay); // server takes slightly longer to send their ENQ
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Do not reply until we get this command
 			writeBuffer.clear();

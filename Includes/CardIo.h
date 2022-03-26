@@ -45,10 +45,7 @@ enum class P {
 	CARD_JAM               = 0x33,
 	MOTOR_ERR              = 0x34, // transport system motor error
 	PRINT_ERR              = 0x35,
-	//UNK_36 = 0x36,
-	//UKN_37 = 0x37,
 	ILLEGAL_ERR            = 0x38, // generic error
-	//UNK_39 = 0x39,
 	BATTERY_ERR            = 0x40, // low battery voltage
 	SYSTEM_ERR             = 0x41, // reader/writer system err
 	TRACK_1_READ_ERR       = 0x51,
@@ -61,7 +58,6 @@ enum class P {
 
 enum class S {
 	NO_JOB           = 0x30,
-	//UNK_31 = 0x31,
 	ILLEGAL_COMMAND  = 0x32,
 	RUNNING_COMMAND  = 0x33,
 	WAITING_FOR_CARD = 0x34,
@@ -104,6 +100,7 @@ public:
 	std::atomic<bool> *insertedCard;
 	std::string cardName = "/home/wutno/Projects/YACardEmu/build/card.bin";
 	std::string backupCardName = "/home/wutno/Projects/YACardEmu/build/card.bin.bak";
+	std::string printName = "/home/wutno/Projects/YACardEmu/build/print.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
 private:
@@ -161,7 +158,7 @@ private:
 	void Command_78_PrintSettings2();
 	void Command_7A_RegisterFont(); // "foreign characters"
 	void Command_7B_PrintImage();
-	void Command_7C_PrintL(std::vector<uint8_t> &packet);
+	void Command_7C_PrintL();
 	void Command_7D_Erase(); // erase the printed image
 	void Command_7E_PrintBarcode();
 	void Command_80_EjectCard();
@@ -187,8 +184,8 @@ private:
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 
 	std::vector<uint8_t> currentPacket{};
-	std::vector<uint8_t> commandBuffer{}; // 
-	std::vector<uint8_t> emptyBuffer{};
+	std::vector<uint8_t> commandBuffer{};
+	std::vector<uint8_t> printBuffer{};
 };
 
 #endif
