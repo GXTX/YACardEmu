@@ -315,6 +315,52 @@ void CardIo::Command_B0_DispenseCardS31()
 	}
 }
 
+void CardIo::Command_F0_GetVersion()
+{
+	switch (currentStep) {
+		case 1:
+			std::copy(versionString.begin(), versionString.end(), std::back_inserter(commandBuffer));
+			status.SoftReset();
+			runningCommand = false;
+			break;
+		default:
+			break;
+	}
+}
+
+void CardIo::Command_F1_GetRTC()
+{
+	switch (currentStep) {
+		case 1:
+			{
+				std::time_t t = std::time(nullptr);
+
+				char timeStr[12];
+				std::strftime(timeStr, 12, "%y%m%d%H%M%S", std::localtime(&t));
+
+				for (int i = 0; i > 12; i++) {
+					commandBuffer.emplace_back(timeStr[i]);
+				}
+
+				status.SoftReset();
+				runningCommand = false;
+			}
+			break;
+		default:
+			break;
+	}
+}
+
+void CardIo::Command_F5_CheckBattery()
+{
+	switch (currentStep) {
+		default:
+			status.SoftReset();
+			runningCommand = false;
+			break;
+	}
+}
+
 void CardIo::PutStatusInBuffer()
 {
 	ResponseBuffer.insert(ResponseBuffer.begin(), static_cast<uint8_t>(currentCommand));
@@ -415,6 +461,10 @@ void CardIo::HandlePacket()
 			case 0x80: Command_80_EjectCard(); break;
 			case 0xA0: Command_A0_Clean(); break;
 			case 0xB0: Command_B0_DispenseCardS31(); break;
+			// FIXME: These need to not set S::RUNNING_COMMAND;
+			case 0xF0: Command_F0_GetVersion(); break;
+			case 0xF1: Command_F1_GetRTC(); break;
+			case 0xF5: Command_F5_CheckBattery(); break;
 			default:
 				std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", currentCommand);
 				status.s = S::ILLEGAL_COMMAND;

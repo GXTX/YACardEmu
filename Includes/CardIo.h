@@ -27,6 +27,7 @@
 #include <fstream>
 #include <filesystem>
 #include <atomic>
+#include <ctime>
 
 // Status bytes:
 //////////////////////////////////////////////
@@ -115,7 +116,9 @@ private:
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
 
-	const uint8_t CARD_SIZE = 0x45; // 
+	const uint8_t CARD_SIZE = 0x45; // track size
+
+	const std::string versionString = "AP:S1234-5678,OS:S9012-3456,0000";
 
 	uint8_t GetByte(uint8_t **buffer);
 	void HandlePacket();
@@ -157,9 +160,9 @@ private:
 	//void Command_C0_ControlLED(); // marked "old"
 	//void Command_C1_SetRetry(); // marked "old"
 	//void Command_E1_SetRTC(); // Req for WMMT3
-	//void Command_F0_GetVersion();
-	//void Command_F1_GetRTC(); // Req for WMMT3
-	//void Command_F5_CheckBattery(); // Req for WMMT3
+	void Command_F0_GetVersion();
+	void Command_F1_GetRTC();
+	void Command_F5_CheckBattery();
 
 	Status status;
 	int currentStep{};
