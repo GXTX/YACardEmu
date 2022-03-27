@@ -30,8 +30,8 @@
 
 static const std::string serialName = "/dev/ttyUSB1";
 
-static const auto delay = std::chrono::milliseconds(1);
-//static const auto delay = std::chrono::microseconds(500);
+static const auto delay = std::chrono::milliseconds(5);
+//static const auto delay = std::chrono::microseconds(150);
 
 std::atomic<bool> running{true};
 std::atomic<bool> insertCard{false};

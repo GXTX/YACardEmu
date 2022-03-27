@@ -78,6 +78,12 @@ struct Status{
 		p = P::NO_ERR;
 		s = S::NO_JOB;
 	}
+
+	void SoftReset()
+	{
+		p = P::NO_ERR;
+		s = S::NO_JOB;
+	}
 };
 
 class CardIo
@@ -109,9 +115,7 @@ private:
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
 
-	const uint8_t CARD_SIZE = 0x45;
-	const uint8_t START_OF_CARD = 0x30;
-	const uint8_t END_OF_CARD = 0x40;
+	const uint8_t CARD_SIZE = 0x45; // 
 
 	uint8_t GetByte(uint8_t **buffer);
 	void HandlePacket(std::vector<uint8_t> &packet);
@@ -121,22 +125,6 @@ private:
 
 	void UpdateStatusBytes();
 	void PutStatusInBuffer();
-
-	enum class Commands {
-		NoCommand = 0x00, // Placeholder
-		Init = 0x10,
-		GetStatus = 0x20,
-		Read = 0x33,
-		Cancel = 0x40,
-		Write = 0x53,
-		PrintSetting = 0x78,
-		ExtraCharacter = 0x7A,
-		String = 0x7C,
-		Erase = 0x7D,
-		Eject = 0x80,
-		Clean = 0xA0, // Multi-step
-		GetCard = 0xB0, // Dispense card
-	};
 
 	// Commands
 	void Command_10_Initalize(); // there's 2 methods here
@@ -179,13 +167,13 @@ private:
 
 	bool runningCommand{false};
 
-	uint8_t mode{0x30}; // FIXME: Do more with this
-
 	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 
 	std::vector<uint8_t> currentPacket{};
 	std::vector<uint8_t> commandBuffer{};
 	std::vector<uint8_t> printBuffer{};
+
+	void debugPrint(); // remove me
 };
 
 #endif

@@ -59,6 +59,7 @@ void SerIo::SendAck()
 #endif
 
 	sp_blocking_write(Port, &ack, 1, 0);
+	sp_drain(Port);
 
 	return;
 }
@@ -78,6 +79,7 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 #endif
 
 	int ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
+	sp_drain(Port);
 
 	// TODO: Should we care about write errors?
 	if (ret <= 0) {

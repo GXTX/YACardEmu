@@ -30,10 +30,98 @@ CardIo::CardIo(std::atomic<bool> *insert)
 
 void CardIo::Command_10_Initalize()
 {
+	enum Mode {
+		Standard = 0x30, // We actually eject anyway..
+		EjectAfter = 0x31,
+		ResetSpecifications = 0x32,
+	};
+
+	Mode mode = static_cast<Mode>(currentPacket[0]);
+
 	switch (currentStep) {
 		case 1:
 			if (status.r == R::HAS_CARD_1) {
 				status.r = R::EJECTING_CARD;
+			}
+			// TODO: Reset printer settings
+			break;
+		default:
+			break;
+	}
+
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
+}
+
+void CardIo::Command_20_ReadStatus()
+{
+	switch (currentStep) {
+		default:
+			status.SoftReset();
+			runningCommand = false;
+			break;
+	}
+}
+
+void CardIo::Command_33_ReadData2()
+{
+	enum Mode {
+		Standard = 0x30, // read 69-bytes, reply size is not 69b
+		ReadVariable = 0x31, // variable length read, 1-47 bytes
+		CardCapture = 0x32, // pull in card?
+	};
+
+	Mode mode = static_cast<Mode>(currentPacket[0]);
+
+	switch (currentStep) {
+		case 1:
+			if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
+				if (status.r != R::HAS_CARD_1) {
+					status.s = S::WAITING_FOR_CARD; // FIXME: is this correct?
+					currentStep--;
+				}
+			} else {
+				if (status.r == R::HAS_CARD_1) {
+					status.s = S::RUNNING_COMMAND; // TODO: don't set this here, cleanup from above
+					cardData.clear();
+					LoadCardFromFS();
+					std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
+				} else {
+					status.p = P::ILLEGAL_ERR; // FIXME: is this correct?
+				}
+			}
+		break;
+		default:
+			break;
+	}
+
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
+}
+
+void CardIo::Command_40_Cancel()
+{
+	switch (currentStep) {
+		default:
+			status.SoftReset();
+			runningCommand = false;
+			break;
+	}
+}
+
+void CardIo::Command_53_WriteData2()
+{
+	switch (currentStep) {
+		case 1:
+			if (status.r != R::HAS_CARD_1) {
+				status.p = P::ILLEGAL_ERR; // FIXME: Verify
+			} else {
+				cardData.clear();
+				// currentPacket still has the mode/bit/track bytes, we need to skip them
+				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData));
+				SaveCardToFS();
 			}
 			break;
 		default:
@@ -47,117 +135,78 @@ void CardIo::Command_10_Initalize()
 	return;
 }
 
-void CardIo::Command_20_ReadStatus()
+void CardIo::Command_78_PrintSettings2()
 {
-	// We force everything *but* card state to reset.
-	status.p = P::NO_ERR;
-	status.s = S::NO_JOB;
-	runningCommand = false;
-}
-
-void CardIo::Command_33_ReadData2()
-{
-	enum Mode {
-		Standard = 0x30, // read 69-bytes
-		ReadVariable = 0x31, // variable length read, 1-47 bytes
-		CardCapture = 0x32, // pull in card?
-	};
-
 	switch (currentStep) {
-	case 1:
-		if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
-			if (status.r != R::HAS_CARD_1) {
-				status.s = S::WAITING_FOR_CARD; // FIXME: is this correct?
-				currentStep--;
-			}
-		} else {
-			if (status.r != R::HAS_CARD_1) {
-				//status.s = S::ILLEGAL_COMMAND; // FIXME: is this correct?
-				status.p = P::ILLEGAL_ERR;
-			} else {
-				status.s = S::RUNNING_COMMAND; // clean up from above
-				if (cardData.empty()) {
-					std::puts("load\n");
-					LoadCardFromFS();
-				}
-				std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
-			}
-		}
-		break;
-	default:
-		break;
+		default:
+			break;
 	}
-
 
 	if (currentStep > 1) {
 		runningCommand = false;
 	}
-
-	return;
-}
-
-void CardIo::Command_53_WriteData2()
-{
-	if (currentStep == 1) {
-		if (status.r != R::HAS_CARD_1) {
-			//status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
-			status.p = P::ILLEGAL_ERR;
-		} else {
-			cardData.clear();
-			// currentPacket still has the mode/bit/track bytes, we need to skip them
-			std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData));
-			SaveCardToFS();
-		}
-	}
-
-	runningCommand = false;
-
-	return;
 }
 
 void CardIo::Command_7C_PrintL()
 {
-	//enum Mode {
-	//	Wait = 0x30, // is it expected to run this after WriteData2?
-	//	Now = 0x31,
-	//};
+	enum Mode {
+		Wait = 0x30, // is it expected to run this in the background after WriteData2?
+		Now = 0x31,
+	};
 
 	enum BufferControl {
 		Clear = 0x30,
 		DontClear = 0x31,
 	};
 
-	if (currentStep == 1 && status.r != R::HAS_CARD_1) {
-		status.p = P::ILLEGAL_ERR;
-	} else {
-		if (currentPacket[1] == static_cast<uint8_t>(BufferControl::Clear)) {
-			printBuffer.clear();
-		}
+	Mode mode = static_cast<Mode>(currentPacket[0]);
+	BufferControl control = static_cast<BufferControl>(currentPacket[1]);
+	uint8_t lineOffset = currentPacket[2];
 
-		std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
+	switch (currentStep) {
+		case 1:
+			if (status.r != R::HAS_CARD_1) {
+				status.p = P::ILLEGAL_ERR; // FIXME: Verify
+			} else {
+				if (control == BufferControl::Clear) {
+					printBuffer.clear();
+				}
+				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
 
-		// FIXME: Do this better.
-		std::ofstream card;
-		std::string writeBack{};
-		std::copy(printBuffer.begin(), printBuffer.end(), std::back_inserter(writeBack));
+				// FIXME: Do this better.
+				std::ofstream card;
+				std::string writeBack{};
+				std::copy(printBuffer.begin(), printBuffer.end(), std::back_inserter(writeBack));
 
-		card.open(printName, std::ofstream::out | std::ofstream::binary);
-		card.write(writeBack.c_str(), writeBack.size());
-		card.close();
-		
+				card.open(printName, std::ofstream::out | std::ofstream::binary);
+				card.write(writeBack.c_str(), writeBack.size());
+				card.close();
+			}
+			break;
+		default:
+			break;
 	}
 
-	runningCommand = false;
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
 }
 
 void CardIo::Command_7D_Erase()
 {
-	if (currentStep == 1 && status.r != R::HAS_CARD_1) {
-		//status.s = S::ILLEGAL_COMMAND; // FIXME: Verify
-		status.p = P::ILLEGAL_ERR;
+	switch (currentStep) {
+		case 1:
+			if (status.r != R::HAS_CARD_1) {
+				status.p = P::ILLEGAL_ERR; // FIXME: Verify
+			}
+			break;
+		default:
+			break;
 	}
 
-	runningCommand = false;
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
 }
 
 void CardIo::Command_80_EjectCard()
@@ -201,42 +250,38 @@ void CardIo::Command_A0_Clean()
 	if (currentStep > 3) {
 		runningCommand = false;
 	}
-
-	return;
 }
 
 void CardIo::Command_B0_DispenseCardS31()
 {
 	enum Mode {
 		Dispense = 0x31,
-		CheckOnly = 0x32, // check status of dispenser
+		CheckOnly = 0x32,
 	};
 
-	if (mode == static_cast<uint8_t>(Mode::Dispense)) {
-		if (status.s != S::ILLEGAL_COMMAND) {
-			switch (currentStep) {
-				case 1:
+	Mode mode = static_cast<Mode>(currentPacket[0]);
+
+	switch (currentStep) {
+		case 1:
+			if (mode == Mode::CheckOnly) {
+				status.s = S::CARD_FULL;
+			} else {
+				if (status.s != S::ILLEGAL_COMMAND) {
 					if (status.r == R::HAS_CARD_1) {
 						status.s = S::ILLEGAL_COMMAND;
 					} else {
 						status.r = R::HAS_CARD_1;
 					}
-					break;
-				default:
-					break;
+				}
 			}
-		}
-
-		if (currentStep > 1) {
-			runningCommand = false;
-		}
-	} else {
-		// FIXME: Verify
-		status.s = S::CARD_FULL;
-		runningCommand = false;
+			break;
+		default:
+			break;
 	}
 
-	return;
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
 }
 
 void CardIo::PutStatusInBuffer()
@@ -288,7 +333,14 @@ void CardIo::SaveCardToFS()
 	card.close();
 
 	return;
-} 
+}
+
+void CardIo::debugPrint()
+{
+	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d\n",
+	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
+	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
+}
 
 void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 {
@@ -312,41 +364,31 @@ void CardIo::HandlePacket(std::vector<uint8_t> &packet)
 	if (runningCommand && currentStep == 0 && currentCommand != 0x20) { // 20 is a special case, see function
 		// Get S::RUNNING_COMMAND to be the first response always
 		currentStep++;
-			std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mnode: %X\n",
-	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
+		debugPrint();
 		return;
 	} else if (runningCommand) {
 		switch (currentCommand) {
-			case 0x10: mode = packet[0]; Command_10_Initalize(); break;
+			case 0x10: Command_10_Initalize(); break;
 			case 0x20: Command_20_ReadStatus(); break;
-			case 0x33: mode = packet[0]; Command_33_ReadData2(); break;
-			case 0x40: runningCommand = false; break; // We don't need to do anything special here
-			case 0x53: mode = packet[0]; Command_53_WriteData2(); break;
-			case 0x78: runningCommand = false; break; // TODO: Implement, reply status is fine
-			case 0x7C: Command_7C_PrintL(); break; // TODO: Implement, reply status is fine
-			case 0x7D: Command_7D_Erase(); return;
+			case 0x33: Command_33_ReadData2(); break;
+			case 0x40: Command_40_Cancel(); break;
+			case 0x53: Command_53_WriteData2(); break;
+			case 0x78: Command_78_PrintSettings2(); break;
+			case 0x7C: Command_7C_PrintL(); break;
+			case 0x7D: Command_7D_Erase(); break;
 			case 0x80: Command_80_EjectCard(); break;
 			case 0xA0: Command_A0_Clean(); break;
-			case 0xB0: mode = packet[0]; Command_B0_DispenseCardS31(); break;
+			case 0xB0: Command_B0_DispenseCardS31(); break;
 			default:
-				std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", packet[0]);
-				runningCommand = false;
+				std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", currentCommand);
 				status.s = S::ILLEGAL_COMMAND;
+				runningCommand = false;
 				break;
 		}
 		currentStep++;
 	}
 
-	if (!runningCommand) {
-		if (status.s != S::NO_JOB && status.s != S::ILLEGAL_COMMAND) {
-			status.s = S::NO_JOB;
-		}
-	}
-
-	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d, mode: %X\n",
-	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand, mode);
+	debugPrint();
 }
 
 uint8_t CardIo::GetByte(uint8_t **buffer)
@@ -373,7 +415,6 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
 		std::cerr << " Missing STX!\n";
-		status.s = S::ILLEGAL_COMMAND;
 		readBuffer.clear();
 		return SyncError;
 	}
@@ -387,7 +428,6 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	if (readBuffer.at(count) != END_OF_TEXT) {
 		std::cout << " Missing ETX!\n";
-		status.s = S::ILLEGAL_COMMAND;
 		readBuffer.clear();
 		return SyntaxError;
 	}
@@ -416,7 +456,6 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	// Verify checksum - skip packet if invalid
 	if (packet_checksum != actual_checksum) {
 		std::cerr << " Checksum error!\n";
-		status.s = S::ILLEGAL_COMMAND;
 		return ChecksumError;
 	}
 
@@ -430,14 +469,16 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	// Remove the current command and the masters status bytes, we don't need it
 	currentPacket.erase(currentPacket.begin(), currentPacket.begin()+4);
 
-	//status.SoftReset();
-
+	status.SoftReset();
 	status.s = S::RUNNING_COMMAND;
-	status.p = P::NO_ERR;
 	runningCommand = true;
 	currentStep = 0;
-	mode = 0x30;
 	commandBuffer.clear();
+	
+	// FIXME: special case, we need to handle this better, but server does NOT accept an ACK from us on eject command
+	if (currentCommand == 0x80) {
+		return ServerWaitingReply;
+	}
 
 	return Okay;
 }
