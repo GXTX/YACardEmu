@@ -23,9 +23,10 @@
 
 #define DEBUG_CARD_PACKETS
 
-CardIo::CardIo(std::atomic<bool> *insert)
+CardIo::CardIo(bool *insertedCard, std::string *cardName)
 {
-	insertedCard = insert;
+	this->insertedCard = insertedCard;
+	this->cardName = cardName;
 }
 
 void CardIo::Command_10_Initalize()
@@ -297,7 +298,7 @@ void CardIo::LoadCardFromFS()
 {
 	// FIXME: Create a card if one doesn't exist. Find a better way to do this, gdb running as sudo can't find the file unless it's full path
 
-	std::ifstream card(cardName.c_str(), std::ifstream::in | std::ifstream::binary | std::ifstream::ate);
+	std::ifstream card(cardName->c_str(), std::ifstream::in | std::ifstream::binary | std::ifstream::ate);
 	std::string readBack(CARD_SIZE, 0);
 	int size = 0;
 
@@ -320,7 +321,7 @@ void CardIo::SaveCardToFS()
 
 	std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
 
-	card.open(cardName, std::ofstream::out | std::ofstream::binary);
+	card.open(*cardName, std::ofstream::out | std::ofstream::binary);
 	card.write(writeBack.c_str(), writeBack.size());
 	card.close();
 

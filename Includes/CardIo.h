@@ -99,13 +99,13 @@ public:
 		ServerWaitingReply,
 	};
 
-	CardIo(std::atomic<bool> *insert);
+	CardIo(bool *insertedCard, std::string *cardName);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
-	std::atomic<bool> *insertedCard;
-	std::string cardName = "/home/wutno/Projects/YACardEmu/build/card.bin";
-	std::string backupCardName = "/home/wutno/Projects/YACardEmu/build/card.bin.bak";
+	bool *insertedCard;
+	std::string *cardName;
+	std::string backupCardName = "/home/wutno/Projects/YACardEmu/build/card.bin.bak"; // TODO: Get this from cardPath in main.cpp
 	std::string printName = "/home/wutno/Projects/YACardEmu/build/print.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();

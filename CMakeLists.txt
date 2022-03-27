@@ -6,7 +6,7 @@ find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SERIAL REQUIRED libserialport)
 
-include_directories(${SERIAL_INCLUDE_DIRS} ${THREAD_INLCUDE_DIRS} ${PROJECT_SOURCE_DIR}/Includes)
+include_directories(${SERIAL_INCLUDE_DIRS} ${THREAD_INLCUDE_DIRS} ${PROJECT_SOURCE_DIR}/Includes ${PROJECT_SOURCE_DIR}/3rdparty/cpp-httplib)
 
 add_executable(${PROJECT_NAME}
 	main.cpp
