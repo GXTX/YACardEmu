@@ -68,7 +68,7 @@ void CardIo::Command_20_ReadStatus()
 void CardIo::Command_33_ReadData2()
 {
 	enum Mode {
-		Standard = 0x30, // read 69-bytes, reply size is not 69b
+		Standard = 0x30, // read 69-bytes
 		ReadVariable = 0x31, // variable length read, 1-47 bytes
 		CardCapture = 0x32, // pull in card?
 	};
@@ -114,6 +114,32 @@ void CardIo::Command_40_Cancel()
 
 void CardIo::Command_53_WriteData2()
 {
+	enum Mode {
+		Standard     = 30, // 69-bytes
+		ReadVariable = 31, // variable length, 1-47 bytes
+	};
+
+	enum BitMode {
+		SevenBitParity   = 30,
+		EightBitNoParity = 31,
+	};
+
+	enum Track {
+		Track_1 = 30,
+		Track_2 = 31,
+		Track_3 = 32,
+		Track_1_And_2 = 33,
+		Track_1_And_3 = 34,
+		Track_2_And_3 = 35,
+		Track_1_2_And_3 = 36,
+	};
+
+	Mode mode = static_cast<Mode>(currentPacket[0]);
+	BitMode bit = static_cast<BitMode>(currentPacket[1]);
+
+	// TODO: Impliment this, is req for some applications, how are multitrack write/reads handled? is there a break?
+	Track track = static_cast<Track>(currentPacket[2]);
+
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
@@ -296,19 +322,16 @@ void CardIo::PutStatusInBuffer()
 
 void CardIo::LoadCardFromFS()
 {
-	// FIXME: Create a card if one doesn't exist. Find a better way to do this, gdb running as sudo can't find the file unless it's full path
-
-	std::ifstream card(cardName->c_str(), std::ifstream::in | std::ifstream::binary | std::ifstream::ate);
-	std::string readBack(CARD_SIZE, 0);
-	int size = 0;
-
-	if (card.good() && card.tellg() == CARD_SIZE && cardData.empty()) {
-		size = card.tellg();
-		card.seekg(std::ifstream::beg);
-		card.read(&readBack[0], size);
+	if (std::filesystem::exists(cardName->c_str()) &&
+			std::filesystem::file_size(cardName->c_str()) == CARD_SIZE) {
+		std::ifstream card(cardName->c_str(), std::ifstream::in | std::ifstream::binary);
+		std::string readBack(CARD_SIZE, 0);
+		card.read(&readBack[0], CARD_SIZE);
 		card.close();
 		std::copy(readBack.begin(), readBack.end(), std::back_inserter(cardData));
 		std::copy(readBack.begin(), readBack.end(), std::back_inserter(backupCardData));
+	} else {
+		status.p = P::SYSTEM_ERR; // FIXME: Correct?
 	}
 
 	return;
