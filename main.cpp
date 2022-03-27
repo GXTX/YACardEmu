@@ -25,23 +25,25 @@
 #include <atomic>
 #include <csignal>
 #include <filesystem>
+#include <string>
 
 #include "CardIo.h"
 #include "SerIo.h"
 
 #include "httplib.h"
 
-// Globals
-static const std::string serialName = "/dev/ttyUSB1"; // TODO: runtime configure
+#include "mini/ini.h"
 
+// Globals
 static const auto delay = std::chrono::milliseconds(5);
 
 std::atomic<bool> running{true};
-std::atomic<bool> insertCard{false};
 
 bool insertedCard = false;
-std::string cardName{}; // Contains the FULL path
-static const std::string cardPath{"/home/wutno/Projects/YACardEmu/build"}; // TODO: runtime configure
+std::string cardName{};
+std::string cardPath{}; // Full base path
+std::string httpPort{};
+std::string serialName{};
 //
 
 void sigHandler(int sig)
@@ -88,7 +90,42 @@ void httpServer()
 		running = false;
 	});
 
-	svr.listen("0.0.0.0", 8080);
+	svr.listen("0.0.0.0", std::stoi(httpPort));
+}
+
+bool readConfig()
+{
+	// Read in config values
+	mINI::INIFile config("config.ini");
+
+	mINI::INIStructure ini;
+	
+	if (!config.read(ini)) {
+		// TODO: Generate INI
+		std::cerr << "Unable to open config.ini!\n";
+		return false;
+	}
+
+	if (ini.has("config")) {
+		cardPath = ini["config"]["basepath"];
+		cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
+		httpPort = ini["config"]["apiport"];
+		serialName = ini["config"]["serialpath"];
+	}
+
+	if (cardPath.empty()) {
+		cardPath = std::filesystem::current_path();
+	}
+
+	if (httpPort.empty()) {
+		httpPort = "8080";
+	}
+
+	if (serialName.empty()) {
+		serialName = "/dev/ttyUSB1";
+	}
+
+	return true;
 }
 
 int main()
@@ -97,7 +134,11 @@ int main()
 	std::signal(SIGINT, sigHandler);
 	std::signal(SIGTERM, sigHandler);
 
-	std::unique_ptr<CardIo> cardHandler (std::make_unique<CardIo>(&insertedCard, &cardName));
+	if (!readConfig()) {
+		return 1;
+	}
+
+	std::unique_ptr<CardIo> cardHandler (std::make_unique<CardIo>(&insertedCard, &cardPath, &cardName));
 
 	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName.c_str()));
 	if (!serialHandler->IsInitialized) {

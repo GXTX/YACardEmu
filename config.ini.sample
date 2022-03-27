@@ -1,0 +1,9 @@
+[config]
+apiport = 8080
+; basepath MUST end in a trailing slash!
+basepath = /home/wutno/cards/
+serialpath = /dev/ttyUSB0;
+;
+; Optional
+;
+autoselectedcard = card.bin

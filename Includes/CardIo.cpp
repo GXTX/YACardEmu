@@ -23,9 +23,10 @@
 
 #define DEBUG_CARD_PACKETS
 
-CardIo::CardIo(bool *insertedCard, std::string *cardName)
+CardIo::CardIo(bool *insertedCard, std::string *basePath, std::string *cardName)
 {
 	this->insertedCard = insertedCard;
+	this->basePath = basePath;
 	this->cardName = cardName;
 }
 
@@ -203,9 +204,12 @@ void CardIo::Command_7C_PrintL()
 				// FIXME: Do this better.
 				std::ofstream card;
 				std::string writeBack{};
+				std::string fullPath(basePath->c_str());
+				fullPath.append(printName);
+
 				std::copy(printBuffer.begin(), printBuffer.end(), std::back_inserter(writeBack));
 
-				card.open(printName, std::ofstream::out | std::ofstream::binary);
+				card.open(fullPath, std::ofstream::out | std::ofstream::binary);
 				card.write(writeBack.c_str(), writeBack.size());
 				card.close();
 			}
@@ -322,9 +326,12 @@ void CardIo::PutStatusInBuffer()
 
 void CardIo::LoadCardFromFS()
 {
-	if (std::filesystem::exists(cardName->c_str()) &&
-			std::filesystem::file_size(cardName->c_str()) == CARD_SIZE) {
-		std::ifstream card(cardName->c_str(), std::ifstream::in | std::ifstream::binary);
+	std::string fullPath(basePath->c_str());
+	fullPath.append(cardName->c_str());
+
+	if (std::filesystem::exists(fullPath.c_str()) &&
+			std::filesystem::file_size(fullPath.c_str()) == CARD_SIZE) {
+		std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
 		std::string readBack(CARD_SIZE, 0);
 		card.read(&readBack[0], CARD_SIZE);
 		card.close();
@@ -342,9 +349,12 @@ void CardIo::SaveCardToFS()
 	std::ofstream card;
 	std::string writeBack{};
 
+	std::string fullPath(basePath->c_str());
+	fullPath.append(cardName->c_str());
+
 	std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
 
-	card.open(*cardName, std::ofstream::out | std::ofstream::binary);
+	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
 	card.write(writeBack.c_str(), writeBack.size());
 	card.close();
 
@@ -352,7 +362,9 @@ void CardIo::SaveCardToFS()
 
 	std::copy(backupCardData.begin(), backupCardData.end(), std::back_inserter(writeBack));
 
-	card.open(backupCardName, std::ofstream::out | std::ofstream::binary);
+	fullPath.append(".bak");
+
+	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
 	card.write(writeBack.c_str(), writeBack.size());
 	card.close();
 
@@ -366,7 +378,7 @@ void CardIo::debugPrint()
 	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
 }
 
-void CardIo::HandlePacket(std::vector<uint8_t> &packet)
+void CardIo::HandlePacket()
 {
 	if (!runningCommand) {
 		if (status.s != S::NO_JOB && status.s != S::ILLEGAL_COMMAND) {
@@ -435,7 +447,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	if (sync == ENQUIRY) {
 		std::cout << " ENQ\n";
 		readBuffer.erase(readBuffer.begin());
-		HandlePacket(currentPacket);
+		HandlePacket();
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
 		std::cerr << " Missing STX!\n";

@@ -99,14 +99,14 @@ public:
 		ServerWaitingReply,
 	};
 
-	CardIo(bool *insertedCard, std::string *cardName);
+	CardIo(bool *insertedCard, std::string *basePath, std::string *cardName);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
 	bool *insertedCard;
 	std::string *cardName;
-	std::string backupCardName = "/home/wutno/Projects/YACardEmu/build/card.bin.bak"; // TODO: Get this from cardPath in main.cpp
-	std::string printName = "/home/wutno/Projects/YACardEmu/build/print.bin";
+	std::string *basePath;
+	std::string printName = "print.bin";
 	void LoadCardFromFS();
 	void SaveCardToFS();
 private:
@@ -118,7 +118,7 @@ private:
 	const uint8_t CARD_SIZE = 0x45; // 
 
 	uint8_t GetByte(uint8_t **buffer);
-	void HandlePacket(std::vector<uint8_t> &packet);
+	void HandlePacket();
 
 	std::vector<uint8_t>cardData{};
 	std::vector<uint8_t>backupCardData{}; // Filled with the data when we first loaded the card.

@@ -1,3 +1,6 @@
 [submodule "3rdparty/cpp-httplib"]
 	path = 3rdparty/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib
+[submodule "3rdparty/mINI"]
+	path = 3rdparty/mINI
+	url = https://github.com/pulzed/mINI
