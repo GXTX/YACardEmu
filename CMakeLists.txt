@@ -33,3 +33,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 target_compile_options(${PROJECT_NAME} PRIVATE -march=native -Wall -Wextra -Wpedantic)
 
 target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} spdlog::spdlog)
+
+add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/site
+                ${CMAKE_CURRENT_BINARY_DIR}/site
+)

@@ -57,6 +57,8 @@ void httpServer()
 {
 	httplib::Server svr;
 
+	svr.set_mount_point("/", "site");
+
 	svr.Get("/list", [](const httplib::Request &, httplib::Response &res) {
 		std::string list{};
 
