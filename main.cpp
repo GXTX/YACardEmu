@@ -31,8 +31,8 @@
 #include "SerIo.h"
 
 #include "httplib.h"
-
 #include "mini/ini.h"
+#include "spdlog/spdlog.h"
 
 // Globals
 static const auto delay = std::chrono::milliseconds(5);
@@ -81,12 +81,12 @@ void httpServer()
 	});
 
 	svr.Get("/stopServer", [&svr](const httplib::Request &, httplib::Response &) {
-		std::puts("Stopping API server...");
+		spdlog::info("Stopping API server...");
 		svr.stop();
 	});
 
 	svr.Get("/stop", [](const httplib::Request &, httplib::Response &) {
-		std::puts("Stopping application...");
+		spdlog::info("Stopping application...");
 		running = false;
 	});
 
@@ -102,7 +102,7 @@ bool readConfig()
 	
 	if (!config.read(ini)) {
 		// TODO: Generate INI
-		std::cerr << "Unable to open config.ini!\n";
+		spdlog::critical("Unable to open config.ini!");
 		return false;
 	}
 
@@ -130,6 +130,13 @@ bool readConfig()
 
 int main()
 {
+#ifdef NDEBUG
+	spdlog::set_level(spdlog::level::warn);
+#else
+	spdlog::set_level(spdlog::level::debug);
+#endif
+	spdlog::set_pattern("[%^%l%$] %v");
+    
 	// Handle quitting gracefully via signals
 	std::signal(SIGINT, sigHandler);
 	std::signal(SIGTERM, sigHandler);
@@ -142,12 +149,12 @@ int main()
 
 	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName.c_str()));
 	if (!serialHandler->IsInitialized) {
-		std::cerr << "Coudln't initialize the serial controller.\n";
+		spdlog::critical("Couldn't initalize the serial controller.");
 		return 1;
 	}
 
 	// Handle card inserting.
-	std::puts("Starting API server...");
+	spdlog::info("Starting API server...");
 	std::thread(httpServer).detach();
 
 	SerIo::Status serialStatus;

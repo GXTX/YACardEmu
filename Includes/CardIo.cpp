@@ -28,6 +28,13 @@ CardIo::CardIo(bool *insertedCard, std::string *basePath, std::string *cardName)
 	this->insertedCard = insertedCard;
 	this->basePath = basePath;
 	this->cardName = cardName;
+
+#ifdef NDEBUG
+	spdlog::set_level(spdlog::level::warn);
+#else
+	spdlog::set_level(spdlog::level::debug);
+#endif
+	spdlog::set_pattern("[%^%l%$] %v");
 }
 
 void CardIo::Command_10_Initalize()
@@ -368,6 +375,12 @@ void CardIo::PutStatusInBuffer()
 	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(status.r));
 	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(status.p));
 	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(status.s));
+
+	spdlog::debug("R: {0:X} P: {0:X} S: {0:X}", 
+		static_cast<uint8_t>(status.r),
+		static_cast<uint8_t>(status.p),
+		static_cast<uint8_t>(status.s)
+	);
 }
 
 void CardIo::LoadCardFromFS()
@@ -417,13 +430,6 @@ void CardIo::SaveCardToFS()
 	return;
 }
 
-void CardIo::debugPrint()
-{
-	std::printf("\n\ncurrentCommand: %X, currentStep: %d, status.r: %X, status.p: %X, status.s: %X, runningCommand: %d\n",
-	currentCommand, currentStep, static_cast<uint8_t>(status.r), 
-	static_cast<uint8_t>(status.p), static_cast<uint8_t>(status.s), runningCommand);
-}
-
 void CardIo::HandlePacket()
 {
 	if (!runningCommand) {
@@ -446,7 +452,6 @@ void CardIo::HandlePacket()
 	if (runningCommand && currentStep == 0 && currentCommand != 0x20) { // 20 is a special case, see function
 		// Get S::RUNNING_COMMAND to be the first response always
 		currentStep++;
-		debugPrint();
 		return;
 	} else if (runningCommand) {
 		switch (currentCommand) {
@@ -466,15 +471,13 @@ void CardIo::HandlePacket()
 			case 0xF1: Command_F1_GetRTC(); break;
 			case 0xF5: Command_F5_CheckBattery(); break;
 			default:
-				std::printf("CardIo::HandlePacket: Unhandled Command %02X\n", currentCommand);
+				spdlog::warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
 				status.s = S::ILLEGAL_COMMAND;
 				runningCommand = false;
 				break;
 		}
 		currentStep++;
 	}
-
-	debugPrint();
 }
 
 uint8_t CardIo::GetByte(uint8_t **buffer)
@@ -487,7 +490,7 @@ uint8_t CardIo::GetByte(uint8_t **buffer)
 
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 {
-	std::cout << "CardIo::ReceivePacket:";
+	spdlog::debug("CardIo::ReceivePacket: ");
 
 	uint8_t *buffer = &readBuffer[0];
 
@@ -495,12 +498,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	uint8_t sync = GetByte(&buffer);
 
 	if (sync == ENQUIRY) {
-		std::cout << " ENQ\n";
+		spdlog::debug("ENQ");
 		readBuffer.erase(readBuffer.begin());
 		HandlePacket();
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
-		std::cerr << " Missing STX!\n";
+		spdlog::warn("Missing STX!");
 		readBuffer.clear();
 		return SyncError;
 	}
@@ -508,12 +511,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	uint8_t count = GetByte(&buffer);
 
 	if (count > readBuffer.size() - 1) { // Count counts itself but we still have STX
-		std::cout << " Waiting for more data\n";
+		spdlog::debug("Waiting for more data");
 		return SizeError;
 	}
 
 	if (readBuffer.at(count) != END_OF_TEXT) {
-		std::cout << " Missing ETX!\n";
+		spdlog::debug("Missing ETX!");
 		readBuffer.clear();
 		return SyntaxError;
 	}
@@ -541,14 +544,11 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	// Verify checksum - skip packet if invalid
 	if (packet_checksum != actual_checksum) {
-		std::cerr << " Checksum error!\n";
+		spdlog::warn("Read checksum bad!");
 		return ChecksumError;
 	}
 
-	for (const uint8_t n : currentPacket) {
-		std::printf(" %02X", n);
-	}
-	std::cout << "\n";
+	spdlog::debug("{:Xn}", spdlog::to_hex(currentPacket));
 
 	currentCommand = currentPacket[0];
 
@@ -571,7 +571,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 {
-	std::cout << "CardIo::BuildPacket:";
+	spdlog::debug("CardIo::BuildPacket: ");
 
 	std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(ResponseBuffer));
 
@@ -605,10 +605,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 
 	ResponseBuffer.clear();
 
-	for (const uint8_t n : writeBuffer) {
-		std::printf(" %02X", n);
-	}
-	std::cout << "\n";
+	spdlog::debug("{:Xn}", spdlog::to_hex(currentPacket));
 
 	return Okay;
 }

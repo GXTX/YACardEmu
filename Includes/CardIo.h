@@ -29,6 +29,9 @@
 #include <atomic>
 #include <ctime>
 
+#include "spdlog/spdlog.h"
+#include "spdlog/fmt/bin_to_hex.h"
+
 // Status bytes:
 //////////////////////////////////////////////
 enum class R {
@@ -175,8 +178,6 @@ private:
 	std::vector<uint8_t> currentPacket{};
 	std::vector<uint8_t> commandBuffer{};
 	std::vector<uint8_t> printBuffer{};
-
-	void debugPrint(); // remove me
 };
 
 #endif

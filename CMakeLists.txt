@@ -26,8 +26,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	endif()
 endif()
 
+add_subdirectory(3rdparty/spdlog)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -march=native -Wall -Wextra -Wpedantic)
 
-target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} spdlog::spdlog)

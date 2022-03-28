@@ -4,3 +4,6 @@
 [submodule "3rdparty/mINI"]
 	path = 3rdparty/mINI
 	url = https://github.com/pulzed/mINI
+[submodule "3rdparty/spdlog"]
+	path = 3rdparty/spdlog
+	url = https://github.com/gabime/spdlog

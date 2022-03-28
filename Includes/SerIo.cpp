@@ -25,6 +25,13 @@
 
 SerIo::SerIo(const char *devicePath)
 {
+#ifdef NDEBUG
+	spdlog::set_level(spdlog::level::warn);
+#else
+	spdlog::set_level(spdlog::level::debug);
+#endif
+	spdlog::set_pattern("[%^%l%$] %v");
+
 	sp_new_config(&PortConfig);
 	sp_set_config_baudrate(PortConfig, 9600);
 	sp_set_config_bits(PortConfig, 8);
@@ -37,7 +44,7 @@ SerIo::SerIo(const char *devicePath)
 	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
 
 	if (ret != SP_OK) {
-		std::cerr << "SerIo::Init: Failed to open " << devicePath << "\n";
+		spdlog::critical("SerIo::Init: Failed to open {}", devicePath);
 		IsInitialized = false;
 	} else {
 		sp_set_config(Port, PortConfig);
@@ -54,9 +61,7 @@ void SerIo::SendAck()
 {
 	constexpr static const uint8_t ack = 0x06;
 
-#ifdef DEBUG_SERIAL
-	std::puts("SerIo::SendAck: 06");
-#endif
+	spdlog::debug("SerIo::SendAck: 06");
 
 	sp_blocking_write(Port, &ack, 1, 0);
 	sp_drain(Port);
@@ -70,13 +75,8 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 		return Status::ZeroSizeError;
 	}
 
-#ifdef DEBUG_SERIAL
-	std::cout << "SerIo::Write:";
-	for (uint8_t c : buffer) {
-		std::printf(" %02X", c);
-	}
-	std::cout << "\n";
-#endif
+	spdlog::debug("SerIo::Write: ");
+	spdlog::debug("{:Xn}", spdlog::to_hex(buffer));
 
 	int ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
 	sp_drain(Port);
@@ -85,9 +85,7 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 	if (ret <= 0) {
 		return Status::WriteError;
 	} else if (ret != static_cast<int>(buffer.size())) {
-#ifdef DEBUG_SERIAL
-		std::cerr << "SerIo::Write: Only wrote " << std::hex << ret << " of " << std::hex << static_cast<int>(buffer.size()) << " to the port!\n";
-#endif
+		spdlog::error("Only wrote {} of {} to the port!", ret, buffer.size());
 		return Status::WriteError;
 	}
 
@@ -113,13 +111,8 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 
 	std::copy(serialBuffer.begin(), serialBuffer.end(), std::back_inserter(buffer));
 
-#ifdef DEBUG_SERIAL
-	std::cout << "SerIo::Read:";
-	for (uint8_t c : serialBuffer) {
-		std::printf(" %02X", c);
-	}
-	std::cout << "\n";
-#endif
+	spdlog::debug("SerIo::Read: ");
+	spdlog::debug("{:Xn}", spdlog::to_hex(buffer));
 
 	return Status::Okay;
 }
