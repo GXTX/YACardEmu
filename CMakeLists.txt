@@ -51,7 +51,7 @@ include(FetchContent)
 
 FetchContent_Declare(
 	font
-	URL https://unifoundry.com/pub/unifont/unifont-14.0.02/font-builds/unifont_jp-14.0.02.ttf
+	URL https://github.com/indico/indico-fonts/raw/master/indico_fonts/kochi-gothic-subst.ttf
 	DOWNLOAD_NO_EXTRACT true
 )
 
@@ -65,6 +65,6 @@ add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
 
 add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_BINARY_DIR}/_deps/font-src/unifont_jp-14.0.02.ttf
-                ${CMAKE_CURRENT_BINARY_DIR}/unifont_jp.ttf
+                ${CMAKE_CURRENT_BINARY_DIR}/_deps/font-src/kochi-gothic-subst.ttf
+                ${CMAKE_CURRENT_BINARY_DIR}/kochi-gothic-subst.ttf
 )

@@ -37,7 +37,7 @@ public:
     ICUConv();
     ~ICUConv();
 
-	bool convertAndPrint(std::vector<uint8_t> &in);
+	bool convertAndPrint(int lineOffset, std::vector<uint8_t> &in);
 
 	UErrorCode err{U_ZERO_ERROR};
 private:

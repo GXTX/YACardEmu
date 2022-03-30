@@ -20,6 +20,7 @@
 */
 
 #include "ICUConv.h"
+#include <iostream>
 
 ICUConv::ICUConv()
 {
@@ -32,7 +33,7 @@ ICUConv::~ICUConv()
 	ucnv_close(ucnv);
 }
 
-bool ICUConv::convertAndPrint(std::vector<uint8_t> &in)
+bool ICUConv::convertAndPrint(int lineOffset, std::vector<uint8_t> &in)
 {
 #if 0
 	std::string incoming(in.begin(), in.end());
@@ -44,39 +45,36 @@ bool ICUConv::convertAndPrint(std::vector<uint8_t> &in)
 
 	std::u16string u16(buffer);
 
-	std::vector<std::u16string> lineMessage{};
-	lineMessage.resize(15);
-
-	int line = 0;
-	for (const char16_t c : u16) {
-		if (c == 0x11 || c == 0x14) // FIXME: We need to make certain things happen with control chars
-			continue;
-
-		lineMessage.at(line).append(&c);
-
-		if (c == 0x0D)
-		line++;
-	}
-
 	TTF_Init();
-	TTF_Font *font = TTF_OpenFont("unifont_jp.ttf", 42);
-	SDL_Color color = {0x0, 0x0, 0x0, 0xFF};
+	TTF_Font *font = TTF_OpenFont("kochi-gothic-subst.ttf", 38);
+	SDL_Color color = {0x100, 0x100, 0x150, 0xFF};
 	SDL_Surface *cardImage = IMG_Load("2.png");
 
-	int virt = 100;
+	// Initial offset
+	int virt = 100 + (14 * lineOffset);
+	int horz = 85;
 
-	for (const std::u16string &t : lineMessage) {
-		if (t.empty() || t.at(0) == 0x0D)
+	for (const char16_t c : u16) {
+		if (c == 0x0D) {
+			TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
+			virt += 14; // \n
 			continue;
+		}
 
-		SDL_Surface *textSurf = TTF_RenderUNICODE_Blended_Wrapped(font, (const uint16_t *)t.c_str(), color, 1024);
+		if (c == 0x11) {
+			TTF_SetFontStyle(font, TTF_STYLE_BOLD);
+		} else if (c == 0x14) {
+			TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
+		}
 
-		SDL_Rect location = {100, virt, 0, 0};
-
+		SDL_Rect location = {horz, virt, 0, 0};
+		SDL_Surface *textSurf = TTF_RenderUNICODE_Solid(font, (const uint16_t *)&c, color);
 		SDL_BlitSurface(textSurf, NULL, cardImage, &location);
 		SDL_FreeSurface(textSurf);
 
-		virt += 45;
+		int advance = 0;
+		TTF_GlyphMetrics(font, c, NULL, NULL, NULL, NULL, &advance);
+		horz += advance;
 	}
 
 	IMG_SavePNG(cardImage, "file.png");
