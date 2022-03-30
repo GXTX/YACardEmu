@@ -81,7 +81,26 @@ void CardIo::Command_33_ReadData2()
 		CardCapture = 0x32, // pull in card?
 	};
 
+	enum BitMode {
+		SevenBitParity = 0x30,
+		EightBitNoParity = 0x31,
+	};
+
+	enum Track {
+		Track_1 = 0x30,
+		Track_2 = 0x31,
+		Track_3 = 0x32,
+		Track_1_And_2 = 0x33,
+		Track_1_And_3 = 0x34,
+		Track_2_And_3 = 0x35,
+		Track_1_2_And_3 = 0x36,
+	};
+
 	Mode mode = static_cast<Mode>(currentPacket[0]);
+	BitMode bit = static_cast<BitMode>(currentPacket[1]);
+
+	// TODO: Impliment this, is req for some applications, how are multitrack write/reads handled? is there a break?
+	Track track = static_cast<Track>(currentPacket[2]);
 
 	switch (currentStep) {
 		case 1:
@@ -123,23 +142,23 @@ void CardIo::Command_40_Cancel()
 void CardIo::Command_53_WriteData2()
 {
 	enum Mode {
-		Standard     = 30, // 69-bytes
-		ReadVariable = 31, // variable length, 1-47 bytes
+		Standard = 0x30, // 69-bytes
+		ReadVariable = 0x31, // variable length, 1-47 bytes
 	};
 
 	enum BitMode {
-		SevenBitParity   = 30,
-		EightBitNoParity = 31,
+		SevenBitParity = 0x30,
+		EightBitNoParity = 0x31,
 	};
 
 	enum Track {
-		Track_1 = 30,
-		Track_2 = 31,
-		Track_3 = 32,
-		Track_1_And_2 = 33,
-		Track_1_And_3 = 34,
-		Track_2_And_3 = 35,
-		Track_1_2_And_3 = 36,
+		Track_1 = 0x30,
+		Track_2 = 0x31,
+		Track_3 = 0x32,
+		Track_1_And_2 = 0x33,
+		Track_1_And_3 = 0x34,
+		Track_2_And_3 = 0x35,
+		Track_1_2_And_3 = 0x36,
 	};
 
 	Mode mode = static_cast<Mode>(currentPacket[0]);

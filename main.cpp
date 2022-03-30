@@ -29,10 +29,12 @@
 
 #include "CardIo.h"
 #include "SerIo.h"
+#include "ICUConv.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
 #include "spdlog/spdlog.h"
+
 
 // Globals
 static const auto delay = std::chrono::milliseconds(5);
@@ -138,7 +140,7 @@ int main()
 	spdlog::set_level(spdlog::level::debug);
 #endif
 	spdlog::set_pattern("[%^%l%$] %v");
-    
+
 	// Handle quitting gracefully via signals
 	std::signal(SIGINT, sigHandler);
 	std::signal(SIGTERM, sigHandler);
