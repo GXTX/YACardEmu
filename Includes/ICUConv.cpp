@@ -34,6 +34,7 @@ ICUConv::~ICUConv()
 
 bool ICUConv::convertAndPrint(std::vector<uint8_t> &in)
 {
+#if 0
 	std::string incoming(in.begin(), in.end());
 
 	char16_t buffer[255];
@@ -43,19 +44,46 @@ bool ICUConv::convertAndPrint(std::vector<uint8_t> &in)
 
 	std::u16string u16(buffer);
 
+	std::vector<std::u16string> lineMessage{};
+	lineMessage.resize(15);
+
+	int line = 0;
+	for (const char16_t c : u16) {
+		if (c == 0x11 || c == 0x14) // FIXME: We need to make certain things happen with control chars
+			continue;
+
+		lineMessage.at(line).append(&c);
+
+		if (c == 0x0D)
+		line++;
+	}
+
 	TTF_Init();
-	TTF_Font *font = TTF_OpenFont("unifont_jp.ttf", 16);
-	SDL_Color color = {0xFF, 0x00, 0x00, 0xFF};
-	SDL_Surface *surf = TTF_RenderUNICODE_Blended_Wrapped(font, (const uint16_t *)u16.c_str(), color, 255);
+	TTF_Font *font = TTF_OpenFont("unifont_jp.ttf", 42);
+	SDL_Color color = {0x0, 0x0, 0x0, 0xFF};
+	SDL_Surface *cardImage = IMG_Load("2.png");
 
-    if (!surf) {
-        return false;
-    }
+	int virt = 100;
 
-	IMG_SavePNG(surf, "file.png");
+	for (const std::u16string &t : lineMessage) {
+		if (t.empty() || t.at(0) == 0x0D)
+			continue;
 
-	SDL_FreeSurface(surf);
+		SDL_Surface *textSurf = TTF_RenderUNICODE_Blended_Wrapped(font, (const uint16_t *)t.c_str(), color, 1024);
+
+		SDL_Rect location = {100, virt, 0, 0};
+
+		SDL_BlitSurface(textSurf, NULL, cardImage, &location);
+		SDL_FreeSurface(textSurf);
+
+		virt += 45;
+	}
+
+	IMG_SavePNG(cardImage, "file.png");
+
+	SDL_FreeSurface(cardImage);
 	TTF_Quit();
+#endif
 
 	return true;
 }

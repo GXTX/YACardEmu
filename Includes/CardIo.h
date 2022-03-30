@@ -32,6 +32,8 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"
 
+#include "ICUConv.h"
+
 // Status bytes:
 //////////////////////////////////////////////
 enum class R {
