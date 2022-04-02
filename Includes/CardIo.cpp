@@ -170,7 +170,7 @@ void CardIo::Command_53_WriteData2()
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
-				status.p = P::ILLEGAL_ERR; // FIXME: Verify
+				status.p = P::ILLEGAL_ERR;
 			} else {
 				cardData.clear();
 				// currentPacket still has the mode/bit/track bytes, we need to skip them
@@ -220,16 +220,16 @@ void CardIo::Command_7C_PrintL()
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
-				status.p = P::ILLEGAL_ERR; // FIXME: Verify
+				status.p = P::ILLEGAL_ERR;
 			} else {
 				if (control == BufferControl::Clear) {
 					printBuffer.clear();
 				}
 				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
-
+#if 0
 				ICUConv conv = ICUConv();
 				conv.convertAndPrint(lineOffset, printBuffer);
-
+#endif
 				// FIXME: Do this better.
 				std::ofstream card;
 				std::string writeBack{};
@@ -257,7 +257,7 @@ void CardIo::Command_7D_Erase()
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
-				status.p = P::ILLEGAL_ERR; // FIXME: Verify
+				status.p = P::ILLEGAL_ERR;
 			}
 			break;
 		default:
@@ -532,7 +532,8 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	uint8_t count = GetByte(&buffer);
 
-	if (count > readBuffer.size() - 1) { // Count counts itself but we still have STX
+	// count counts itself but readBuffer will have both the STX and sum, we need to skip these.
+	if (count > readBuffer.size() - 2) {
 		spdlog::debug("Waiting for more data");
 		return SizeError;
 	}

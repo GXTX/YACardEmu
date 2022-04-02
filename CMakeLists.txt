@@ -34,6 +34,14 @@ endif()
 
 add_subdirectory(3rdparty/spdlog)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+	include(CheckIPOSupported)
+	check_ipo_supported(RESULT supported OUTPUT error)
+	if (supported)
+		set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+	endif()
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -march=native -Wall -Wextra -Wpedantic)
@@ -52,6 +60,7 @@ include(FetchContent)
 FetchContent_Declare(
 	font
 	URL https://github.com/indico/indico-fonts/raw/master/indico_fonts/kochi-gothic-subst.ttf
+	URL_HASH SHA1=f1938a925ee84623bc75d952e60e04b40d435288
 	DOWNLOAD_NO_EXTRACT true
 )
 
