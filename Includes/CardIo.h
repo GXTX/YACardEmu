@@ -120,9 +120,7 @@ private:
 	const uint8_t END_OF_TEXT = 0x03;
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
-
 	const uint8_t CARD_SIZE = 0x45; // track size
-
 	const std::string versionString = "AP:S1234-5678,OS:S9012-3456,0000";
 
 	uint8_t GetByte(uint8_t **buffer);
@@ -132,25 +130,16 @@ private:
 	std::vector<uint8_t>backupCardData{}; // Filled with the data when we first loaded the card.
 
 	void UpdateStatusBytes();
-	void PutStatusInBuffer();
+	void UpdateStatusInBuffer();
+	void SetPError(P error_code);
+	void SetSError(S error_code);
 
 	// Commands
-	void Command_10_Initalize(); // there's 2 methods here
+	void Command_10_Initalize();
 	void Command_20_ReadStatus();
-	//void Command_30_ReadData(); // marked "old"
-	//void Command_33_ReadDataL();
 	void Command_33_ReadData2(); // multi-track read
-	//void Command_35_GetData();
 	void Command_40_Cancel();
-	//void Command_50_WriteData(); // marked "old" 7-bit
-	//void Command_53_WriteDataL();
 	void Command_53_WriteData2(); // multi-track write
-	//void Command_55_WriteAndDischarge(); // marked "old"
-	//void Command_5C_WriteBinaryData(); // marked "old"
-	//void Command_70_Print(); // marked "old"
-	//void Command_73_Print20Lines(); // marked "old"
-	//void Command_75_PrintAndDischarge(); // marked "old"
-	//void Command_78_PrintSettings();
 	void Command_78_PrintSettings2();
 	void Command_7A_RegisterFont(); // "foreign characters"
 	void Command_7B_PrintImage();
@@ -158,12 +147,8 @@ private:
 	void Command_7D_Erase(); // erase the printed image
 	void Command_7E_PrintBarcode();
 	void Command_80_EjectCard();
-	//void Command_90_EmptyCardDispenser(); // eject all cards?
-	void Command_A0_Clean(); // requires multi-step replies
-	//void Command_B0_DispenseCard();
+	void Command_A0_Clean();
 	void Command_B0_DispenseCardS31();
-	//void Command_C0_ControlLED(); // marked "old"
-	//void Command_C1_SetRetry(); // marked "old"
 	//void Command_E1_SetRTC(); // Req for WMMT3
 	void Command_F0_GetVersion();
 	void Command_F1_GetRTC();
@@ -174,8 +159,6 @@ private:
 	uint8_t currentCommand{};
 
 	bool runningCommand{false};
-
-	std::vector<uint8_t> ResponseBuffer{}; // Command Response
 
 	std::vector<uint8_t> currentPacket{};
 	std::vector<uint8_t> commandBuffer{};

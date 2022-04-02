@@ -116,7 +116,7 @@ void CardIo::Command_33_ReadData2()
 					LoadCardFromFS();
 					std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
 				} else {
-					status.p = P::ILLEGAL_ERR; // FIXME: is this correct?
+					SetPError(P::ILLEGAL_ERR);
 				}
 			}
 		break;
@@ -170,7 +170,7 @@ void CardIo::Command_53_WriteData2()
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
-				status.p = P::ILLEGAL_ERR;
+				SetPError(P::ILLEGAL_ERR);
 			} else {
 				cardData.clear();
 				// currentPacket still has the mode/bit/track bytes, we need to skip them
@@ -220,7 +220,7 @@ void CardIo::Command_7C_PrintL()
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
-				status.p = P::ILLEGAL_ERR;
+				SetPError(P::ILLEGAL_ERR);
 			} else {
 				if (control == BufferControl::Clear) {
 					printBuffer.clear();
@@ -257,7 +257,7 @@ void CardIo::Command_7D_Erase()
 	switch (currentStep) {
 		case 1:
 			if (status.r != R::HAS_CARD_1) {
-				status.p = P::ILLEGAL_ERR;
+				SetPError(P::ILLEGAL_ERR);
 			}
 			break;
 		default:
@@ -276,7 +276,7 @@ void CardIo::Command_80_EjectCard()
 			if (status.r == R::HAS_CARD_1) {
 				status.r = R::EJECTING_CARD;
 			} else {
-				status.s = S::ILLEGAL_COMMAND; // FIXME: Is this correct?
+				SetSError(S::ILLEGAL_COMMAND); // FIXME: Is this correct?
 			}
 			break;
 		default:
@@ -328,7 +328,7 @@ void CardIo::Command_B0_DispenseCardS31()
 			} else {
 				if (status.s != S::ILLEGAL_COMMAND) {
 					if (status.r == R::HAS_CARD_1) {
-						status.s = S::ILLEGAL_COMMAND;
+						SetSError(S::ILLEGAL_COMMAND);
 					} else {
 						status.r = R::HAS_CARD_1;
 					}
@@ -390,13 +390,23 @@ void CardIo::Command_F5_CheckBattery()
 	}
 }
 
-void CardIo::PutStatusInBuffer()
+void CardIo::SetPError(P error_code)
 {
-	ResponseBuffer.insert(ResponseBuffer.begin(), static_cast<uint8_t>(currentCommand));
+	status.p = error_code;
+	runningCommand = false;
+}
 
-	ResponseBuffer.insert(ResponseBuffer.begin()+1, static_cast<uint8_t>(status.r));
-	ResponseBuffer.insert(ResponseBuffer.begin()+2, static_cast<uint8_t>(status.p));
-	ResponseBuffer.insert(ResponseBuffer.begin()+3, static_cast<uint8_t>(status.s));
+void CardIo::SetSError(S error_code)
+{
+	status.s = error_code;
+	runningCommand = false;
+}
+
+void CardIo::UpdateStatusInBuffer()
+{
+	commandBuffer[1] = static_cast<uint8_t>(status.r);
+	commandBuffer[2] = static_cast<uint8_t>(status.p);
+	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
 	spdlog::debug("R: {0:X} P: {0:X} S: {0:X}", 
 		static_cast<uint8_t>(status.r),
@@ -457,6 +467,10 @@ void CardIo::HandlePacket()
 	if (!runningCommand) {
 		if (status.s != S::NO_JOB && status.s != S::ILLEGAL_COMMAND) {
 			status.s = S::NO_JOB;
+		}
+
+		if (status.p != P::NO_ERR) {
+			status.p = P::NO_ERR;
 		}
 	}
 	
@@ -576,13 +590,18 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	currentCommand = currentPacket[0];
 
 	// Remove the current command and the masters status bytes, we don't need it
-	currentPacket.erase(currentPacket.begin(), currentPacket.begin()+4);
+	currentPacket.erase(currentPacket.begin(), currentPacket.begin() + 4);
 
 	status.SoftReset();
 	status.s = S::RUNNING_COMMAND;
 	runningCommand = true;
 	currentStep = 0;
+
 	commandBuffer.clear();
+	commandBuffer.emplace_back(currentCommand);
+	commandBuffer.emplace_back(static_cast<uint8_t>(status.r));
+	commandBuffer.emplace_back(static_cast<uint8_t>(status.p));
+	commandBuffer.emplace_back(static_cast<uint8_t>(status.s));
 	
 	// FIXME: special case, we need to handle this better, but server does NOT accept an ACK from us on eject command
 	if (currentCommand == 0x80) {
@@ -596,16 +615,12 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 {
 	spdlog::debug("CardIo::BuildPacket: ");
 
-	std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(ResponseBuffer));
+	UpdateStatusInBuffer();
 
-	PutStatusInBuffer();
-
-	uint8_t count = (ResponseBuffer.size() + 2) & 0xFF; // FIXME: +2 why?
+	uint8_t count = (commandBuffer.size() + 2) & 0xFF; // FIXME: +2 why?
 
 	// Ensure our outgoing buffer is empty.
-	if (!writeBuffer.empty()) {
-		writeBuffer.clear();
-	}
+	writeBuffer.clear();
 
 	// Send the header bytes
 	writeBuffer.emplace_back(START_OF_TEXT);
@@ -615,18 +630,16 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 	uint8_t packet_checksum = count;
 
 	// Encode the payload data
-	for (const uint8_t n : ResponseBuffer) {
+	for (const uint8_t n : commandBuffer) {
 		writeBuffer.emplace_back(n);
 		packet_checksum ^= n;
 	}
 
 	writeBuffer.emplace_back(END_OF_TEXT);
-	packet_checksum ^= END_OF_TEXT;
 
 	// Write the checksum to the last byte
+	packet_checksum ^= END_OF_TEXT;
 	writeBuffer.emplace_back(packet_checksum);
-
-	ResponseBuffer.clear();
 
 	spdlog::debug("{:Xn}", spdlog::to_hex(currentPacket));
 
