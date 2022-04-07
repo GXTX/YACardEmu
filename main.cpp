@@ -38,7 +38,7 @@
 
 // Globals
 //static const auto delay = std::chrono::milliseconds(1);
-auto delay{std::chrono::microseconds(25)};
+static const auto delay{std::chrono::microseconds(500)};
 
 std::atomic<bool> running{true};
 

@@ -408,7 +408,7 @@ void CardIo::UpdateStatusInBuffer()
 	commandBuffer[2] = static_cast<uint8_t>(status.p);
 	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
-	spdlog::debug("R: {0:X} P: {0:X} S: {0:X}", 
+	spdlog::debug("R: {0:X} P: {1:X} S: {2:X}", 
 		static_cast<uint8_t>(status.r),
 		static_cast<uint8_t>(status.p),
 		static_cast<uint8_t>(status.s)
@@ -465,13 +465,11 @@ void CardIo::SaveCardToFS()
 void CardIo::HandlePacket()
 {
 	if (!runningCommand) {
-		if (status.s != S::NO_JOB && status.s != S::ILLEGAL_COMMAND) {
+		if (status.s != S::ILLEGAL_COMMAND) {
 			status.s = S::NO_JOB;
 		}
 
-		if (status.p != P::NO_ERR) {
-			status.p = P::NO_ERR;
-		}
+		status.p = P::NO_ERR;
 	}
 	
 	// We "grab" the card for the user
@@ -485,34 +483,36 @@ void CardIo::HandlePacket()
 		status.r = R::HAS_CARD_1;
 	}
 
-	if (runningCommand && currentStep == 0 && currentCommand != 0x20) { // 20 is a special case, see function
-		// Get S::RUNNING_COMMAND to be the first response always
-		currentStep++;
-		return;
-	} else if (runningCommand) {
-		switch (currentCommand) {
-			case 0x10: Command_10_Initalize(); break;
-			case 0x20: Command_20_ReadStatus(); break;
-			case 0x33: Command_33_ReadData2(); break;
-			case 0x40: Command_40_Cancel(); break;
-			case 0x53: Command_53_WriteData2(); break;
-			case 0x78: Command_78_PrintSettings2(); break;
-			case 0x7C: Command_7C_PrintL(); break;
-			case 0x7D: Command_7D_Erase(); break;
-			case 0x80: Command_80_EjectCard(); break;
-			case 0xA0: Command_A0_Clean(); break;
-			case 0xB0: Command_B0_DispenseCardS31(); break;
-			// FIXME: These need to not set S::RUNNING_COMMAND;
-			case 0xF0: Command_F0_GetVersion(); break;
-			case 0xF1: Command_F1_GetRTC(); break;
-			case 0xF5: Command_F5_CheckBattery(); break;
-			default:
-				spdlog::warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
-				status.s = S::ILLEGAL_COMMAND;
-				runningCommand = false;
-				break;
+	if (runningCommand) { // 20 is a special case, see function
+		if (currentStep == 0 && currentCommand != 0x20) {
+			// Get S::RUNNING_COMMAND to be the first response always
+			currentStep++;
+			return;
+		} else {
+			switch (currentCommand) {
+				case 0x10: Command_10_Initalize(); break;
+				case 0x20: Command_20_ReadStatus(); break;
+				case 0x33: Command_33_ReadData2(); break;
+				case 0x40: Command_40_Cancel(); break;
+				case 0x53: Command_53_WriteData2(); break;
+				case 0x78: Command_78_PrintSettings2(); break;
+				case 0x7C: Command_7C_PrintL(); break;
+				case 0x7D: Command_7D_Erase(); break;
+				case 0x80: Command_80_EjectCard(); break;
+				case 0xA0: Command_A0_Clean(); break;
+				case 0xB0: Command_B0_DispenseCardS31(); break;
+				// FIXME: These need to not set S::RUNNING_COMMAND;
+				case 0xF0: Command_F0_GetVersion(); break;
+				case 0xF1: Command_F1_GetRTC(); break;
+				case 0xF5: Command_F5_CheckBattery(); break;
+				default:
+					spdlog::warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
+					status.s = S::ILLEGAL_COMMAND;
+					runningCommand = false;
+					break;
+			}
+			currentStep++;
 		}
-		currentStep++;
 	}
 }
 
@@ -617,7 +617,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 
 	UpdateStatusInBuffer();
 
-	uint8_t count = (commandBuffer.size() + 2) & 0xFF; // FIXME: +2 why?
+	uint8_t count = (commandBuffer.size() + 2);
 
 	// Ensure our outgoing buffer is empty.
 	writeBuffer.clear();

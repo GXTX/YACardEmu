@@ -96,7 +96,7 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 {
 	int bytes = sp_input_waiting(Port);
 
-	if (bytes < 1) { // TODO: Should we stall instead? smallest packet size is 1
+	if (bytes < 1) {
 		return Status::ReadError;
 	}
 
