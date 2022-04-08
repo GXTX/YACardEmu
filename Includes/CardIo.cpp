@@ -114,7 +114,11 @@ void CardIo::Command_33_ReadData2()
 					status.s = S::RUNNING_COMMAND; // TODO: don't set this here, cleanup from above
 					cardData.clear();
 					LoadCardFromFS();
-					std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
+					if (cardData.empty()) {
+						SetPError(P::READ_ERR);
+					} else {
+						std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
+					}
 				} else {
 					SetPError(P::ILLEGAL_ERR);
 				}
@@ -347,12 +351,10 @@ void CardIo::Command_B0_DispenseCardS31()
 void CardIo::Command_F0_GetVersion()
 {
 	switch (currentStep) {
-		case 1:
+		default:
 			std::copy(versionString.begin(), versionString.end(), std::back_inserter(commandBuffer));
 			status.SoftReset();
 			runningCommand = false;
-			break;
-		default:
 			break;
 	}
 }
@@ -360,22 +362,15 @@ void CardIo::Command_F0_GetVersion()
 void CardIo::Command_F1_GetRTC()
 {
 	switch (currentStep) {
-		case 1:
-			{
-				std::time_t t = std::time(nullptr);
-
-				char timeStr[12];
-				std::strftime(timeStr, 12, "%y%m%d%H%M%S", std::localtime(&t));
-
-				for (int i = 0; i > 12; i++) {
-					commandBuffer.emplace_back(timeStr[i]);
-				}
-
-				status.SoftReset();
-				runningCommand = false;
-			}
-			break;
 		default:
+			{
+				std::string timeStr(14, 0);
+				std::time_t time = std::time(nullptr);
+				std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&time));
+				std::copy(timeStr.begin(), timeStr.end(), std::back_inserter(commandBuffer));
+			}
+			status.SoftReset();
+			runningCommand = false;
 			break;
 	}
 }
@@ -384,6 +379,7 @@ void CardIo::Command_F5_CheckBattery()
 {
 	switch (currentStep) {
 		default:
+			// We don't do anything here because we never report a bad battery.
 			status.SoftReset();
 			runningCommand = false;
 			break;
@@ -428,8 +424,6 @@ void CardIo::LoadCardFromFS()
 		card.close();
 		std::copy(readBack.begin(), readBack.end(), std::back_inserter(cardData));
 		std::copy(readBack.begin(), readBack.end(), std::back_inserter(backupCardData));
-	} else {
-		status.p = P::SYSTEM_ERR; // FIXME: Correct?
 	}
 
 	return;
