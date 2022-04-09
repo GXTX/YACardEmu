@@ -29,6 +29,8 @@ CardIo::CardIo(bool *insertedCard, std::string *basePath, std::string *cardName)
 	this->basePath = basePath;
 	this->cardName = cardName;
 
+	std::time_t startTime = std::time(nullptr);
+
 #ifdef NDEBUG
 	spdlog::set_level(spdlog::level::warn);
 #else
@@ -106,18 +108,50 @@ void CardIo::Command_33_ReadData2()
 		case 1:
 			if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
 				if (status.r != R::HAS_CARD_1) {
-					status.s = S::WAITING_FOR_CARD; // FIXME: is this correct?
+					status.s = S::WAITING_FOR_CARD;
 					currentStep--;
 				}
 			} else {
 				if (status.r == R::HAS_CARD_1) {
 					status.s = S::RUNNING_COMMAND; // TODO: don't set this here, cleanup from above
-					cardData.clear();
-					LoadCardFromFS();
-					if (cardData.empty()) {
-						SetPError(P::READ_ERR);
+
+					// Clear the tracks that the machine is trying to read, we may have left over data
+					if (track < Track::Track_1_And_2) {
+						cardData.at(static_cast<size_t>(track) - 0x30).clear();
+					} else if (track == Track::Track_1_2_And_3) {
+						cardData.clear();
+						cardData.resize(NUM_TRACKS);
 					} else {
-						std::copy(cardData.begin(), cardData.end(), std::back_inserter(commandBuffer));
+						SetPError(P::ILLEGAL_ERR); // We don't support any other methods for now
+						return;
+					}
+
+					std::string fullPath(basePath->c_str());
+					fullPath.append(cardName->c_str());
+					std::string readBack(CARD_SIZE, 0);
+
+					if (std::filesystem::exists(fullPath.c_str()) &&
+							std::filesystem::file_size(fullPath.c_str()) == CARD_SIZE) {
+						std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
+						std::string readBack(CARD_SIZE, 0);
+
+						if (track == Track::Track_1_2_And_3) {
+							card.read(&readBack[0], CARD_SIZE);
+							for (int i = 0; i < 3; i++) {
+								std::copy(readBack.begin() + (i * TRACK_SIZE), readBack.begin() + (i * TRACK_SIZE + TRACK_SIZE), std::back_inserter(cardData.at(i)));
+							}
+							std::copy(readBack.begin(), readBack.end(), std::back_inserter(commandBuffer));
+						} else {
+							uint8_t absTrack = (static_cast<uint8_t>(track) - 0x30);
+							uint8_t filePos = absTrack * TRACK_SIZE;
+							card.seekg(filePos);
+							card.read(&readBack[0], TRACK_SIZE);
+							std::copy(readBack.begin(), readBack.begin() + TRACK_SIZE, std::back_inserter(cardData.at(absTrack)));
+							std::copy(readBack.begin(), readBack.begin() + TRACK_SIZE, std::back_inserter(commandBuffer));
+						}
+						card.close();
+					} else {
+						SetPError(P::READ_ERR);
 					}
 				} else {
 					SetPError(P::ILLEGAL_ERR);
@@ -147,7 +181,7 @@ void CardIo::Command_53_WriteData2()
 {
 	enum Mode {
 		Standard = 0x30, // 69-bytes
-		ReadVariable = 0x31, // variable length, 1-47 bytes
+		WriteVariable = 0x31, // variable length, 1-47 bytes
 	};
 
 	enum BitMode {
@@ -176,10 +210,37 @@ void CardIo::Command_53_WriteData2()
 			if (status.r != R::HAS_CARD_1) {
 				SetPError(P::ILLEGAL_ERR);
 			} else {
-				cardData.clear();
-				// currentPacket still has the mode/bit/track bytes, we need to skip them
-				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData));
-				SaveCardToFS();
+				if (track < Track::Track_1_And_2) {
+					cardData.at(static_cast<size_t>(track) - 0x30).clear();
+					std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData.at(static_cast<size_t>(track) - 0x30)));
+				} else if (track == Track::Track_1_2_And_3) {
+					cardData.clear();
+					cardData.resize(NUM_TRACKS);
+					for (int i = 0; i < NUM_TRACKS; i++) {
+						std::copy(currentPacket.begin() + 3, currentPacket.begin() + (i * TRACK_SIZE + TRACK_SIZE), std::back_inserter(cardData.at(i)));
+					}
+				} else {
+					SetPError(P::ILLEGAL_ERR); // We don't support any other methods for now
+					return;
+				}
+
+				std::string writeBack{};
+
+				for (int i = 0; i < NUM_TRACKS; i++) {
+					// Fill in null track data if the machine hasn't given us any to make size correct
+					if (cardData.at(i).empty()) {
+						cardData.at(i).resize(TRACK_SIZE);
+					}
+					std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(writeBack));
+				}
+
+				std::string fullPath(basePath->c_str());
+				fullPath.append(cardName->c_str());
+
+				std::ofstream card;
+				card.open(fullPath, std::ofstream::out | std::ofstream::binary);
+				card.write(writeBack.c_str(), writeBack.size());
+				card.close();
 			}
 			break;
 		default:
@@ -348,6 +409,27 @@ void CardIo::Command_B0_DispenseCardS31()
 	}
 }
 
+void CardIo::Command_E1_SetRTC()
+{
+	switch (currentStep) {
+		default:
+			{
+				std::stringstream timeStrS{};
+				std::string timeStr{};
+				std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(timeStr));
+
+				timeStrS << timeStr;
+
+				std::tm *tempTime{};
+				timeStrS >> std::get_time(tempTime, "%y%m%d%H%M%S");
+				time = std::mktime(tempTime);
+			}
+			status.SoftReset();
+			runningCommand = false;
+			break;
+	}
+}
+
 void CardIo::Command_F0_GetVersion()
 {
 	switch (currentStep) {
@@ -364,9 +446,18 @@ void CardIo::Command_F1_GetRTC()
 	switch (currentStep) {
 		default:
 			{
-				std::string timeStr(14, 0);
-				std::time_t time = std::time(nullptr);
-				std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&time));
+				std::string timeStr(12, 0);
+				std::time_t currentTime = std::time(nullptr);
+
+				std::time_t convTime{};
+
+				if (time != 0) {
+					convTime = time + currentTime - startTime;
+				} else {
+					convTime = currentTime;
+				}
+
+				std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&convTime));
 				std::copy(timeStr.begin(), timeStr.end(), std::back_inserter(commandBuffer));
 			}
 			status.SoftReset();
@@ -409,51 +500,6 @@ void CardIo::UpdateStatusInBuffer()
 		static_cast<uint8_t>(status.p),
 		static_cast<uint8_t>(status.s)
 	);
-}
-
-void CardIo::LoadCardFromFS()
-{
-	std::string fullPath(basePath->c_str());
-	fullPath.append(cardName->c_str());
-
-	if (std::filesystem::exists(fullPath.c_str()) &&
-			std::filesystem::file_size(fullPath.c_str()) == CARD_SIZE) {
-		std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
-		std::string readBack(CARD_SIZE, 0);
-		card.read(&readBack[0], CARD_SIZE);
-		card.close();
-		std::copy(readBack.begin(), readBack.end(), std::back_inserter(cardData));
-		std::copy(readBack.begin(), readBack.end(), std::back_inserter(backupCardData));
-	}
-
-	return;
-}
-
-void CardIo::SaveCardToFS()
-{
-	std::ofstream card;
-	std::string writeBack{};
-
-	std::string fullPath(basePath->c_str());
-	fullPath.append(cardName->c_str());
-
-	std::copy(cardData.begin(), cardData.end(), std::back_inserter(writeBack));
-
-	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
-	card.write(writeBack.c_str(), writeBack.size());
-	card.close();
-
-	writeBack.clear();
-
-	std::copy(backupCardData.begin(), backupCardData.end(), std::back_inserter(writeBack));
-
-	fullPath.append(".bak");
-
-	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
-	card.write(writeBack.c_str(), writeBack.size());
-	card.close();
-
-	return;
 }
 
 void CardIo::HandlePacket()
@@ -635,7 +681,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 	packet_checksum ^= END_OF_TEXT;
 	writeBuffer.emplace_back(packet_checksum);
 
-	spdlog::debug("{:Xn}", spdlog::to_hex(currentPacket));
+	spdlog::debug("{:Xn}", spdlog::to_hex(writeBuffer));
 
 	return Okay;
 }
