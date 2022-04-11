@@ -51,21 +51,13 @@ public:
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
-	bool *insertedCard;
-	std::string *cardName;
-	std::string *basePath;
+	bool *insertedCard{nullptr};
+	std::string *cardName{nullptr};
+	std::string *basePath{nullptr};
 	std::string printName = "print.bin";
-private:
+protected:
 	// Status bytes:
 	//////////////////////////////////////////////
-	enum class R {
-		NO_CARD           = 0x30,
-		HAS_CARD_1        = 0x31,
-		CARD_STATUS_ERROR = 0x32,
-		HAS_CARD_2        = 0x33,
-		EJECTING_CARD     = 0x34,
-	};
-
 	enum class P {
 		NO_ERR                 = 0x30,
 		READ_ERR               = 0x31,
@@ -96,13 +88,11 @@ private:
 	//////////////////////////////////////////////
 
 	struct Status{
-		R r = R::NO_CARD;
 		P p = P::NO_ERR;
 		S s = S::NO_JOB;
 
 		void Reset()
 		{
-			r = R::NO_CARD;
 			p = P::NO_ERR;
 			s = S::NO_JOB;
 		}
@@ -126,7 +116,6 @@ private:
 	uint8_t GetByte(uint8_t **buffer);
 	void HandlePacket();
 
-	//std::vector<uint8_t>backupCardData{}; // Filled with the data when we first loaded the card.
 	std::vector<std::vector<uint8_t>> cardData{{}, {}, {}};
 
 	void UpdateStatusBytes();
@@ -141,7 +130,7 @@ private:
 	void Command_40_Cancel();
 	void Command_53_WriteData2(); // multi-track write
 	void Command_78_PrintSettings2();
-	void Command_7A_RegisterFont(); // "foreign characters"
+	void Command_7A_RegisterFont();
 	void Command_7B_PrintImage();
 	void Command_7C_PrintL();
 	void Command_7D_Erase(); // erase the printed image
@@ -166,6 +155,13 @@ private:
 
 	std::time_t startTime{};
 	std::time_t time{};
+
+	virtual uint8_t GetRStatus() = 0;
+	virtual void UpdateRStatus() = 0;
+
+	virtual bool HasCard() = 0;
+	virtual void DispenseCard() = 0;
+	virtual void EjectCard() = 0;
 };
 
 #endif

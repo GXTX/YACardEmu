@@ -51,8 +51,8 @@ void CardIo::Command_10_Initalize()
 
 	switch (currentStep) {
 		case 1:
-			if (status.r == R::HAS_CARD_1) {
-				status.r = R::EJECTING_CARD;
+			if (HasCard()) {
+				EjectCard();
 			}
 			// TODO: Reset printer settings
 			break;
@@ -107,12 +107,12 @@ void CardIo::Command_33_ReadData2()
 	switch (currentStep) {
 		case 1:
 			if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
-				if (status.r != R::HAS_CARD_1) {
+				if (!HasCard()) {
 					status.s = S::WAITING_FOR_CARD;
 					currentStep--;
 				}
 			} else {
-				if (status.r == R::HAS_CARD_1) {
+				if (HasCard()) {
 					status.s = S::RUNNING_COMMAND; // TODO: don't set this here, cleanup from above
 
 					// Clear the tracks that the machine is trying to read, we may have left over data
@@ -207,7 +207,7 @@ void CardIo::Command_53_WriteData2()
 
 	switch (currentStep) {
 		case 1:
-			if (status.r != R::HAS_CARD_1) {
+			if (!HasCard()) {
 				SetPError(P::ILLEGAL_ERR);
 			} else {
 				if (track < Track::Track_1_And_2) {
@@ -284,7 +284,7 @@ void CardIo::Command_7C_PrintL()
 
 	switch (currentStep) {
 		case 1:
-			if (status.r != R::HAS_CARD_1) {
+			if (!HasCard()) {
 				SetPError(P::ILLEGAL_ERR);
 			} else {
 				if (control == BufferControl::Clear) {
@@ -321,7 +321,7 @@ void CardIo::Command_7D_Erase()
 {
 	switch (currentStep) {
 		case 1:
-			if (status.r != R::HAS_CARD_1) {
+			if (!HasCard()) {
 				SetPError(P::ILLEGAL_ERR);
 			}
 			break;
@@ -338,8 +338,8 @@ void CardIo::Command_80_EjectCard()
 {
 	switch (currentStep) {
 		case 1:
-			if (status.r == R::HAS_CARD_1) {
-				status.r = R::EJECTING_CARD;
+			if (HasCard()) {
+				EjectCard();
 			} else {
 				SetSError(S::ILLEGAL_COMMAND); // FIXME: Is this correct?
 			}
@@ -357,7 +357,7 @@ void CardIo::Command_A0_Clean()
 {
 	switch (currentStep) {
 		case 1:
-			if (status.r == R::NO_CARD) {
+			if (!HasCard()) {
 				status.s = S::WAITING_FOR_CARD;
 				currentStep--;
 			}
@@ -366,7 +366,7 @@ void CardIo::Command_A0_Clean()
 			status.s = S::RUNNING_COMMAND; // TODO: don't set this here
 			break;
 		case 3:
-			status.r = R::EJECTING_CARD;
+			EjectCard();
 			break;
 		default: 
 			break;
@@ -392,10 +392,10 @@ void CardIo::Command_B0_DispenseCardS31()
 				status.s = S::CARD_FULL;
 			} else {
 				if (status.s != S::ILLEGAL_COMMAND) {
-					if (status.r == R::HAS_CARD_1) {
+					if (HasCard()) {
 						SetSError(S::ILLEGAL_COMMAND);
 					} else {
-						status.r = R::HAS_CARD_1;
+						DispenseCard();
 					}
 				}
 			}
@@ -491,12 +491,14 @@ void CardIo::SetSError(S error_code)
 
 void CardIo::UpdateStatusInBuffer()
 {
-	commandBuffer[1] = static_cast<uint8_t>(status.r);
+	//commandBuffer[1] = static_cast<uint8_t>(status.r);
+	commandBuffer[1] = GetRStatus();
 	commandBuffer[2] = static_cast<uint8_t>(status.p);
 	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
 	spdlog::debug("R: {0:X} P: {1:X} S: {2:X}", 
-		static_cast<uint8_t>(status.r),
+		//static_cast<uint8_t>(status.r),
+		GetRStatus(),
 		static_cast<uint8_t>(status.p),
 		static_cast<uint8_t>(status.s)
 	);
@@ -511,17 +513,8 @@ void CardIo::HandlePacket()
 
 		status.p = P::NO_ERR;
 	}
-	
-	// We "grab" the card for the user
-	if (status.r == R::EJECTING_CARD) {
-		*insertedCard = false;
-		status.r = R::NO_CARD;
-	}
 
-	// We require the user to "insert" a card if we're waiting
-	if (*insertedCard && status.s == S::WAITING_FOR_CARD) {
-		status.r = R::HAS_CARD_1;
-	}
+	UpdateRStatus();
 
 	if (runningCommand) { // 20 is a special case, see function
 		if (currentStep == 0 && currentCommand != 0x20) {
@@ -639,7 +632,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	commandBuffer.clear();
 	commandBuffer.emplace_back(currentCommand);
-	commandBuffer.emplace_back(static_cast<uint8_t>(status.r));
+	commandBuffer.emplace_back(GetRStatus());
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.p));
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.s));
 	

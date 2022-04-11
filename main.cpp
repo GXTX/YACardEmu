@@ -27,7 +27,8 @@
 #include <filesystem>
 #include <string>
 
-#include "CardIo.h"
+//#include "CardIo.h"
+#include "C1231LR.h"
 #include "SerIo.h"
 #include "ICUConv.h"
 
@@ -149,7 +150,8 @@ int main()
 		return 1;
 	}
 
-	std::unique_ptr<CardIo> cardHandler (std::make_unique<CardIo>(&insertedCard, &cardPath, &cardName));
+	//std::unique_ptr<CardIo> cardHandler (std::make_unique<CardIo>(&insertedCard, &cardPath, &cardName));
+	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(&insertedCard, &cardPath, &cardName));
 
 	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName.c_str()));
 	if (!serialHandler->IsInitialized) {

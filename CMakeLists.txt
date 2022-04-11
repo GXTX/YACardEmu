@@ -22,6 +22,7 @@ add_executable(${PROJECT_NAME}
 	Includes/CardIo.cpp
 	Includes/SerIo.cpp
 	Includes/ICUConv.cpp
+	Includes/C1231LR.cpp
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
