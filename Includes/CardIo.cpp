@@ -228,9 +228,10 @@ void CardIo::Command_53_WriteData2()
 
 				for (int i = 0; i < NUM_TRACKS; i++) {
 					// Fill in null track data if the machine hasn't given us any to make size correct
-					if (cardData.at(i).empty()) {
+					if (cardData.at(i).size() != TRACK_SIZE) {
 						cardData.at(i).resize(TRACK_SIZE);
 					}
+
 					std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(writeBack));
 				}
 
