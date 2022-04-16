@@ -41,10 +41,7 @@ void C1231LR::UpdateRStatus()
 
 bool C1231LR::HasCard()
 {
-	if (localStatus == LR::HAS_CARD_1) {
-		return true;
-	}
-	return false;
+	return localStatus == LR::HAS_CARD_1;
 }
 
 void C1231LR::DispenseCard()

@@ -217,7 +217,7 @@ void CardIo::Command_53_WriteData2()
 					cardData.clear();
 					cardData.resize(NUM_TRACKS);
 					for (int i = 0; i < NUM_TRACKS; i++) {
-						std::copy(currentPacket.begin() + 3, currentPacket.begin() + (i * TRACK_SIZE + TRACK_SIZE), std::back_inserter(cardData.at(i)));
+						std::copy(currentPacket.begin() + 3 + (i * TRACK_SIZE), currentPacket.begin() + (i * TRACK_SIZE + TRACK_SIZE), std::back_inserter(cardData.at(i)));
 					}
 				} else {
 					SetPError(P::ILLEGAL_ERR); // We don't support any other methods for now
