@@ -66,7 +66,7 @@ void httpServer()
 		std::string list{};
 
 		for (const auto &entry: std::filesystem::directory_iterator(cardPath)) {
-			list.append(entry.path());
+			list.append(entry.path().string());
 			list.append("\n");
 		}
 
@@ -119,7 +119,7 @@ bool readConfig()
 	}
 
 	if (cardPath.empty()) {
-		cardPath = std::filesystem::current_path();
+		cardPath = std::filesystem::current_path().string();
 	}
 
 	if (httpPort.empty()) {

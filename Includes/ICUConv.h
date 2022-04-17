@@ -22,14 +22,18 @@
 #ifndef ICUCONV_H
 #define ICUCONV_H
 
+#ifdef _WIN32
+#define SDL_MAIN_HANDLED
+#endif
+
 #include <vector>
 #include <codecvt>
 #include <locale>
 #include <unicode/ucnv.h>
 
-#include "SDL2/SDL.h"
-#include "SDL2/SDL_ttf.h"
-#include "SDL2/SDL_image.h"
+#include "SDL.h"
+#include "SDL_ttf.h"
+#include "SDL_image.h"
 
 class ICUConv
 {

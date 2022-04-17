@@ -1,4 +1,11 @@
 build/
+Debug/
+Release/
+bin/
+obj/
 .vscode/
+.vs/
+3rdparty/
 [Vv]ersion.h
-
+[Yy][Aa][Cc]ard[Ee]mu.*
+premake5.exe
