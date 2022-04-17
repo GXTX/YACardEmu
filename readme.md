@@ -44,14 +44,14 @@ Windows
 git clone --recursive https://github.com/GXTX/YACardEmu
 cd YACardEmu
 ```
-Extract premake5 (next to premake5.bat)
+Extract premake5 (next to premake5.bat)  
 Extract libserialport to 3rdparty/libserialport  
 Extract icu to 3rdparty/icu4c  
 Extract SDL2 to 3rdparty/SDL2 (!! without the SDL2-2.0.20 folder !!)  
 Extract SDL2_ttf to 3rdparty/SDL2_ttf (!! without the SDL2_ttf-2.0.18 folder !!)  
 Extract SDL2_image to 3rdparty/SDL2_image (!! without the SDL2_image-2.0.5 folder !!)
 
-Run premake5.bat
+Run premake5.bat  
 Open YACardEmu.sln and build solution (debug or release).
 
 Running
