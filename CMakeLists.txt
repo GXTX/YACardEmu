@@ -15,6 +15,7 @@ include_directories(${SERIAL_INCLUDE_DIRS} ${THREAD_INLCUDE_DIRS}
 	${PROJECT_SOURCE_DIR}/Includes
 	${PROJECT_SOURCE_DIR}/3rdparty/cpp-httplib
 	${PROJECT_SOURCE_DIR}/3rdparty/mINI/src
+	${SDL2_INCLUDE_DIRS}
 )
 
 add_executable(${PROJECT_NAME}
