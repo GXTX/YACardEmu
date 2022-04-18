@@ -636,11 +636,6 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	commandBuffer.emplace_back(GetRStatus());
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.p));
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.s));
-	
-	// FIXME: special case, we need to handle this better, but server does NOT accept an ACK from us on eject command
-	if (currentCommand == 0x80) {
-		return ServerWaitingReply;
-	}
 
 	return Okay;
 }
