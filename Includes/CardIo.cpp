@@ -54,7 +54,6 @@ void CardIo::Command_10_Initalize()
 			if (HasCard()) {
 				EjectCard();
 			}
-			// TODO: Reset printer settings
 			break;
 		default:
 			break;
@@ -199,29 +198,76 @@ void CardIo::Command_53_WriteData2()
 		Track_1_2_And_3 = 0x36,
 	};
 
+	if (currentPacket.size() < 3) {
+		SetPError(P::SYSTEM_ERR);
+		return;
+	} 
+
 	Mode mode = static_cast<Mode>(currentPacket[0]);
 	BitMode bit = static_cast<BitMode>(currentPacket[1]);
-
-	// TODO: Impliment this, is req for some applications, how are multitrack write/reads handled? is there a break?
 	Track track = static_cast<Track>(currentPacket[2]);
 
 	switch (currentStep) {
 		case 1:
-			if (!HasCard()) {
+			if (!HasCard() || mode == Mode::WriteVariable) {
 				SetPError(P::ILLEGAL_ERR);
 			} else {
-				if (track < Track::Track_1_And_2) {
-					cardData.at(static_cast<size_t>(track) - 0x30).clear();
-					std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData.at(static_cast<size_t>(track) - 0x30)));
-				} else if (track == Track::Track_1_2_And_3) {
-					cardData.clear();
-					cardData.resize(NUM_TRACKS);
-					for (int i = 0; i < NUM_TRACKS; i++) {
-						std::copy( currentPacket.begin() + 3 + (i * TRACK_SIZE), currentPacket.begin() + 3 + ((i * TRACK_SIZE) + TRACK_SIZE), std::back_inserter(cardData.at(i)));
-					}
-				} else {
-					SetPError(P::ILLEGAL_ERR); // We don't support any other methods for now
-					return;
+				switch (track) {
+					case Track::Track_1:
+					case Track::Track_2:
+					case Track::Track_3:
+						{
+							const uint8_t ctrack = static_cast<uint8_t>(track) - 0x30;
+							cardData.at(ctrack).clear();
+							std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData.at(ctrack)));
+						}
+						break;
+					case Track::Track_1_And_2:
+					case Track::Track_1_And_3:
+					case Track::Track_2_And_3:
+						{
+							if (currentPacket.size() - 3 < TRACK_SIZE + 1) {
+								SetPError(P::SYSTEM_ERR); // FIXME: Should we do this? Or should we just fill in NULL
+								return;
+							}
+
+							// TODO: This feels bad...
+							uint8_t ctrack, ctrack1;
+
+							if (track == Track::Track_1_And_2) {
+								ctrack = 0; ctrack1 = 1;
+							} else if (track == Track::Track_1_And_3) {
+								ctrack = 0; ctrack1 = 2;
+							} else {
+								ctrack = 1; ctrack1 = 2;
+							}
+
+							cardData.at(ctrack).clear();
+							cardData.at(ctrack1).clear();
+
+							std::copy(currentPacket.begin() + 3, currentPacket.begin() + 3 + TRACK_SIZE, std::back_inserter(cardData.at(ctrack)));
+							std::copy(currentPacket.begin() + 3 + TRACK_SIZE, currentPacket.end(), std::back_inserter(cardData.at(ctrack1)));
+						}
+						break;
+					case Track::Track_1_2_And_3:
+						{
+							if (currentPacket.size() - 3 < CARD_SIZE) {
+								SetPError(P::SYSTEM_ERR); // FIXME: Should we do this? Or should we just fill in NULL
+								return;
+							}
+
+							cardData.clear();
+							cardData.resize(NUM_TRACKS);
+							for (int i = 0; i < NUM_TRACKS; i++) {
+								const uint8_t offset = 3 + (i * TRACK_SIZE);
+								std::copy(currentPacket.begin() + offset, currentPacket.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
+							}
+						}
+						break;
+					default:
+						SetPError(P::ILLEGAL_ERR);
+						spdlog::warn("Unknown track write option {0:X}", static_cast<uint8_t>(track));
+						return;
 				}
 
 				std::string writeBack{};
@@ -229,6 +275,7 @@ void CardIo::Command_53_WriteData2()
 				for (int i = 0; i < NUM_TRACKS; i++) {
 					// Fill in null track data if the machine hasn't given us any to make size correct
 					if (cardData.at(i).size() != TRACK_SIZE) {
+						// FIXME: Should we actaully be doing this?
 						cardData.at(i).resize(TRACK_SIZE);
 					}
 
@@ -278,6 +325,11 @@ void CardIo::Command_7C_PrintL()
 		Clear = 0x30,
 		DontClear = 0x31,
 	};
+
+	if (currentPacket.size() < 3) {
+		SetPError(P::SYSTEM_ERR);
+		return;
+	}
 
 	Mode mode = static_cast<Mode>(currentPacket[0]);
 	BufferControl control = static_cast<BufferControl>(currentPacket[1]);
@@ -364,7 +416,7 @@ void CardIo::Command_A0_Clean()
 			}
 			break;
 		case 2:
-			status.s = S::RUNNING_COMMAND; // TODO: don't set this here
+			status.s = S::RUNNING_COMMAND; // TODO: cleanup from case 1, don't set this here
 			break;
 		case 3:
 			EjectCard();
@@ -384,6 +436,11 @@ void CardIo::Command_B0_DispenseCardS31()
 		Dispense = 0x31,
 		CheckOnly = 0x32,
 	};
+
+	if (currentPacket.empty()) {
+		SetSError(S::ILLEGAL_COMMAND);
+		return;
+	}
 
 	Mode mode = static_cast<Mode>(currentPacket[0]);
 
@@ -434,10 +491,12 @@ void CardIo::Command_E1_SetRTC()
 void CardIo::Command_F0_GetVersion()
 {
 	switch (currentStep) {
-		default:
+		case 1:
 			std::copy(versionString.begin(), versionString.end(), std::back_inserter(commandBuffer));
 			status.SoftReset();
 			runningCommand = false;
+			break;
+		default:
 			break;
 	}
 }
@@ -445,7 +504,7 @@ void CardIo::Command_F0_GetVersion()
 void CardIo::Command_F1_GetRTC()
 {
 	switch (currentStep) {
-		default:
+		case 1:
 			{
 				std::string timeStr(12, 0);
 				std::time_t currentTime = std::time(nullptr);
@@ -463,6 +522,8 @@ void CardIo::Command_F1_GetRTC()
 			}
 			status.SoftReset();
 			runningCommand = false;
+			break;
+		default:
 			break;
 	}
 }
@@ -492,13 +553,11 @@ void CardIo::SetSError(S error_code)
 
 void CardIo::UpdateStatusInBuffer()
 {
-	//commandBuffer[1] = static_cast<uint8_t>(status.r);
 	commandBuffer[1] = GetRStatus();
 	commandBuffer[2] = static_cast<uint8_t>(status.p);
 	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
 	spdlog::debug("R: {0:X} P: {1:X} S: {2:X}", 
-		//static_cast<uint8_t>(status.r),
 		GetRStatus(),
 		static_cast<uint8_t>(status.p),
 		static_cast<uint8_t>(status.s)
@@ -536,13 +595,13 @@ void CardIo::HandlePacket()
 				case 0xA0: Command_A0_Clean(); break;
 				case 0xB0: Command_B0_DispenseCardS31(); break;
 				// FIXME: These need to not set S::RUNNING_COMMAND;
+				case 0xE1: Command_E1_SetRTC(); break;
 				case 0xF0: Command_F0_GetVersion(); break;
 				case 0xF1: Command_F1_GetRTC(); break;
 				case 0xF5: Command_F5_CheckBattery(); break;
 				default:
 					spdlog::warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
-					status.s = S::ILLEGAL_COMMAND;
-					runningCommand = false;
+					SetSError(S::ILLEGAL_COMMAND);
 					break;
 			}
 			currentStep++;
@@ -626,6 +685,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	// Remove the current command and the masters status bytes, we don't need it
 	currentPacket.erase(currentPacket.begin(), currentPacket.begin() + 4);
 
+	// TODO: Do all of this below better...
 	status.SoftReset();
 	status.s = S::RUNNING_COMMAND;
 	runningCommand = true;
