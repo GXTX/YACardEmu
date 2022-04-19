@@ -127,6 +127,8 @@ protected:
 	void UpdateStatusInBuffer();
 	void SetPError(P error_code);
 	void SetSError(S error_code);
+	bool ReadTrack(std::vector<uint8_t> &trackData, int trackNumber);
+	void WriteTrack(std::vector<uint8_t> &trackData, int trackNumber);
 
 	// Commands
 	void Command_10_Initalize();

@@ -97,10 +97,13 @@ void CardIo::Command_33_ReadData2()
 		Track_1_2_And_3 = 0x36,
 	};
 
+	if (currentPacket.size() < 3) {
+		SetPError(P::SYSTEM_ERR);
+		return;
+	}
+
 	Mode mode = static_cast<Mode>(currentPacket[0]);
 	BitMode bit = static_cast<BitMode>(currentPacket[1]);
-
-	// TODO: Impliment this, is req for some applications, how are multitrack write/reads handled? is there a break?
 	Track track = static_cast<Track>(currentPacket[2]);
 
 	switch (currentStep) {
@@ -114,43 +117,68 @@ void CardIo::Command_33_ReadData2()
 				if (HasCard()) {
 					status.s = S::RUNNING_COMMAND; // TODO: don't set this here, cleanup from above
 
-					// Clear the tracks that the machine is trying to read, we may have left over data
-					if (track < Track::Track_1_And_2) {
-						cardData.at(static_cast<size_t>(track) - 0x30).clear();
-					} else if (track == Track::Track_1_2_And_3) {
-						cardData.clear();
-						cardData.resize(NUM_TRACKS);
-					} else {
-						SetPError(P::ILLEGAL_ERR); // We don't support any other methods for now
-						return;
-					}
-
-					std::string fullPath(basePath->c_str());
-					fullPath.append(cardName->c_str());
-					std::string readBack(CARD_SIZE, 0);
-
-					if (std::filesystem::exists(fullPath.c_str()) &&
-							std::filesystem::file_size(fullPath.c_str()) == CARD_SIZE) {
-						std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
-						std::string readBack(CARD_SIZE, 0);
-
-						if (track == Track::Track_1_2_And_3) {
-							card.read(&readBack[0], CARD_SIZE);
-							for (int i = 0; i < 3; i++) {
-								std::copy(readBack.begin() + (i * TRACK_SIZE), readBack.begin() + (i * TRACK_SIZE + TRACK_SIZE), std::back_inserter(cardData.at(i)));
+					switch (track) {
+						case Track::Track_1:
+						case Track::Track_2:
+						case Track::Track_3:
+							{
+								const uint8_t ctrack = static_cast<uint8_t>(track) - 0x30;
+								cardData.at(ctrack).clear();
+								bool res = ReadTrack(cardData.at(ctrack), ctrack);
+								if (!res) {
+									SetPError(P::READ_ERR);
+									return;
+								}
+								std::copy(cardData.at(ctrack).begin(), cardData.at(ctrack).end(), std::back_inserter(commandBuffer));
 							}
-							std::copy(readBack.begin(), readBack.end(), std::back_inserter(commandBuffer));
-						} else {
-							uint8_t absTrack = (static_cast<uint8_t>(track) - 0x30);
-							uint8_t filePos = absTrack * TRACK_SIZE;
-							card.seekg(filePos);
-							card.read(&readBack[0], TRACK_SIZE);
-							std::copy(readBack.begin(), readBack.begin() + TRACK_SIZE, std::back_inserter(cardData.at(absTrack)));
-							std::copy(readBack.begin(), readBack.begin() + TRACK_SIZE, std::back_inserter(commandBuffer));
-						}
-						card.close();
-					} else {
-						SetPError(P::READ_ERR);
+							break;
+						case Track::Track_1_And_2:
+						case Track::Track_1_And_3:
+						case Track::Track_2_And_3:
+							{
+								// TODO: This feels bad...
+								uint8_t ctrack, ctrack1;
+
+								if (track == Track::Track_1_And_2) {
+									ctrack = 0; ctrack1 = 1;
+								} else if (track == Track::Track_1_And_3) {
+									ctrack = 0; ctrack1 = 2;
+								} else {
+									ctrack = 1; ctrack1 = 2;
+								}
+
+								cardData.at(ctrack).clear();
+								cardData.at(ctrack1).clear();
+
+								bool res = ReadTrack(cardData.at(ctrack), ctrack);
+								res = ReadTrack(cardData.at(ctrack1), ctrack1);
+								if (!res) {
+									SetPError(P::READ_ERR);
+									return;
+								}
+
+								std::copy(cardData.at(ctrack).begin(), cardData.at(ctrack).end(), std::back_inserter(commandBuffer));
+								std::copy(cardData.at(ctrack1).begin(), cardData.at(ctrack1).end(), std::back_inserter(commandBuffer));
+							}
+							break;
+						case Track::Track_1_2_And_3:
+							{
+								cardData.clear();
+								cardData.resize(NUM_TRACKS);
+								for (int i = 0; i < NUM_TRACKS; i++) {
+									bool res = ReadTrack(cardData.at(i), i);
+									if (!res) {
+										SetPError(P::READ_ERR);
+										return;
+									}
+									std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(commandBuffer));
+								}
+							}
+							break;
+						default:
+							SetPError(P::ILLEGAL_ERR);
+							spdlog::warn("Unknown track read option {0:X}", static_cast<uint8_t>(track));
+							return;
 					}
 				} else {
 					SetPError(P::ILLEGAL_ERR);
@@ -220,6 +248,7 @@ void CardIo::Command_53_WriteData2()
 							const uint8_t ctrack = static_cast<uint8_t>(track) - 0x30;
 							cardData.at(ctrack).clear();
 							std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData.at(ctrack)));
+							WriteTrack(cardData.at(ctrack), ctrack);
 						}
 						break;
 					case Track::Track_1_And_2:
@@ -247,6 +276,9 @@ void CardIo::Command_53_WriteData2()
 
 							std::copy(currentPacket.begin() + 3, currentPacket.begin() + 3 + TRACK_SIZE, std::back_inserter(cardData.at(ctrack)));
 							std::copy(currentPacket.begin() + 3 + TRACK_SIZE, currentPacket.end(), std::back_inserter(cardData.at(ctrack1)));
+
+							WriteTrack(cardData.at(ctrack), ctrack);
+							WriteTrack(cardData.at(ctrack1), ctrack1);
 						}
 						break;
 					case Track::Track_1_2_And_3:
@@ -261,6 +293,7 @@ void CardIo::Command_53_WriteData2()
 							for (int i = 0; i < NUM_TRACKS; i++) {
 								const uint8_t offset = 3 + (i * TRACK_SIZE);
 								std::copy(currentPacket.begin() + offset, currentPacket.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
+								WriteTrack(cardData.at(i), i);
 							}
 						}
 						break;
@@ -269,26 +302,6 @@ void CardIo::Command_53_WriteData2()
 						spdlog::warn("Unknown track write option {0:X}", static_cast<uint8_t>(track));
 						return;
 				}
-
-				std::string writeBack{};
-
-				for (int i = 0; i < NUM_TRACKS; i++) {
-					// Fill in null track data if the machine hasn't given us any to make size correct
-					if (cardData.at(i).size() != TRACK_SIZE) {
-						// FIXME: Should we actaully be doing this?
-						cardData.at(i).resize(TRACK_SIZE);
-					}
-
-					std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(writeBack));
-				}
-
-				std::string fullPath(basePath->c_str());
-				fullPath.append(cardName->c_str());
-
-				std::ofstream card;
-				card.open(fullPath, std::ofstream::out | std::ofstream::binary);
-				card.write(writeBack.c_str(), writeBack.size());
-				card.close();
 			}
 			break;
 		default:
@@ -539,6 +552,47 @@ void CardIo::Command_F5_CheckBattery()
 			runningCommand = false;
 			break;
 	}
+}
+
+bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
+{
+	std::string fullPath = *basePath + *cardName;
+	fullPath.append(".track_" + std::to_string(trackNumber));
+
+	if (std::filesystem::exists(fullPath.c_str())) {
+		if (std::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
+			std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
+			std::string readBack(TRACK_SIZE, 0);
+
+			card.read(&readBack[0], readBack.size());
+			trackData.clear();
+			std::copy(readBack.begin(), readBack.end(), std::back_inserter(trackData));
+			card.close();
+		} else {
+			return false;
+		}
+	} else {
+		// TODO: Is this a desired outcome?
+		std::vector<uint8_t> blank(TRACK_SIZE, 0);
+		WriteTrack(blank, trackNumber);
+		trackData.resize(TRACK_SIZE);
+	}
+
+	return true;
+}
+
+void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
+{
+	std::string fullPath = *basePath + *cardName;
+	fullPath.append(".track_" + std::to_string(trackNumber));
+
+	std::string writeBack{};
+	std::copy(trackData.begin(), trackData.end(), std::back_inserter(writeBack));
+
+	std::ofstream card;
+	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
+	card.write(writeBack.c_str(), writeBack.size());
+	card.close();
 }
 
 void CardIo::SetPError(P error_code)

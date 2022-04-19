@@ -26,14 +26,6 @@ add_executable(${PROJECT_NAME}
 	Includes/C1231LR.cpp
 )
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-	include(CheckIPOSupported)
-	check_ipo_supported(RESULT supported OUTPUT error)
-	if (supported)
-		set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-	endif()
-endif()
-
 add_subdirectory(3rdparty/spdlog)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
