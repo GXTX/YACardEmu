@@ -47,7 +47,7 @@ void CardIo::Command_10_Initalize()
 		ResetSpecifications = 0x32,
 	};
 
-	Mode mode = static_cast<Mode>(currentPacket[0]);
+	//Mode mode = static_cast<Mode>(currentPacket[0]);
 
 	switch (currentStep) {
 		case 1:
@@ -390,7 +390,9 @@ void CardIo::Command_7D_Erase()
 void CardIo::Command_80_EjectCard()
 {
 	switch (currentStep) {
-		case 1:
+		case 1: // FIXME: Special for "Transfer Card Data" in MT2EXP, we need 2 S::RUNNING_COMMAND replies
+			break;
+		case 2:
 			if (HasCard()) {
 				EjectCard();
 			} else {
@@ -401,7 +403,7 @@ void CardIo::Command_80_EjectCard()
 			break;
 	}
 
-	if (currentStep > 1) {
+	if (currentStep > 2) {
 		runningCommand = false;
 	}
 }
@@ -679,6 +681,11 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	}
 
 	spdlog::debug("{:Xn}", spdlog::to_hex(currentPacket));
+
+	// FIXME: MT2EXP "Transfer Card Data" interrupts Eject to do a CheckStatus, if we don't actaully eject here the system will error
+	if (currentCommand == 0x80) {
+		EjectCard();
+	}
 
 	currentCommand = currentPacket[0];
 
