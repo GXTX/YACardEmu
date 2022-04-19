@@ -357,10 +357,7 @@ void CardIo::Command_7C_PrintL()
 					printBuffer.clear();
 				}
 				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
-#if 0
-				ICUConv conv = ICUConv();
-				conv.convertAndPrint(lineOffset, printBuffer);
-#endif
+
 				// FIXME: Do this better.
 				std::ofstream card;
 				std::string writeBack{};
