@@ -7,7 +7,7 @@ YACardEmu (*YetAnother*CardEmu) is a program to emulate the Sanwa CRP-1231LR-10N
 
 Building
 ---------
-##### Prerequisites
+#### Prerequisites
 
 Ubuntu / Debian / Raspbian
 
@@ -22,7 +22,7 @@ Windows
 [libserialport](https://github.com/sigrokproject/libserialport/archive/refs/heads/master.zip)  
 
 
-##### Build
+#### Build
 
 Ubuntu / Debian / Raspbian
 
@@ -40,11 +40,12 @@ Windows
 git clone --recursive https://github.com/GXTX/YACardEmu
 cd YACardEmu
 ```
-Extract premake5 (next to premake5.bat)  
-Extract libserialport to 3rdparty/libserialport  
+Extract `premake5` (next to `premake5.bat`)  
+Extract `libserialport` to `3rdparty/libserialport`
 
-Run premake5.bat  
-Open YACardEmu.sln and build solution (debug or release).
+Run `premake5.bat`
+
+Open `YACardEmu.sln` and build solution (debug or release).
 
 Running
 ---------
@@ -52,15 +53,13 @@ Running
 You must have a USB to RS232 (or a physical serial port) connected to your machine. Configuration is made via both a `config.ini` file & via a web portal / API.
 To access the web portal point your browser to `http://YOURIPHERE:8080/`, this web page is where you'll choose your card and insert your card.
 
-Editing `config.ini` to point to where you want your cards stored is required. 
+Editing `config.ini` to point to where you want your cards stored is required.
 
 Ubuntu
 
-The program *must* be ran as root.
-
 ```
 cp ../config.ini.sample config.ini
-sudo ./YACardEmu
+./YACardEmu
 ```
 
 Windows

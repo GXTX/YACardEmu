@@ -71,7 +71,7 @@ void httpServer()
 		res.set_content(list, "text/plain");
 	});
 
-	svr.Post("/actions", [](const httplib::Request &req, httplib::Response) {
+	svr.Get("/actions", [](const httplib::Request &req, httplib::Response &res) {
 		if (req.has_param("insert")) {
 			insertedCard = true;
 		} else if (req.has_param("remove")) {
@@ -81,16 +81,14 @@ void httpServer()
 		if (req.has_param("name")) {
 			cardName = req.get_param_value("name");
 		}
+
+		res.set_redirect("/");
 	});
 
-	svr.Get("/stopServer", [&svr](const httplib::Request &, httplib::Response &) {
-		spdlog::info("Stopping API server...");
-		svr.stop();
-	});
-
-	svr.Get("/stop", [](const httplib::Request &, httplib::Response &) {
+	svr.Get("/stop", [&svr](const httplib::Request &, httplib::Response &) {
 		spdlog::info("Stopping application...");
 		running = false;
+		svr.stop();
 	});
 
 	svr.listen("0.0.0.0", std::stoi(httpPort));
