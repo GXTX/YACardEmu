@@ -17,6 +17,7 @@ add_executable(${PROJECT_NAME}
 	Includes/CardIo.cpp
 	Includes/SerIo.cpp
 	Includes/C1231LR.cpp
+	Includes/base64.cpp
 )
 
 add_subdirectory(3rdparty/spdlog)

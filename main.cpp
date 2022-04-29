@@ -29,6 +29,7 @@
 
 #include "C1231LR.h"
 #include "SerIo.h"
+#include "base64.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
@@ -61,14 +62,52 @@ void httpServer()
 	svr.set_mount_point("/", "site");
 
 	svr.Get("/list", [](const httplib::Request &, httplib::Response &res) {
-		std::string list{};
+
+		std::string list{"["};
 
 		for (const auto &entry: std::filesystem::directory_iterator(cardPath)) {
-			list.append(entry.path().string());
-			list.append("\n");
+			std::string card{entry.path().string()};
+
+			auto find = card.find(".track_0");
+
+			if (find != std::string::npos) {
+				card.replace(find, 8, "");
+				list.append("{\"name\":\"");
+#ifdef _WIN32
+				list.append(card.substr(card.find_last_of("\\") + 1));
+#else
+				list.append(card.substr(card.find_last_of("/") + 1));
+#endif
+				list.append("\",\"image\":\"");
+
+				auto find2 = card.find(".bin");
+				if (find2 != std::string::npos)
+					card.replace(find2, 4, ".png");
+				
+				std::string base64{};
+
+				if (std::filesystem::exists(card)) {
+					std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
+
+					base64.resize(std::filesystem::file_size(card));
+
+					img.read(reinterpret_cast<char *>(&base64[0]), base64.size());
+					img.close();
+				}
+
+				std::string encoded = base64_encode(base64, false);
+				list.append("data:image/png;base64, ");
+				list.append(encoded);
+				list.append("\"},");
+			}
 		}
 
-		res.set_content(list, "text/plain");
+		// remove the errant comma
+		list.pop_back();
+
+		list.append("]");
+
+		res.set_content(list, "application/json");
 	});
 
 	svr.Get("/actions", [](const httplib::Request &req, httplib::Response &res) {
