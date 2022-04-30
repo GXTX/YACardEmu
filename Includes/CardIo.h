@@ -33,6 +33,7 @@
 #include <atomic>
 #include <ctime>
 #include <sstream>
+#include <iomanip>
 
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"

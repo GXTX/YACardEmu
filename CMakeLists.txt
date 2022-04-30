@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.10)
 
 project(YACardEmu)
 
@@ -34,10 +34,18 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -march=native -Wall -Wextra -Wpedantic)
 
-target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES}
-	${CMAKE_THREAD_LIBS_INIT}
-	spdlog::spdlog
-)
+if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 8.9)
+	target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES}
+		${CMAKE_THREAD_LIBS_INIT}
+		spdlog::spdlog
+	)
+else ()
+	target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES}
+		${CMAKE_THREAD_LIBS_INIT}
+		stdc++fs #gcc8 has odd support for this
+		spdlog::spdlog
+	)
+endif()
 
 add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
