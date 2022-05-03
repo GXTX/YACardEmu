@@ -686,7 +686,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
 		spdlog::warn("Missing STX!");
-		readBuffer.clear();
+		readBuffer.erase(readBuffer.begin()); // SLOW!
 		return SyncError;
 	}
 
@@ -700,7 +700,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	if (readBuffer.at(count) != END_OF_TEXT) {
 		spdlog::debug("Missing ETX!");
-		readBuffer.clear();
+		readBuffer.erase(readBuffer.begin(), readBuffer.begin() + count);
 		return SyntaxError;
 	}
 
