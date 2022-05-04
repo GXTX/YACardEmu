@@ -187,7 +187,7 @@ int main()
 
 	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(&insertedCard, &cardPath, &cardName));
 
-	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName.c_str()));
+	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName));
 	if (!serialHandler->IsInitialized) {
 		spdlog::critical("Couldn't initalize the serial controller.");
 		return 1;
