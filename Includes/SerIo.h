@@ -42,8 +42,9 @@ public:
 	};
 
 	bool IsInitialized{};
+	bool isPipe{};
 
-	SerIo(const char *devicePath);
+	SerIo(std::string& devicePath);
 	~SerIo();
 
 	SerIo::Status Read(std::vector<uint8_t> &buffer);
@@ -54,6 +55,10 @@ private:
 	sp_port_config *PortConfig{nullptr};
 
 	std::vector<uint8_t> serialBuffer{};
+
+#ifdef _WIN32
+	HANDLE hPipe{};
+#endif
 };
 
 #endif

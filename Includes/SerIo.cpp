@@ -23,7 +23,7 @@
 
 #define DEBUG_SERIAL
 
-SerIo::SerIo(const char *devicePath)
+SerIo::SerIo(std::string &devicePath)
 {
 #ifdef NDEBUG
 	spdlog::set_level(spdlog::level::warn);
@@ -32,6 +32,23 @@ SerIo::SerIo(const char *devicePath)
 #endif
 	spdlog::set_pattern("[%^%l%$] %v");
 
+#ifdef _WIN32
+	if (devicePath.find("pipe") != std::string::npos) {
+		hPipe = CreateNamedPipeA(devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
+
+		if (hPipe == INVALID_HANDLE_VALUE) {
+			spdlog::critical("SerIo::Init: Failed to create pipe");
+			IsInitialized = false;
+		}
+		else {
+			IsInitialized = true;
+		}
+
+		isPipe = true;
+
+		return;
+	}
+#endif
 	sp_new_config(&PortConfig);
 	sp_set_config_baudrate(PortConfig, 9600);
 	sp_set_config_bits(PortConfig, 8);
@@ -39,7 +56,7 @@ SerIo::SerIo(const char *devicePath)
 	sp_set_config_stopbits(PortConfig, 1);
 	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
 
-	sp_get_port_by_name(devicePath, &Port);
+	sp_get_port_by_name(devicePath.c_str(), &Port);
 
 	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
 
@@ -54,7 +71,14 @@ SerIo::SerIo(const char *devicePath)
 
 SerIo::~SerIo()
 {
-	sp_close(Port);
+	if (isPipe) {
+#ifdef _WIN32	
+		CloseHandle(hPipe);
+#endif
+	}
+	else {
+		sp_close(Port);
+	}	
 }
 
 void SerIo::SendAck()
@@ -62,6 +86,13 @@ void SerIo::SendAck()
 	constexpr static const uint8_t ack = 0x06;
 
 	spdlog::debug("SerIo::SendAck: 06");
+
+#ifdef _WIN32
+	if (isPipe) { 
+		WriteFile(hPipe, &ack, 1, NULL, NULL);
+		return;
+	}
+#endif
 
 	sp_blocking_write(Port, &ack, 1, 0);
 	sp_drain(Port);
@@ -78,8 +109,19 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 	spdlog::debug("SerIo::Write: ");
 	spdlog::debug("{:Xn}", spdlog::to_hex(buffer));
 
-	int ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
-	sp_drain(Port);
+	int ret = 0;
+
+	if (isPipe) {
+#ifdef _WIN32
+		DWORD dwRet = 0;
+		WriteFile(hPipe, &buffer[0], buffer.size(), &dwRet, NULL);
+		ret = dwRet;
+#endif
+	}
+	else {
+		ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
+		sp_drain(Port);
+	}
 
 	// TODO: Should we care about write errors?
 	if (ret <= 0) {
@@ -94,7 +136,20 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 
 SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 {
-	int bytes = sp_input_waiting(Port);
+	int bytes = 0;
+
+	if (isPipe) {
+#ifdef _WIN32
+		DWORD dwBytes = 0;
+		if (PeekNamedPipe(hPipe, 0, 0, 0, &dwBytes, 0) == 0) {
+			return Status::ReadError;
+		}
+		bytes = dwBytes;
+#endif
+	}
+	else {
+		bytes = sp_input_waiting(Port);
+	}
 
 	if (bytes < 1) {
 		return Status::ReadError;
@@ -103,7 +158,17 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 	serialBuffer.clear();
 	serialBuffer.resize(static_cast<size_t>(bytes));
 
-	int ret = sp_nonblocking_read(Port, &serialBuffer[0], serialBuffer.size());
+	int ret = 0;
+
+	if (isPipe) {
+#ifdef _WIN32
+		BOOL bRet = ReadFile(hPipe, &serialBuffer[0], serialBuffer.size(), NULL, NULL);
+		ret = bRet;
+#endif
+	}
+	else {
+		ret = sp_nonblocking_read(Port, &serialBuffer[0], serialBuffer.size());
+	}
 
 	if (ret <= 0) {
 		return Status::ReadError;
