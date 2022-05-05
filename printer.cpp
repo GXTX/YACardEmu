@@ -51,7 +51,7 @@ int main()
 	icu::UnicodeString halfu = ":: Halfwidth-Fullwidth;";
 
 	TTF_Init();
-	TTF_Font *font = TTF_OpenFont("/home/wutno/Projects/YACardEmu/build/kochi-gothic-subst.ttf", 30);
+	TTF_Font *font = TTF_OpenFont("/home/wutno/Projects/YACardEmu/build/kochi-gothic-subst.ttf", 42);
 	if (font == nullptr) {
 		return 1;
 	}
@@ -69,7 +69,10 @@ int main()
 		return 1;
 	}
 
-	int horz = 90, virt = 100, cbuffsize = 255;
+	int horz = 96, virt = 100, cbuffsize = 255;
+
+	int advance = 0;
+	TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
 
 	for (const auto &src : lines) {
 		icu::UnicodeString str{};
@@ -80,31 +83,21 @@ int main()
 		str.setTo(srcBuffer, reqSize);
 		free(srcBuffer);
 
-
-		if (src.find('\x11') != std::string::npos) {
-			//literate(halfu, &str);
-			//TTF_SetFontStyle(font, TTF_STYLE_BOLD);
+		if (str.indexOf('\x11') != -1) {
 			TTF_SetFontSize(font, 42);
-
-			//UErrorCode status = U_ZERO_ERROR;
-			//icu::Transliterator *trans = icu::Transliterator::createInstance(halfu, UTRANS_FORWARD, status);
-			//trans->transliterate(str, 0, str.length());
-
-
-			//UTransliterator *trans = utrans_open(half.c_str(), UTRANS_FORWARD, nullptr, -1, nullptr, &err);
-
-
-			//icu::Transliterator *trans = icu::Transliterator::createInstance();
-
-			//utrans_transUChars(trans, dest, &cbuffsize, 255, 0, &cbuffsize, &err);
-			//utrans_close(trans);
+			TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
+			advance = advance + 15;
+			str.removeBetween(str.indexOf('\x11'), str.lastIndexOf('\x11') + 1);
 		} else {
-			//UTransliterator *trans = utrans_open(full.c_str(), UTRANS_FORWARD, nullptr, -1, nullptr, &err);
-			//utrans_transUChars(trans, dest, &cbuffsize, 255, 0, &cbuffsize, &err);
-			//utrans_close(trans);
-			//literate(fullu, &str);
 			TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
-			TTF_SetFontSize(font, 30);
+			TTF_SetFontSize(font, 35);
+			TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
+			advance = advance + 3;
+		}
+
+		// FIXME: We need to split the string and set pt to 35, will need to adjust new horz to where it would be
+		if (str.indexOf('\x14') > -1) {
+			str.removeBetween(str.indexOf('\x14'), str.lastIndexOf('\x14') + 1);
 		}
 
 		SDL_Rect location = {horz, virt, 0, 0};
@@ -112,9 +105,7 @@ int main()
 		SDL_BlitSurface(textSurf, NULL, cardImage, &location);
 		SDL_FreeSurface(textSurf);
 
-		int advance = 0;
-		TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
-		virt += advance + 10;
+		virt += advance;
 	}
 
 	IMG_SavePNG(cardImage, "file.png");
