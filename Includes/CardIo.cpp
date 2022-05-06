@@ -275,7 +275,7 @@ void CardIo::Command_53_WriteData2()
 							cardData.at(ctrack1).clear();
 
 							std::copy(currentPacket.begin() + 3, currentPacket.begin() + 3 + TRACK_SIZE, std::back_inserter(cardData.at(ctrack)));
-							std::copy(currentPacket.begin() + 3 + TRACK_SIZE + 1, currentPacket.end(), std::back_inserter(cardData.at(ctrack1)));
+							std::copy(currentPacket.begin() + 3 + TRACK_SIZE, currentPacket.end(), std::back_inserter(cardData.at(ctrack1)));
 
 							WriteTrack(cardData.at(ctrack), ctrack);
 							WriteTrack(cardData.at(ctrack1), ctrack1);
