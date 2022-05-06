@@ -24,9 +24,10 @@ project "YACardEmu"
 	links { "libserialport" }
 
 	postbuildcommands {
-	  "if exist $(TargetDir)..\\..\\config.ini.sample copy /y $(TargetDir)..\\..\\config.ini.sample $(TargetDir)config.ini",	  
+	  "if exist $(TargetDir)..\\..\\config.ini.sample copy /y $(TargetDir)..\\..\\config.ini.sample $(TargetDir)config.ini.sample",	  
 	  "if exist $(TargetDir)..\\..\\%{cfg.buildcfg}\\libserialport.dll copy /y $(TargetDir)..\\..\\%{cfg.buildcfg}\\libserialport.dll $(TargetDir)libserialport.dll", 
-	  "if exist $(TargetDir)..\\..\\site xcopy /y $(TargetDir)..\\..\\site $(TargetDir)site\\"
+	  "if exist $(TargetDir)..\\..\\site xcopy /y $(TargetDir)..\\..\\site $(TargetDir)site\\",
+	  "if exist $(TargetDir)..\\..\\license.txt copy /y $(TargetDir)..\\..\\license.txt $(TargetDir)license.txt"
 	}
 
 	filter "configurations:Debug"

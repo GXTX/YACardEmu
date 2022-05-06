@@ -1,0 +1,88 @@
+name: GitHub CI
+# Taken from https://github.com/Cxbx-Reloaded/Cxbx-Reloaded
+on:
+  push:
+    paths-ignore:
+      - '.gitattributes'
+      - '.github/*'
+      - '.github/*_TEMPLATE/**'
+      - '.gitignore'
+      - '*.bat'
+      - '*.yml'
+      - 'doc/**'
+  pull_request:
+    paths-ignore:
+      - '.gitattributes'
+      - '.github/*'
+      - '.github/*_TEMPLATE/**'
+      - '.gitignore'
+      - '*.bat'
+      - '*.yml'
+      - 'doc/**'
+
+jobs:
+  build-windows:
+    name: Build (Windows, ${{ matrix.configuration }}, VS${{ matrix.vsver }}) # runner.os doesn't work here
+    runs-on: windows-${{ matrix.vsver }}
+    env:
+      POWERSHELL_TELEMETRY_OPTOUT: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Release, Debug]
+        vsver: [2022]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Clone libserialport
+        uses: actions/checkout@v3
+        with:
+          repository: sigrokproject/libserialport
+          path: './3rdparty/libserialport'
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+      - name: Premake
+        run: |
+          Invoke-WebRequest -Uri https://github.com/premake/premake-core/releases/download/v5.0.0-beta1/premake-5.0.0-beta1-windows.zip -OutFile premake.zip
+          7z e premake.zip
+          .\premake5 vs2022
+      - name: Build
+        run: |
+          msbuild YACardEmu.sln -t:rebuild -verbosity:detailed -property:Configuration=${{ matrix.configuration }}
+          del bin\${{ matrix.configuration }}\*.pdb
+        shell: cmd
+      - uses: actions/upload-artifact@v3
+        with:
+          name: YACardEmu-${{ matrix.configuration }}
+          path: bin/${{ matrix.configuration }}
+          if-no-files-found: error
+
+  release:
+    if: |
+      github.event.action != 'pull_request' &&
+      github.ref == 'refs/heads/master'     &&
+      github.repository == 'GXTX/YACardEmu'
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+      - name: Re-zip artifacts
+        id: zip
+        run: |
+          for artifact in artifacts/*; do
+            7z a ${artifact}.zip "./${artifact}/*"
+            if [ $(stat -c %s ${artifact}.zip) -le 100000 ]; then
+              echo "Error: Archive ${artifact}.zip too small!"
+              exit 1
+            fi
+          done
+          echo "::set-output name=tag_name::CI-${GITHUB_SHA::7}"
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create ${{ steps.zip.outputs.tag_name }} artifacts/*.zip -p --target $GITHUB_SHA --title '${{ steps.zip.outputs.tag_name }}'
