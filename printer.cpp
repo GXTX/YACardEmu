@@ -69,7 +69,7 @@ int main()
 		return 1;
 	}
 
-	int horz = 96, virt = 100, cbuffsize = 255;
+	int horz = 105, virt = 100, cbuffsize = 255;
 
 	int advance = 0;
 	TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
@@ -86,23 +86,37 @@ int main()
 		if (str.indexOf('\x11') != -1) {
 			TTF_SetFontSize(font, 42);
 			TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
-			advance = advance + 15;
+			advance = advance + 18;
 			str.removeBetween(str.indexOf('\x11'), str.lastIndexOf('\x11') + 1);
 		} else {
-			TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
-			TTF_SetFontSize(font, 35);
+			//TTF_SetFontStyle(font, TTF_STYLE_NORMAL);
+			TTF_SetFontSize(font, 34);
 			TTF_GlyphMetrics(font, '\r', NULL, NULL, NULL, NULL, &advance);
 			advance = advance + 3;
 		}
 
-		// FIXME: We need to split the string and set pt to 35, will need to adjust new horz to where it would be
+		bool hasReset{};
+		icu::UnicodeString str2{};
 		if (str.indexOf('\x14') > -1) {
-			str.removeBetween(str.indexOf('\x14'), str.lastIndexOf('\x14') + 1);
+			//icu::UnicodeString str2{};
+			str.extractBetween(str.indexOf('\x14') + 1, str.length() + 1, str2);
+			str.setCharAt(str.indexOf('\x14'), '\x00'); // FIXME: bad bad
+			//str.removeBetween(str.indexOf('\x14'), str.getCapacity());
+			//str.truncate(str.indexOf('\x14') - 1);
+			hasReset = true;
 		}
 
 		SDL_Rect location = {horz, virt, 0, 0};
 		SDL_Surface *textSurf = TTF_RenderUNICODE_Blended(font, (const Uint16 *)str.getBuffer(), color);
 		SDL_BlitSurface(textSurf, NULL, cardImage, &location);
+		if (hasReset) {
+			TTF_SetFontSize(font, 34);
+			SDL_Rect location = {textSurf->clip_rect.w + (advance * 1.7), virt + (advance / 5.7), 0, 0};
+			SDL_Surface *textSurf2 = TTF_RenderUNICODE_Blended(font, (const Uint16 *)str2.getBuffer(), color);
+			SDL_BlitSurface(textSurf2, NULL, cardImage, &location);
+			SDL_FreeSurface(textSurf2);
+			TTF_SetFontSize(font, 42);
+		}
 		SDL_FreeSurface(textSurf);
 
 		virt += advance;
