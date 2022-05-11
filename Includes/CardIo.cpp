@@ -725,10 +725,6 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 {
 	spdlog::debug("CardIo::ReceivePacket: ");
 
-	if (readBuffer.size() < 8) {
-		return SyntaxError;
-	}
-
 	uint8_t *buffer = &readBuffer[0];
 
 	// First, read the sync byte
@@ -743,6 +739,10 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 		spdlog::warn("Missing STX!");
 		readBuffer.erase(readBuffer.begin()); // SLOW!
 		return SyncError;
+	}
+
+	if (readBuffer.size() < 8) {
+		return SyntaxError;
 	}
 
 	uint8_t count = GetByte(&buffer);
