@@ -327,6 +327,37 @@ void CardIo::Command_78_PrintSettings2()
 	}
 }
 
+void CardIo::Command_7A_RegisterFont()
+{
+	switch (currentStep) {
+		case 1:
+			break;
+		default:
+			break;
+	}
+
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
+}
+
+void CardIo::Command_7B_PrintImage()
+{
+	switch (currentStep) {
+		case 1:
+			if (!HasCard()) {
+				SetPError(P::ILLEGAL_ERR);
+			}
+			break;
+		default:
+			break;
+	}
+
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
+}
+
 void CardIo::Command_7C_PrintL()
 {
 	enum Mode {
@@ -381,6 +412,23 @@ void CardIo::Command_7C_PrintL()
 }
 
 void CardIo::Command_7D_Erase()
+{
+	switch (currentStep) {
+		case 1:
+			if (!HasCard()) {
+				SetPError(P::ILLEGAL_ERR);
+			}
+			break;
+		default:
+			break;
+	}
+
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
+}
+
+void CardIo::Command_7E_PrintBarcode()
 {
 	switch (currentStep) {
 		case 1:
@@ -642,8 +690,11 @@ void CardIo::HandlePacket()
 				case 0x40: Command_40_Cancel(); break;
 				case 0x53: Command_53_WriteData2(); break;
 				case 0x78: Command_78_PrintSettings2(); break;
+				case 0x7A: Command_7A_RegisterFont(); break;
+				case 0x7B: Command_7B_PrintImage(); break;
 				case 0x7C: Command_7C_PrintL(); break;
 				case 0x7D: Command_7D_Erase(); break;
+				case 0x7E: Command_7E_PrintBarcode(); break;
 				case 0x80: Command_80_EjectCard(); break;
 				case 0xA0: Command_A0_Clean(); break;
 				case 0xB0: Command_B0_DispenseCardS31(); break;
