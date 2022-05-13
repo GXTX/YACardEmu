@@ -115,8 +115,6 @@ void CardIo::Command_33_ReadData2()
 				}
 			} else {
 				if (HasCard()) {
-					status.s = S::RUNNING_COMMAND; // TODO: don't set this here, cleanup from above
-
 					switch (track) {
 						case Track::Track_1:
 						case Track::Track_2:
@@ -319,25 +317,19 @@ void CardIo::Command_78_PrintSettings2()
 {
 	switch (currentStep) {
 		default:
+			status.SoftReset();
+			runningCommand = false;
 			break;
-	}
-
-	if (currentStep > 1) {
-		runningCommand = false;
 	}
 }
 
 void CardIo::Command_7A_RegisterFont()
 {
 	switch (currentStep) {
-		case 1:
-			break;
 		default:
+			status.SoftReset();
+			runningCommand = false;
 			break;
-	}
-
-	if (currentStep > 1) {
-		runningCommand = false;
 	}
 }
 
@@ -475,8 +467,7 @@ void CardIo::Command_A0_Clean()
 				currentStep--;
 			}
 			break;
-		case 2:
-			status.s = S::RUNNING_COMMAND; // TODO: cleanup from case 1, don't set this here
+		case 2: // Force a RUNNING_JOB only response
 			break;
 		case 3:
 			EjectCard();
@@ -540,7 +531,7 @@ void CardIo::Command_E1_SetRTC()
 
 				std::tm *tempTime{};
 				timeStrS >> std::get_time(tempTime, "%y%m%d%H%M%S");
-				time = std::mktime(tempTime);
+				setTime = std::mktime(tempTime);
 			}
 			status.SoftReset();
 			runningCommand = false;
@@ -551,7 +542,7 @@ void CardIo::Command_E1_SetRTC()
 void CardIo::Command_F0_GetVersion()
 {
 	switch (currentStep) {
-		case 1:
+		case 0:
 			std::copy(versionString.begin(), versionString.end(), std::back_inserter(commandBuffer));
 			status.SoftReset();
 			runningCommand = false;
@@ -564,15 +555,15 @@ void CardIo::Command_F0_GetVersion()
 void CardIo::Command_F1_GetRTC()
 {
 	switch (currentStep) {
-		case 1:
+		case 0:
 			{
-				std::string timeStr(12, 0);
+				std::string timeStr(13, 0);
 				std::time_t currentTime = std::time(nullptr);
 
 				std::time_t convTime{};
 
-				if (time != 0) {
-					convTime = time + currentTime - startTime;
+				if (setTime != 0) {
+					convTime = setTime + currentTime - startTime;
 				} else {
 					convTime = currentTime;
 				}
@@ -678,38 +669,31 @@ void CardIo::HandlePacket()
 	UpdateRStatus();
 
 	if (runningCommand) { // 20 is a special case, see function
-		if (currentStep == 0 && currentCommand != 0x20) {
-			// Get S::RUNNING_COMMAND to be the first response always
-			currentStep++;
-			return;
-		} else {
-			switch (currentCommand) {
-				case 0x10: Command_10_Initalize(); break;
-				case 0x20: Command_20_ReadStatus(); break;
-				case 0x33: Command_33_ReadData2(); break;
-				case 0x40: Command_40_Cancel(); break;
-				case 0x53: Command_53_WriteData2(); break;
-				case 0x78: Command_78_PrintSettings2(); break;
-				case 0x7A: Command_7A_RegisterFont(); break;
-				case 0x7B: Command_7B_PrintImage(); break;
-				case 0x7C: Command_7C_PrintL(); break;
-				case 0x7D: Command_7D_Erase(); break;
-				case 0x7E: Command_7E_PrintBarcode(); break;
-				case 0x80: Command_80_EjectCard(); break;
-				case 0xA0: Command_A0_Clean(); break;
-				case 0xB0: Command_B0_DispenseCardS31(); break;
-				// FIXME: These need to not set S::RUNNING_COMMAND;
-				case 0xE1: Command_E1_SetRTC(); break;
-				case 0xF0: Command_F0_GetVersion(); break;
-				case 0xF1: Command_F1_GetRTC(); break;
-				case 0xF5: Command_F5_CheckBattery(); break;
-				default:
-					spdlog::warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
-					SetSError(S::ILLEGAL_COMMAND);
-					break;
-			}
-			currentStep++;
+		switch (currentCommand) {
+			case 0x10: Command_10_Initalize(); break;
+			case 0x20: Command_20_ReadStatus(); break;
+			case 0x33: Command_33_ReadData2(); break;
+			case 0x40: Command_40_Cancel(); break;
+			case 0x53: Command_53_WriteData2(); break;
+			case 0x78: Command_78_PrintSettings2(); break;
+			case 0x7A: Command_7A_RegisterFont(); break;
+			case 0x7B: Command_7B_PrintImage(); break;
+			case 0x7C: Command_7C_PrintL(); break;
+			case 0x7D: Command_7D_Erase(); break;
+			case 0x7E: Command_7E_PrintBarcode(); break;
+			case 0x80: Command_80_EjectCard(); break;
+			case 0xA0: Command_A0_Clean(); break;
+			case 0xB0: Command_B0_DispenseCardS31(); break;
+			case 0xE1: Command_E1_SetRTC(); break;
+			case 0xF0: Command_F0_GetVersion(); break;
+			case 0xF1: Command_F1_GetRTC(); break;
+			case 0xF5: Command_F5_CheckBattery(); break;
+			default:
+				spdlog::warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
+				SetSError(S::ILLEGAL_COMMAND);
+				break;
 		}
+		currentStep++;
 	}
 }
 

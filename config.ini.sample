@@ -1,10 +1,13 @@
 [config]
-apiport = 8080
 ; basepath MUST end in a trailing slash!
 basepath = /home/wutno/cards/
-serialpath = /dev/ttyUSB0
+; Linux
+;serialpath = /dev/ttyUSB0
+; Windows
+;serialpath = COM3
 ;serialpath = \\.\pipe\YACardEmu
 ;
 ; Optional
 ;
+apiport = 8080
 autoselectedcard = card.bin

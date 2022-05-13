@@ -35,9 +35,8 @@
 #include "mini/ini.h"
 #include "spdlog/spdlog.h"
 
-
 // Globals
-static const auto delay{std::chrono::microseconds(500)};
+static const auto delay{std::chrono::milliseconds(25)};
 
 std::atomic<bool> running{true};
 
@@ -193,7 +192,6 @@ int main()
 		return 1;
 	}
 
-	// Handle card inserting.
 	spdlog::info("Starting API server...");
 	std::thread(httpServer).detach();
 

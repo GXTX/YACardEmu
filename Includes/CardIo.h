@@ -160,7 +160,7 @@ protected:
 	std::vector<uint8_t> printBuffer{};
 
 	std::time_t startTime{};
-	std::time_t time{};
+	std::time_t setTime{};
 
 	virtual uint8_t GetRStatus() = 0;
 	virtual void UpdateRStatus() = 0;

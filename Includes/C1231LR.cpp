@@ -36,6 +36,10 @@ void C1231LR::UpdateRStatus()
 	// We require the user to "insert" a card if we're waiting
 	if (*insertedCard && localStatus == LR::NO_CARD) {
 		localStatus = LR::HAS_CARD_1;
+
+		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
+			status.s = S::RUNNING_COMMAND;
+		}
 	}
 }
 

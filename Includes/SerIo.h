@@ -51,14 +51,14 @@ public:
 	SerIo::Status Write(std::vector<uint8_t> &buffer);
 	void SendAck();
 private:
+#ifdef _WIN32
+	HANDLE hPipe{};
+#endif
+
 	sp_port *Port{nullptr};
 	sp_port_config *PortConfig{nullptr};
 
 	std::vector<uint8_t> serialBuffer{};
-
-#ifdef _WIN32
-	HANDLE hPipe{};
-#endif
 };
 
 #endif

@@ -39,8 +39,7 @@ SerIo::SerIo(std::string &devicePath)
 		if (hPipe == INVALID_HANDLE_VALUE) {
 			spdlog::critical("SerIo::Init: Failed to create pipe");
 			IsInitialized = false;
-		}
-		else {
+		} else {
 			IsInitialized = true;
 		}
 
@@ -49,6 +48,7 @@ SerIo::SerIo(std::string &devicePath)
 		return;
 	}
 #endif
+
 	sp_new_config(&PortConfig);
 	sp_set_config_baudrate(PortConfig, 9600);
 	sp_set_config_bits(PortConfig, 8);
@@ -117,8 +117,7 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 		WriteFile(hPipe, &buffer[0], buffer.size(), &dwRet, NULL);
 		ret = dwRet;
 #endif
-	}
-	else {
+	} else {
 		ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
 		sp_drain(Port);
 	}
@@ -127,7 +126,7 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 	if (ret <= 0) {
 		return Status::WriteError;
 	} else if (ret != static_cast<int>(buffer.size())) {
-		spdlog::error("Only wrote {} of {} to the port!", ret, buffer.size());
+		spdlog::error("Only wrote {0:X} of {1:X} to the port!", ret, buffer.size());
 		return Status::WriteError;
 	}
 
@@ -146,8 +145,7 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 		}
 		bytes = dwBytes;
 #endif
-	}
-	else {
+	} else {
 		bytes = sp_input_waiting(Port);
 	}
 
@@ -165,8 +163,7 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 		BOOL bRet = ReadFile(hPipe, &serialBuffer[0], serialBuffer.size(), NULL, NULL);
 		ret = bRet;
 #endif
-	}
-	else {
+	} else {
 		ret = sp_nonblocking_read(Port, &serialBuffer[0], serialBuffer.size());
 	}
 
