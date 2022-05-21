@@ -102,7 +102,9 @@ void httpServer()
 		}
 
 		// remove the errant comma
-		list.pop_back();
+		if (list.compare("[") != 0) {
+			list.pop_back();
+		}
 
 		list.append("]");
 
