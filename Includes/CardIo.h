@@ -51,11 +51,12 @@ public:
 		ServerWaitingReply,
 	};
 
-	CardIo(bool *insertedCard, std::string *basePath, std::string *cardName);
+	CardIo(bool *insertedCard, std::string *basePath, std::string *cardName, bool *dispenserStatus);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
 	bool *insertedCard{nullptr};
+	bool *dispenserStatus{nullptr};
 	std::string *cardName{nullptr};
 	std::string *basePath{nullptr};
 	std::string printName = "print.bin";

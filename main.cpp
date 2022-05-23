@@ -41,6 +41,7 @@ static const auto delay{std::chrono::milliseconds(25)};
 std::atomic<bool> running{true};
 
 bool insertedCard = false;
+bool reportDispenserEmpty = false;
 std::string cardName{};
 std::string cardPath{}; // Full base path
 std::string httpPort{};
@@ -124,6 +125,14 @@ void httpServer()
 				cardName = req.get_param_value("cardname");
 			}
 
+			if (req.has_param("dispenser")) {
+				if (req.get_param_value("dispenser").compare("true") == 0) {
+					reportDispenserEmpty = true;
+				} else {
+					reportDispenserEmpty = false;
+				}
+			}
+
 			res.set_redirect("/");
 		}
 	});
@@ -189,7 +198,7 @@ int main()
 		return 1;
 	}
 
-	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(&insertedCard, &cardPath, &cardName));
+	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(&insertedCard, &cardPath, &cardName, &reportDispenserEmpty));
 
 	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName));
 	if (!serialHandler->IsInitialized) {

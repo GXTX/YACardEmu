@@ -21,7 +21,7 @@
 
 #include "C1231LR.h"
 
-C1231LR::C1231LR(bool *insertedCard, std::string *basePath, std::string *cardName) : CardIo(insertedCard, basePath, cardName)
+C1231LR::C1231LR(bool *insertedCard, std::string *basePath, std::string *cardName, bool *dispenserStatus) : CardIo(insertedCard, basePath, cardName, dispenserStatus)
 {
 }
 

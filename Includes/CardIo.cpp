@@ -23,11 +23,12 @@
 
 #define DEBUG_CARD_PACKETS
 
-CardIo::CardIo(bool *insertedCard, std::string *basePath, std::string *cardName)
+CardIo::CardIo(bool *insertedCard, std::string *basePath, std::string *cardName, bool *dispenserStatus)
 {
 	this->insertedCard = insertedCard;
 	this->basePath = basePath;
 	this->cardName = cardName;
+	this->dispenserStatus = dispenserStatus;
 
 	std::time_t startTime = std::time(nullptr);
 
@@ -498,13 +499,21 @@ void CardIo::Command_B0_DispenseCardS31()
 	switch (currentStep) {
 		case 1:
 			if (mode == Mode::CheckOnly) {
-				status.s = S::CARD_FULL;
+				if (*dispenserStatus) {
+					status.s = S::DISPENSER_EMPTY;
+				} else {
+					status.s = S::CARD_FULL;
+				}
 			} else {
 				if (status.s != S::ILLEGAL_COMMAND) {
 					if (HasCard()) {
 						SetSError(S::ILLEGAL_COMMAND);
 					} else {
-						DispenseCard();
+						if (*dispenserStatus) {
+							status.s = S::DISPENSER_EMPTY;
+						} else {
+							DispenseCard();
+						}
 					}
 				}
 			}
