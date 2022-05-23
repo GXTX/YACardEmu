@@ -54,75 +54,78 @@ void sigHandler(int sig)
 	}
 }
 
+std::string generateCardListJSON()
+{
+	std::string list{"["};
+
+	for (const auto &entry: std::filesystem::directory_iterator(cardPath)) {
+		std::string card{entry.path().string()};
+
+		auto find = card.find(".track_0");
+
+		if (find != std::string::npos) {
+			card.replace(find, 8, "");
+			list.append("{\"name\":\"");
+#ifdef _WIN32
+			list.append(card.substr(card.find_last_of("\\") + 1));
+#else
+			list.append(card.substr(card.find_last_of("/") + 1));
+#endif
+			list.append("\",\"image\":\"");
+
+			auto find2 = card.find(".bin");
+			if (find2 != std::string::npos)
+				card.replace(find2, 4, ".png");
+			
+			std::string base64{};
+
+			if (std::filesystem::exists(card)) {
+				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
+
+				base64.resize(std::filesystem::file_size(card));
+
+				img.read(reinterpret_cast<char *>(&base64[0]), base64.size());
+				img.close();
+			}
+
+			std::string encoded = base64_encode(base64, false);
+			list.append("data:image/png;base64, ");
+			list.append(encoded);
+			list.append("\"},");
+		}
+	}
+
+	// remove the errant comma
+	if (list.compare("[") != 0) {
+		list.pop_back();
+	}
+
+	list.append("]");
+	return list;
+}
+
 void httpServer()
 {
 	httplib::Server svr;
 
-	svr.set_mount_point("/", "site");
-
-	svr.Get("/list", [](const httplib::Request &, httplib::Response &res) {
-
-		std::string list{"["};
-
-		for (const auto &entry: std::filesystem::directory_iterator(cardPath)) {
-			std::string card{entry.path().string()};
-
-			auto find = card.find(".track_0");
-
-			if (find != std::string::npos) {
-				card.replace(find, 8, "");
-				list.append("{\"name\":\"");
-#ifdef _WIN32
-				list.append(card.substr(card.find_last_of("\\") + 1));
-#else
-				list.append(card.substr(card.find_last_of("/") + 1));
-#endif
-				list.append("\",\"image\":\"");
-
-				auto find2 = card.find(".bin");
-				if (find2 != std::string::npos)
-					card.replace(find2, 4, ".png");
-				
-				std::string base64{};
-
-				if (std::filesystem::exists(card)) {
-					std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
-
-					base64.resize(std::filesystem::file_size(card));
-
-					img.read(reinterpret_cast<char *>(&base64[0]), base64.size());
-					img.close();
-				}
-
-				std::string encoded = base64_encode(base64, false);
-				list.append("data:image/png;base64, ");
-				list.append(encoded);
-				list.append("\"},");
-			}
-		}
-
-		// remove the errant comma
-		if (list.compare("[") != 0) {
-			list.pop_back();
-		}
-
-		list.append("]");
-
-		res.set_content(list, "application/json");
-	});
+	svr.set_mount_point("/", "public");
 
 	svr.Get("/actions", [](const httplib::Request &req, httplib::Response &res) {
-		if (req.has_param("insert")) {
-			insertedCard = true;
-		} else if (req.has_param("remove")) {
-			insertedCard = false;
-		}
+		if (req.has_param("list")) {
+			res.set_content(generateCardListJSON(), "application/json");
+		} else {
+			if (req.has_param("insert")) {
+				insertedCard = true;
+			} else if (req.has_param("remove")) {
+				insertedCard = false;
+			}
 
-		if (req.has_param("name")) {
-			cardName = req.get_param_value("name");
-		}
+			if (req.has_param("cardname")) {
+				cardName = req.get_param_value("cardname");
+			}
 
-		res.set_redirect("/");
+			res.set_redirect("/");
+		}
 	});
 
 	svr.Get("/stop", [&svr](const httplib::Request &, httplib::Response &) {
