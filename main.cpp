@@ -40,12 +40,7 @@ static const auto delay{std::chrono::milliseconds(25)};
 
 std::atomic<bool> running{true};
 
-bool insertedCard = false;
-bool reportDispenserEmpty = false;
-std::string cardName{};
-std::string cardPath{}; // Full base path
-std::string httpPort{};
-std::string serialName{};
+Settings settings{};
 //
 
 void sigHandler(int sig)
@@ -55,11 +50,11 @@ void sigHandler(int sig)
 	}
 }
 
-std::string generateCardListJSON()
+std::string generateCardListJSON(std::string basepath)
 {
 	std::string list{"["};
 
-	for (const auto &entry: std::filesystem::directory_iterator(cardPath)) {
+	for (const auto &entry: std::filesystem::directory_iterator(basepath)) {
 		std::string card{entry.path().string()};
 
 		auto find = card.find(".track_0");
@@ -111,25 +106,25 @@ void httpServer()
 
 	svr.set_mount_point("/", "public");
 
-	svr.Get("/actions", [](const httplib::Request &req, httplib::Response &res) {
+	svr.Get("/actions", [&settings](const httplib::Request &req, httplib::Response &res) {
 		if (req.has_param("list")) {
-			res.set_content(generateCardListJSON(), "application/json");
+			res.set_content(generateCardListJSON(settings.cardPath), "application/json");
 		} else {
 			if (req.has_param("insert")) {
-				insertedCard = true;
+				settings.insertedCard = true;
 			} else if (req.has_param("remove")) {
-				insertedCard = false;
+				settings.insertedCard = false;
 			}
 
 			if (req.has_param("cardname")) {
-				cardName = req.get_param_value("cardname");
+				settings.cardName = req.get_param_value("cardname");
 			}
 
 			if (req.has_param("dispenser")) {
 				if (req.get_param_value("dispenser").compare("true") == 0) {
-					reportDispenserEmpty = true;
+					settings.reportDispenserEmpty = true;
 				} else {
-					reportDispenserEmpty = false;
+					settings.reportDispenserEmpty = false;
 				}
 			}
 
@@ -143,7 +138,7 @@ void httpServer()
 		svr.stop();
 	});
 
-	svr.listen("0.0.0.0", std::stoi(httpPort));
+	svr.listen("0.0.0.0", std::stoi(settings.httpPort));
 }
 
 bool readConfig()
@@ -160,22 +155,22 @@ bool readConfig()
 	}
 
 	if (ini.has("config")) {
-		cardPath = ini["config"]["basepath"];
-		cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
-		httpPort = ini["config"]["apiport"];
-		serialName = ini["config"]["serialpath"];
+		settings.cardPath = ini["config"]["basepath"];
+		settings.cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
+		settings.httpPort = ini["config"]["apiport"];
+		settings.serialName = ini["config"]["serialpath"];
 	}
 
-	if (cardPath.empty()) {
-		cardPath = std::filesystem::current_path().string();
+	if (settings.cardPath.empty()) {
+		settings.cardPath = std::filesystem::current_path().string();
 	}
 
-	if (httpPort.empty()) {
-		httpPort = "8080";
+	if (settings.httpPort.empty()) {
+		settings.httpPort = "8080";
 	}
 
-	if (serialName.empty()) {
-		serialName = "/dev/ttyUSB1";
+	if (settings.serialName.empty()) {
+		settings.serialName = "/dev/ttyUSB1";
 	}
 
 	return true;
@@ -198,9 +193,9 @@ int main()
 		return 1;
 	}
 
-	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(&insertedCard, &cardPath, &cardName, &reportDispenserEmpty));
+	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(settings));
 
-	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(serialName));
+	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(settings.serialName));
 	if (!serialHandler->IsInitialized) {
 		spdlog::critical("Couldn't initalize the serial controller.");
 		return 1;

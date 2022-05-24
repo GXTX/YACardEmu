@@ -34,7 +34,7 @@
 class C1231LR : public CardIo
 {
 public:
-    C1231LR(bool *insertedCard, std::string *basePath, std::string *cardName, bool *dispenserStatus);
+    C1231LR(Settings &settings);
 protected:
 	enum class LR {
 		NO_CARD           = 0x30,

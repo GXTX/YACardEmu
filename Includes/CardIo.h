@@ -38,6 +38,16 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"
 
+struct Settings {
+	std::string cardName{};
+	std::string cardPath{};
+	std::string httpPort{};
+	std::string serialName{};
+
+	bool insertedCard{false};
+	bool reportDispenserEmpty{false};
+};
+
 class CardIo
 {
 public:
@@ -51,7 +61,7 @@ public:
 		ServerWaitingReply,
 	};
 
-	CardIo(bool *insertedCard, std::string *basePath, std::string *cardName, bool *dispenserStatus);
+	CardIo(Settings &settings);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 

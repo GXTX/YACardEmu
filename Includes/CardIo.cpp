@@ -23,12 +23,12 @@
 
 #define DEBUG_CARD_PACKETS
 
-CardIo::CardIo(bool *insertedCard, std::string *basePath, std::string *cardName, bool *dispenserStatus)
+CardIo::CardIo(Settings &settings)
 {
-	this->insertedCard = insertedCard;
-	this->basePath = basePath;
-	this->cardName = cardName;
-	this->dispenserStatus = dispenserStatus;
+	insertedCard = &settings.insertedCard;
+	basePath = &settings.cardPath;
+	cardName = &settings.cardName;
+	dispenserStatus = &settings.reportDispenserEmpty;
 
 	std::time_t startTime = std::time(nullptr);
 
