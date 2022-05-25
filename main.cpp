@@ -106,9 +106,7 @@ void httpServer()
 
 	svr.set_mount_point("/", "public");
 
-	auto settingsIndirection = &settings;
-
-	svr.Get("/actions", [settingsIndirection](const httplib::Request &req, httplib::Response &res) {
+	svr.Get("/actions", [](const httplib::Request &req, httplib::Response &res) {
 		if (req.has_param("list")) {
 			res.set_content(generateCardListJSON(settings.cardPath), "application/json");
 		} else {
