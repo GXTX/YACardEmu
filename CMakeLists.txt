@@ -10,6 +10,7 @@ include_directories(${SERIAL_INCLUDE_DIRS} ${THREAD_INLCUDE_DIRS}
 	${PROJECT_SOURCE_DIR}/Includes
 	${PROJECT_SOURCE_DIR}/3rdparty/cpp-httplib
 	${PROJECT_SOURCE_DIR}/3rdparty/mINI/src
+	${PROJECT_SOURCE_DIR}/3rdparty/gulfs/include
 )
 
 add_executable(${PROJECT_NAME}
@@ -30,22 +31,14 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	endif()
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -march=native -Wall -Wextra -Wpedantic)
 
-if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 8.9)
-	target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES}
-		${CMAKE_THREAD_LIBS_INIT}
-		spdlog::spdlog
-	)
-else ()
-	target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES}
-		${CMAKE_THREAD_LIBS_INIT}
-		stdc++fs #gcc8 has odd support for this
-		spdlog::spdlog
-	)
-endif()
+target_link_libraries(${PROJECT_NAME} ${SERIAL_LIBRARIES}
+	${CMAKE_THREAD_LIBS_INIT}
+	spdlog::spdlog
+)
 
 add_custom_command(TARGET ${PROJECT_NAME}  POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory

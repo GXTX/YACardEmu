@@ -4,7 +4,7 @@ workspace "YACardEmu"
 
 	systemversion "latest"
 
-	buildoptions { "/std:c++17" }
+	buildoptions { "/std:c++11" }
 
 externalproject "libserialport"
 	location "3rdparty/libserialport"
@@ -19,7 +19,7 @@ project "YACardEmu"
 	
 	files { "main.cpp", "Includes/*.cpp", "Includes/*.h" }
 	
-	includedirs { "Includes/", "3rdParty/spdlog/include/", "3rdParty/mINI/src/", "3rdParty/cpp-httplib/", "3rdParty/libserialport/"}
+	includedirs { "Includes/", "3rdParty/spdlog/include/", "3rdParty/mINI/src/", "3rdParty/cpp-httplib/", "3rdparty/gulfs/include/", "3rdParty/libserialport/"}
 
 	links { "libserialport" }
 

@@ -24,7 +24,6 @@
 #include <thread>
 #include <atomic>
 #include <csignal>
-#include <filesystem>
 #include <string>
 
 #include "C1231LR.h"
@@ -34,6 +33,7 @@
 #include "httplib.h"
 #include "mini/ini.h"
 #include "spdlog/spdlog.h"
+#include "ghc/filesystem.hpp"
 
 // Globals
 static const auto delay{std::chrono::milliseconds(25)};
@@ -54,7 +54,7 @@ std::string generateCardListJSON(std::string basepath)
 {
 	std::string list{"["};
 
-	for (const auto &entry: std::filesystem::directory_iterator(basepath)) {
+	for (const auto &entry: ghc::filesystem::directory_iterator(basepath)) {
 		std::string card{entry.path().string()};
 
 		auto find = card.find(".track_0");
@@ -75,10 +75,10 @@ std::string generateCardListJSON(std::string basepath)
 			
 			std::string base64{};
 
-			if (std::filesystem::exists(card)) {
+			if (ghc::filesystem::exists(card)) {
 				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
 
-				base64.resize(std::filesystem::file_size(card));
+				base64.resize(ghc::filesystem::file_size(card));
 
 				img.read(reinterpret_cast<char *>(&base64[0]), base64.size());
 				img.close();
@@ -162,7 +162,7 @@ bool readConfig()
 	}
 
 	if (settings.cardPath.empty()) {
-		settings.cardPath = std::filesystem::current_path().string();
+		settings.cardPath = ghc::filesystem::current_path().string();
 	}
 
 	if (settings.httpPort.empty()) {
@@ -193,9 +193,9 @@ int main()
 		return 1;
 	}
 
-	std::unique_ptr<C1231LR> cardHandler (std::make_unique<C1231LR>(settings));
+	C1231LR *cardHandler = new C1231LR(settings);
 
-	std::unique_ptr<SerIo> serialHandler (std::make_unique<SerIo>(settings.serialName));
+	SerIo *serialHandler = new SerIo(settings.serialName);
 	if (!serialHandler->IsInitialized) {
 		spdlog::critical("Couldn't initalize the serial controller.");
 		return 1;

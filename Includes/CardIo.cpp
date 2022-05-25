@@ -21,8 +21,6 @@
 
 #include "CardIo.h"
 
-#define DEBUG_CARD_PACKETS
-
 CardIo::CardIo(Settings &settings)
 {
 	insertedCard = &settings.insertedCard;
@@ -604,8 +602,8 @@ bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 	std::string fullPath = *basePath + *cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
 
-	if (std::filesystem::exists(fullPath.c_str())) {
-		if (std::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
+	if (ghc::filesystem::exists(fullPath.c_str())) {
+		if (ghc::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
 			std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
 			std::string readBack(TRACK_SIZE, 0);
 

@@ -29,7 +29,6 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <filesystem>
 #include <atomic>
 #include <ctime>
 #include <sstream>
@@ -37,6 +36,7 @@
 
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"
+#include "ghc/filesystem.hpp"
 
 struct Settings {
 	std::string cardName{};
