@@ -10,3 +10,6 @@
 [submodule "3rdparty/gulfs"]
 	path = 3rdparty/gulfs
 	url = https://github.com/gulrak/filesystem.git
+[submodule "3rdparty/libserialport"]
+	path = 3rdparty/libserialport
+	url = https://github.com/GXTX/libserialport.git
