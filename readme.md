@@ -17,10 +17,14 @@ sudo apt install build-essential cmake pkg-config libserialport-dev
 
 Windows
 
-[VS2022](https://visualstudio.microsoft.com/vs/)  
-[premake5](https://premake.github.io/download)  
-[libserialport](https://github.com/sigrokproject/libserialport/archive/refs/heads/master.zip)  
+**[Precompiled Windows binaries can be found here.](https://github.com/GXTX/YACardEmu/tags)**
 
+1. [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
+    * C++ desktop development
+    * Windows Universal CRT SDK
+    * C++ CMake tools for Windows
+    * Git for Windows
+		* *Optional if you already have Git installed*
 
 #### Build
 
@@ -36,16 +40,15 @@ cmake --build .
 
 Windows
 
-```
-git clone --recursive https://github.com/GXTX/YACardEmu
-cd YACardEmu
-```
-Extract `premake5` (next to `premake5.bat`)  
-Extract `libserialport` to `3rdparty/libserialport`
-
-Run `premake5.bat`
-
-Open `YACardEmu.sln` and build solution (debug or release).
+1. If you don't have CMake installed, open `___ Native Tools Command Prompt for VS 20##`.
+2. `git clone --recursive https://github.com/GXTX/YACardEmu`
+3. `cd` to the `YACardEmu` directory.
+4. Run these commands.
+    1. `mkdir build & cd build`
+    2. `cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release`
+        * VS2022 17.0 or later is required.
+5. `cmake --build . --config Release`
+6. All the required files will be in `build\Release`
 
 Running
 ---------
@@ -65,6 +68,6 @@ cp ../config.ini.sample config.ini
 Windows
 
 ```
-cd bin\release
+cd Release
 YACardEmu.exe
 ```
