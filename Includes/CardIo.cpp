@@ -29,13 +29,6 @@ CardIo::CardIo(Settings &settings)
 	dispenserStatus = &settings.reportDispenserEmpty;
 
 	std::time_t startTime = std::time(nullptr);
-
-#ifdef NDEBUG
-	spdlog::set_level(spdlog::level::warn);
-#else
-	spdlog::set_level(spdlog::level::debug);
-#endif
-	spdlog::set_pattern("[%^%l%$] %v");
 }
 
 void CardIo::Command_10_Initalize()

@@ -44,7 +44,7 @@ endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11)
 
-if(MSVC)
+if (MSVC)
 	target_compile_options(${PROJECT_NAME} PRIVATE /W4)
 	add_definitions(-DWIN32_LEAN_AND_MEAN)
 else()
@@ -72,7 +72,7 @@ if (WIN32)
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy
 			${CMAKE_CURRENT_SOURCE_DIR}/config.ini.sample
-			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/config.init.sample
+			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/config.ini.sample
 	)
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy
@@ -83,5 +83,5 @@ if (WIN32)
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 			${CMAKE_CURRENT_SOURCE_DIR}/public
 			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/public
-)
+	)
 endif()

@@ -25,13 +25,6 @@
 
 SerIo::SerIo(std::string &devicePath)
 {
-#ifdef NDEBUG
-	spdlog::set_level(spdlog::level::warn);
-#else
-	spdlog::set_level(spdlog::level::debug);
-#endif
-	spdlog::set_pattern("[%^%l%$] %v");
-
 #ifdef _WIN32
 	if (devicePath.find("pipe") != std::string::npos) {
 		hPipe = CreateNamedPipeA(devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
@@ -75,8 +68,7 @@ SerIo::~SerIo()
 #ifdef _WIN32	
 		CloseHandle(hPipe);
 #endif
-	}
-	else {
+	} else {
 		sp_close(Port);
 	}	
 }
