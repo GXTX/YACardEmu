@@ -133,6 +133,12 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 #ifdef _WIN32
 		DWORD dwBytes = 0;
 		if (PeekNamedPipe(hPipe, 0, 0, 0, &dwBytes, 0) == 0) {
+			DWORD error = ::GetLastError();
+			if (error == ERROR_BROKEN_PIPE) {
+				spdlog::info("Pipe broken! Resetting...");
+				DisconnectNamedPipe(hPipe);
+				ConnectNamedPipe(hPipe, NULL);
+			}
 			return Status::ReadError;
 		}
 		bytes = dwBytes;
