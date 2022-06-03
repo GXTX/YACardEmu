@@ -23,7 +23,7 @@
 
 #define DEBUG_SERIAL
 
-SerIo::SerIo(std::string &devicePath)
+SerIo::SerIo(std::string &devicePath, int baud)
 {
 #ifdef _WIN32
 	if (devicePath.find("pipe") != std::string::npos) {
@@ -43,7 +43,7 @@ SerIo::SerIo(std::string &devicePath)
 #endif
 
 	sp_new_config(&PortConfig);
-	sp_set_config_baudrate(PortConfig, 9600);
+	sp_set_config_baudrate(PortConfig, baud);
 	sp_set_config_bits(PortConfig, 8);
 	sp_set_config_parity(PortConfig, SP_PARITY_NONE);
 	sp_set_config_stopbits(PortConfig, 1);

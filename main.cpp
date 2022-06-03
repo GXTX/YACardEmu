@@ -37,9 +37,7 @@
 
 // Globals
 static const auto delay{std::chrono::milliseconds(25)};
-
 std::atomic<bool> running{true};
-
 Settings settings{};
 //
 
@@ -173,6 +171,10 @@ bool readConfig()
 		settings.serialName = "/dev/ttyUSB1";
 	}
 
+	if (settings.serialBaud.empty()) {
+		settings.serialBaud = "9600";
+	}
+
 	return true;
 }
 
@@ -195,7 +197,7 @@ int main()
 
 	C1231LR *cardHandler = new C1231LR(settings);
 
-	SerIo *serialHandler = new SerIo(settings.serialName);
+	SerIo *serialHandler = new SerIo(settings.serialName, std::stoi(settings.serialBaud));
 	if (!serialHandler->IsInitialized) {
 		spdlog::critical("Couldn't initalize the serial controller.");
 		return 1;

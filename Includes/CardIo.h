@@ -43,6 +43,7 @@ struct Settings {
 	std::string cardPath{};
 	std::string httpPort{};
 	std::string serialName{};
+	std::string serialBaud{};
 
 	bool insertedCard{false};
 	bool reportDispenserEmpty{false};
@@ -59,6 +60,7 @@ public:
 		ChecksumError,
 		EmptyResponseError,
 		ServerWaitingReply,
+		DontReply,
 	};
 
 	CardIo(Settings &settings);

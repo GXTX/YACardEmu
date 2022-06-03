@@ -48,7 +48,7 @@ public:
 	bool IsInitialized{};
 	bool isPipe{};
 
-	SerIo(std::string& devicePath);
+	SerIo(std::string& devicePath, int baud);
 	~SerIo();
 
 	SerIo::Status Read(std::vector<uint8_t> &buffer);

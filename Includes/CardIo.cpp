@@ -437,8 +437,6 @@ void CardIo::Command_80_EjectCard()
 		case 2:
 			if (HasCard()) {
 				EjectCard();
-			} else {
-				SetSError(S::ILLEGAL_COMMAND); // FIXME: Is this correct?
 			}
 			break;
 		default:
