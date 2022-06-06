@@ -157,6 +157,7 @@ bool readConfig()
 		settings.cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
 		settings.httpPort = ini["config"]["apiport"];
 		settings.serialName = ini["config"]["serialpath"];
+		settings.serialBaud = ini["config"]["serialbaud"];
 	}
 
 	if (settings.cardPath.empty()) {
