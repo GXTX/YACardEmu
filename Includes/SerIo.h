@@ -45,12 +45,19 @@ public:
 		ZeroSizeError,
 	};
 
-	bool IsInitialized{};
-	bool isPipe{};
+	struct Settings {
+		std::string devicePath{};
+		int baudrate;
+		sp_parity parity;
+	};
 
-	SerIo(std::string& devicePath, int baud);
+	bool isPipe{};
+	Settings portSettings{};
+
+	SerIo();
 	~SerIo();
 
+	bool Open();
 	SerIo::Status Read(std::vector<uint8_t> &buffer);
 	SerIo::Status Write(std::vector<uint8_t> &buffer);
 	void SendAck();

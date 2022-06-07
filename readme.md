@@ -71,3 +71,15 @@ Windows
 cd Release
 YACardEmu.exe
 ```
+
+Info
+---------
+
+If you're wishing to run this on hardware there are some settings you'll need to be aware of.
+
+```
+MT1: CRP-1231LR-10NAB     | 9600b none
+MT2: CRP-1231LR-10NAB     | 9600b none
+MT3/DX/DX+: CR-S31R-10HS3 | 38400b even
+F-Zero: CRP-1231BR        | 9600b even
+```

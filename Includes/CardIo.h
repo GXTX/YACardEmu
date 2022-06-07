@@ -38,17 +38,6 @@
 #include "spdlog/fmt/bin_to_hex.h"
 #include "ghc/filesystem.hpp"
 
-struct Settings {
-	std::string cardName{};
-	std::string cardPath{};
-	std::string httpPort{};
-	std::string serialName{};
-	std::string serialBaud{};
-
-	bool insertedCard{false};
-	bool reportDispenserEmpty{false};
-};
-
 class CardIo
 {
 public:
@@ -63,14 +52,18 @@ public:
 		DontReply,
 	};
 
-	CardIo(Settings &settings);
+	struct Settings {
+		std::string cardName{};
+		std::string cardPath{};
+		bool insertedCard{false};
+		bool reportDispenserEmpty{false};
+	};
+
+	CardIo();
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
-	bool *insertedCard{nullptr};
-	bool *dispenserStatus{nullptr};
-	std::string *cardName{nullptr};
-	std::string *basePath{nullptr};
+	Settings cardSettings;
 	std::string printName = "print.bin";
 protected:
 	// Status bytes:
@@ -104,7 +97,7 @@ protected:
 	};
 	//////////////////////////////////////////////
 
-	struct Status{
+	struct Status {
 		P p = P::NO_ERR;
 		S s = S::NO_JOB;
 

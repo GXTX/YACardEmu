@@ -21,14 +21,9 @@
 
 #include "CardIo.h"
 
-CardIo::CardIo(Settings &settings)
+CardIo::CardIo()
 {
-	insertedCard = &settings.insertedCard;
-	basePath = &settings.cardPath;
-	cardName = &settings.cardName;
-	dispenserStatus = &settings.reportDispenserEmpty;
-
-	std::time_t startTime = std::time(nullptr);
+	startTime = std::time(nullptr);
 }
 
 void CardIo::Command_10_Initalize()
@@ -376,7 +371,7 @@ void CardIo::Command_7C_PrintL()
 				// FIXME: Do this better.
 				std::ofstream card;
 				std::string writeBack{};
-				std::string fullPath(basePath->c_str());
+				std::string fullPath(cardSettings.cardPath.c_str());
 				fullPath.append(printName);
 
 				std::copy(printBuffer.begin(), printBuffer.end(), std::back_inserter(writeBack));
@@ -488,7 +483,7 @@ void CardIo::Command_B0_DispenseCardS31()
 	switch (currentStep) {
 		case 1:
 			if (mode == Mode::CheckOnly) {
-				if (*dispenserStatus) {
+				if (cardSettings.reportDispenserEmpty) {
 					status.s = S::DISPENSER_EMPTY;
 				} else {
 					status.s = S::CARD_FULL;
@@ -498,7 +493,7 @@ void CardIo::Command_B0_DispenseCardS31()
 					if (HasCard()) {
 						SetSError(S::ILLEGAL_COMMAND);
 					} else {
-						if (*dispenserStatus) {
+						if (cardSettings.reportDispenserEmpty) {
 							status.s = S::DISPENSER_EMPTY;
 						} else {
 							DispenseCard();
@@ -590,7 +585,7 @@ void CardIo::Command_F5_CheckBattery()
 
 bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 {
-	std::string fullPath = *basePath + *cardName;
+	std::string fullPath = cardSettings.cardPath + cardSettings.cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
@@ -617,7 +612,7 @@ bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 
 void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
 {
-	std::string fullPath = *basePath + *cardName;
+	std::string fullPath = cardSettings.cardPath + cardSettings.cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
 
 	std::string writeBack{};

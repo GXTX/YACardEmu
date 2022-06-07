@@ -10,5 +10,7 @@ basepath = /home/wutno/cards/
 ; Optional
 ;
 ;serialbaud = 9600
+; Acceptable even & none
+;serialparity = none
 apiport = 8080
 autoselectedcard = card.bin

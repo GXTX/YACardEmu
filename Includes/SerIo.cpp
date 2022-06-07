@@ -21,45 +21,8 @@
 
 #include "SerIo.h"
 
-#define DEBUG_SERIAL
-
-SerIo::SerIo(std::string &devicePath, int baud)
+SerIo::SerIo()
 {
-#ifdef _WIN32
-	if (devicePath.find("pipe") != std::string::npos) {
-		hPipe = CreateNamedPipeA(devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
-
-		if (hPipe == INVALID_HANDLE_VALUE) {
-			spdlog::critical("SerIo::Init: Failed to create pipe");
-			IsInitialized = false;
-		} else {
-			IsInitialized = true;
-		}
-
-		isPipe = true;
-
-		return;
-	}
-#endif
-
-	sp_new_config(&PortConfig);
-	sp_set_config_baudrate(PortConfig, baud);
-	sp_set_config_bits(PortConfig, 8);
-	sp_set_config_parity(PortConfig, SP_PARITY_NONE);
-	sp_set_config_stopbits(PortConfig, 1);
-	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
-
-	sp_get_port_by_name(devicePath.c_str(), &Port);
-
-	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
-
-	if (ret != SP_OK) {
-		spdlog::critical("SerIo::Init: Failed to open {}", devicePath);
-		IsInitialized = false;
-	} else {
-		sp_set_config(Port, PortConfig);
-		IsInitialized = true;
-	}
 }
 
 SerIo::~SerIo()
@@ -71,6 +34,43 @@ SerIo::~SerIo()
 	} else {
 		sp_close(Port);
 	}	
+}
+
+bool SerIo::Open()
+{
+#ifdef _WIN32
+	if (portSettings.devicePath.find("pipe") != std::string::npos) {
+		hPipe = CreateNamedPipeA(portSettings.devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
+
+		if (hPipe == INVALID_HANDLE_VALUE) {
+			spdlog::critical("SerIo::Init: Failed to create pipe");
+			return false;
+		} else {
+			isPipe = true;
+			return true;
+		}
+	}
+#endif
+
+	sp_new_config(&PortConfig);
+	sp_set_config_baudrate(PortConfig, portSettings.baudrate);
+	sp_set_config_bits(PortConfig, 8);
+	sp_set_config_parity(PortConfig, portSettings.parity);
+	sp_set_config_stopbits(PortConfig, 1);
+	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
+
+	sp_get_port_by_name(portSettings.devicePath.c_str(), &Port);
+
+	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
+
+	if (ret != SP_OK) {
+		spdlog::critical("SerIo::Init: Failed to open {}", portSettings.devicePath);
+		return false;
+	} else {
+		sp_set_config(Port, PortConfig);
+	}
+
+	return true;
 }
 
 void SerIo::SendAck()
@@ -135,7 +135,7 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 		if (PeekNamedPipe(hPipe, 0, 0, 0, &dwBytes, 0) == 0) {
 			DWORD error = ::GetLastError();
 			if (error == ERROR_BROKEN_PIPE) {
-				spdlog::info("Pipe broken! Resetting...");
+				spdlog::warn("Pipe broken! Resetting...");
 				DisconnectNamedPipe(hPipe);
 				ConnectNamedPipe(hPipe, NULL);
 			}

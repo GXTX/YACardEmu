@@ -21,7 +21,7 @@
 
 #include "C1231LR.h"
 
-C1231LR::C1231LR(Settings &settings) : CardIo(settings)
+C1231LR::C1231LR() : CardIo()
 {
 }
 
@@ -29,12 +29,12 @@ void C1231LR::UpdateRStatus()
 {
 	// We "grab" the card for the user
 	if (localStatus == LR::EJECTING_CARD) {
-		*insertedCard = false;
+		cardSettings.insertedCard = false;
 		localStatus = LR::NO_CARD;
 	}
 
 	// We require the user to "insert" a card if we're waiting
-	if (*insertedCard && localStatus == LR::NO_CARD) {
+	if (cardSettings.insertedCard && localStatus == LR::NO_CARD) {
 		localStatus = LR::HAS_CARD_1;
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {

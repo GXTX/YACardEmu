@@ -38,7 +38,6 @@
 // Globals
 static const auto delay{std::chrono::microseconds(250)};
 std::atomic<bool> running{true};
-Settings settings{};
 //
 
 void sigHandler(int sig)
@@ -98,31 +97,31 @@ std::string generateCardListJSON(std::string basepath)
 	return list;
 }
 
-void httpServer()
+void httpServer(int port, C1231LR::Settings *card)
 {
 	httplib::Server svr;
 
 	svr.set_mount_point("/", "public");
 
-	svr.Get("/actions", [](const httplib::Request &req, httplib::Response &res) {
+	svr.Get("/actions", [&card](const httplib::Request &req, httplib::Response &res) {
 		if (req.has_param("list")) {
-			res.set_content(generateCardListJSON(settings.cardPath), "application/json");
+			res.set_content(generateCardListJSON(card->cardPath), "application/json");
 		} else {
 			if (req.has_param("insert")) {
-				settings.insertedCard = true;
+				card->insertedCard = true;
 			} else if (req.has_param("remove")) {
-				settings.insertedCard = false;
+				card->insertedCard = false;
 			}
 
 			if (req.has_param("cardname")) {
-				settings.cardName = req.get_param_value("cardname");
+				card->cardName = req.get_param_value("cardname");
 			}
 
 			if (req.has_param("dispenser")) {
 				if (req.get_param_value("dispenser").compare("true") == 0) {
-					settings.reportDispenserEmpty = true;
+					card->reportDispenserEmpty = true;
 				} else {
-					settings.reportDispenserEmpty = false;
+					card->reportDispenserEmpty = false;
 				}
 			}
 
@@ -136,15 +135,17 @@ void httpServer()
 		svr.stop();
 	});
 
-	svr.listen("0.0.0.0", std::stoi(settings.httpPort));
+	svr.listen("0.0.0.0", port);
 }
 
-bool readConfig()
+bool readConfig(SerIo::Settings &serial, C1231LR::Settings &card, int *port)
 {
 	// Read in config values
 	mINI::INIFile config("config.ini");
 
 	mINI::INIStructure ini;
+
+	std::string lport, lbaud, lparity;
 	
 	if (!config.read(ini)) {
 		// TODO: Generate INI
@@ -153,27 +154,42 @@ bool readConfig()
 	}
 
 	if (ini.has("config")) {
-		settings.cardPath = ini["config"]["basepath"];
-		settings.cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
-		settings.httpPort = ini["config"]["apiport"];
-		settings.serialName = ini["config"]["serialpath"];
-		settings.serialBaud = ini["config"]["serialbaud"];
+		card.cardPath = ini["config"]["basepath"];
+		card.cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
+		lport = ini["config"]["apiport"];
+		serial.devicePath = ini["config"]["serialpath"];
+		lbaud = ini["config"]["serialbaud"];
+		lparity = ini["config"]["serialparity"];
 	}
 
-	if (settings.cardPath.empty()) {
-		settings.cardPath = ghc::filesystem::current_path().string();
+	if (card.cardPath.empty()) {
+		card.cardPath = ghc::filesystem::current_path().string();
 	}
 
-	if (settings.httpPort.empty()) {
-		settings.httpPort = "8080";
+	if (lport.empty()) {
+		*port = 8080;
+	} else { 
+		*port = std::stoi(lport);
 	}
 
-	if (settings.serialName.empty()) {
-		settings.serialName = "/dev/ttyUSB1";
+	if (serial.devicePath.empty()) {
+		serial.devicePath = "/dev/ttyUSB1";
 	}
 
-	if (settings.serialBaud.empty()) {
-		settings.serialBaud = "9600";
+	if (lbaud.empty()) {
+		serial.baudrate = 9600;
+	} else {
+		serial.baudrate = std::stoi(lbaud);
+	}
+
+	if (lparity.empty()) {
+		serial.parity = SP_PARITY_NONE;
+	} else {
+		if (lparity.find("even") != std::string::npos) {
+			serial.parity = SP_PARITY_EVEN;
+		} else {
+			serial.parity = SP_PARITY_NONE;
+		}
 	}
 
 	return true;
@@ -182,30 +198,33 @@ bool readConfig()
 int main()
 {
 #ifdef NDEBUG
-	spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(spdlog::level::warn);
 #else
 	spdlog::set_level(spdlog::level::debug);
 #endif
 	spdlog::set_pattern("[%^%l%$] %v");
 
+	spdlog::enable_backtrace(15);
+
 	// Handle quitting gracefully via signals
 	std::signal(SIGINT, sigHandler);
 	std::signal(SIGTERM, sigHandler);
 
-	if (!readConfig()) {
+	C1231LR *cardHandler = new C1231LR();
+	SerIo *serialHandler = new SerIo();
+	int httpPort = 8080;
+
+	if (!readConfig(serialHandler->portSettings, cardHandler->cardSettings, &httpPort)) {
 		return 1;
 	}
 
-	C1231LR *cardHandler = new C1231LR(settings);
-
-	SerIo *serialHandler = new SerIo(settings.serialName, std::stoi(settings.serialBaud));
-	if (!serialHandler->IsInitialized) {
+	if (!serialHandler->Open()) {
 		spdlog::critical("Couldn't initalize the serial controller.");
 		return 1;
 	}
 
-	spdlog::info("Starting API server...");
-	std::thread(httpServer).detach();
+	spdlog::warn("Starting API server...");
+	std::thread(httpServer, httpPort, &cardHandler->cardSettings).detach();
 
 	SerIo::Status serialStatus;
 	CardIo::StatusCode cardStatus;
@@ -233,6 +252,7 @@ int main()
 			serialHandler->Write(writeBuffer);
 		}
 
+		spdlog::dump_backtrace();
 		std::this_thread::sleep_for(delay);
 	}
 

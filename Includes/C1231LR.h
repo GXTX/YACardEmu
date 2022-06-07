@@ -33,7 +33,7 @@
 class C1231LR : public CardIo
 {
 public:
-    C1231LR(Settings &settings);
+    C1231LR();
 protected:
 	enum class LR {
 		NO_CARD           = 0x30,
