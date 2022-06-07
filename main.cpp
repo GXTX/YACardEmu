@@ -36,7 +36,7 @@
 #include "ghc/filesystem.hpp"
 
 // Globals
-static const auto delay{std::chrono::microseconds(50)};
+static const auto delay{std::chrono::microseconds(250)};
 std::atomic<bool> running{true};
 Settings settings{};
 //
