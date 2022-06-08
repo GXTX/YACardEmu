@@ -80,8 +80,9 @@ void SerIo::SendAck()
 	spdlog::debug("SerIo::SendAck: 06");
 
 #ifdef _WIN32
-	if (isPipe) { 
-		WriteFile(hPipe, &ack, 1, NULL, NULL);
+	if (isPipe) {
+		DWORD dwRet = 0;
+		WriteFile(hPipe, &ack, 1, &dwRet, NULL);
 		return;
 	}
 #endif
@@ -158,7 +159,8 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 
 	if (isPipe) {
 #ifdef _WIN32
-		BOOL bRet = ReadFile(hPipe, &serialBuffer[0], serialBuffer.size(), NULL, NULL);
+		DWORD dwRet = 0;
+		BOOL bRet = ReadFile(hPipe, &serialBuffer[0], serialBuffer.size(), &dwRet, NULL);
 		ret = bRet;
 #endif
 	} else {
