@@ -201,10 +201,9 @@ int main()
 	spdlog::set_level(spdlog::level::warn);
 #else
 	spdlog::set_level(spdlog::level::debug);
+	spdlog::enable_backtrace(20);
 #endif
 	spdlog::set_pattern("[%^%l%$] %v");
-
-	spdlog::enable_backtrace(15);
 
 	// Handle quitting gracefully via signals
 	std::signal(SIGINT, sigHandler);
