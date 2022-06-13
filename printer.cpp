@@ -110,6 +110,7 @@ int main()
 	int horz = 85, virt = 110, cbuffsize = 255;
 	int advance = TTF_FontLineSkip(font);
 	bool hasDoubleSize{false};
+	bool fourteen{false};
 
 	for (const auto &src : lines) {
 		icu::UnicodeString str(src.c_str(), "shift_jis");
@@ -119,7 +120,10 @@ int main()
 			std::printf("%d", position);
 			std::cout << ":" << str.length() << std::endl;
 
+			UChar32 lastChar{};
+			UChar32 currentChar{};
 			while (findControl(str.char32At(position))) {
+				currentChar = str.char32At(position);
 				if (contr) {
 					if (str.char32At(++position) == 0x73) { // font size
 						y = static_cast<SizeSetting>(str.char32At(++position));
@@ -128,11 +132,23 @@ int main()
 					}
 					// FIXME: font selection
 				} else {
-					hasDoubleSize = true;
+					if (str.char32At(position) == 0x11) {
+						hasDoubleSize = true;
+						if (lastChar == 0x14) {
+							horz = 85;
+							virt += advance + 1 + (hasDoubleSize ? 17 : 0);
+						}
+					}
 					str.remove(position, 1);
 				}
+				lastChar = currentChar;
 			}
 			contr = false;
+
+			bool isSpace{false};
+			if (str.char32At(position)) {
+				isSpace = true;
+			}
 
 			SDL_Surface *textSurf = TTF_RenderGlyph32_Blended(font, str.char32At(position), color);
 			position++;
@@ -157,7 +173,7 @@ int main()
 			horz += (newText->clip_rect.w / 1.25) + 2;
 		}
 
-		virt += advance + 1 + (hasDoubleSize ? 15 : 0);
+		virt += advance + 1 + (hasDoubleSize ? 17 : 0);
 		horz = 85;
 		hasDoubleSize = false;
 	}
