@@ -13,7 +13,7 @@
 #include <SDL2/SDL_image.h>
 
 #define DEFAULT_X 90
-#define DEFAULT_Y 110
+#define DEFAULT_Y 90
 
 enum SizeSetting {
 	one = 0x31,
@@ -28,7 +28,7 @@ SizeSetting xScale{SizeSetting::one};
 int main()
 {
 	std::vector<uint8_t> data(255, 0);
-	std::string filename{"/home/wutno/cardsb/print2.bin"};
+	std::string filename{"/home/wutno/cards/print.bin"};
 	std::ifstream card(filename.c_str(), std::ifstream::in | std::ifstream::binary);
 	card.read(reinterpret_cast<char *>(&data[0]), data.size());
 	card.close();
@@ -38,14 +38,14 @@ int main()
 	}
 
 	TTF_Init();
-	TTF_Font *font = TTF_OpenFont("/home/wutno/cardsb/kochi-gothic-subst.ttf", 35);
+	TTF_Font *font = TTF_OpenFont("/home/wutno/cardsb/kochi-gothic-subst.ttf", 34);
 	if (font == nullptr) {
 		std::cerr << "Could not open font\n";
 		return 1;
 	}
 
 	SDL_Color color = {0x64, 0x64, 0x96, 0xFF};
-	SDL_Surface *cardImage = IMG_Load("15.png");
+	SDL_Surface *cardImage = IMG_Load("1.png");
 	if (cardImage == nullptr) {
 		std::cerr << "Could not open 15.png\n";
 		return 1;
@@ -86,7 +86,7 @@ int main()
 				{
 					if (usedScale) {
 						lastUsedScale = true;
-						yLocation += lineSkip * 2;
+						yLocation += lineSkip * 1.75;
 					} else {
 						lastUsedScale = false;
 						yLocation += lineSkip * 1.15;
@@ -94,6 +94,8 @@ int main()
 
 					xLocation = DEFAULT_X;
 					usedScale = false;
+					yScale = SizeSetting::one;
+					xScale = SizeSetting::one;
 					position++;
 				}
 				continue;
@@ -137,10 +139,13 @@ int main()
 				break;
 		}
 
+		int x_scale = static_cast<int>(xScale) - 0x30;
+		int y_scale = static_cast<int>(yScale) - 0x30;
+
 		SDL_Surface *newGlyph = SDL_CreateRGBSurface(
 			0,
-			glyph->clip_rect.w * (static_cast<int>(xScale) - 0x30),
-			glyph->clip_rect.h * (static_cast<int>(yScale) - 0x30),
+			glyph->clip_rect.w * (x_scale > 1 ? x_scale * 0.75 : 1),
+			glyph->clip_rect.h * (y_scale > 1 ? y_scale * 0.75 : 1),
 			32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 		);
 
