@@ -13,7 +13,7 @@
 #include <SDL2/SDL_image.h>
 
 #define DEFAULT_X 90
-#define DEFAULT_Y 90
+#define DEFAULT_Y 110
 
 enum SizeSetting {
 	one = 0x31,
@@ -28,7 +28,7 @@ SizeSetting xScale{SizeSetting::one};
 int main()
 {
 	std::vector<uint8_t> data(255, 0);
-	std::string filename{"/home/wutno/cards/print.bin"};
+	std::string filename{"/home/wutno/cardsb/print2.bin"};
 	std::ifstream card(filename.c_str(), std::ifstream::in | std::ifstream::binary);
 	card.read(reinterpret_cast<char *>(&data[0]), data.size());
 	card.close();
@@ -45,7 +45,7 @@ int main()
 	}
 
 	SDL_Color color = {0x64, 0x64, 0x96, 0xFF};
-	SDL_Surface *cardImage = IMG_Load("1.png");
+	SDL_Surface *cardImage = IMG_Load("15.png");
 	if (cardImage == nullptr) {
 		std::cerr << "Could not open 15.png\n";
 		return 1;
@@ -86,16 +86,14 @@ int main()
 				{
 					if (usedScale) {
 						lastUsedScale = true;
-						yLocation += lineSkip * 1.75;
+						yLocation += lineSkip * 2;
 					} else {
 						lastUsedScale = false;
-						yLocation += lineSkip * 1.15;
+						yLocation += lineSkip * 1.25;
 					}
 
 					xLocation = DEFAULT_X;
 					usedScale = false;
-					yScale = SizeSetting::one;
-					xScale = SizeSetting::one;
 					position++;
 				}
 				continue;
