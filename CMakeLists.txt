@@ -12,6 +12,10 @@ add_executable(${PROJECT_NAME}
 	Includes/base64.cpp
 )
 
+add_executable(printer
+	printer.cpp
+)
+
 if (WIN32)
 	add_subdirectory(3rdparty/libserialport)
 	add_dependencies(${PROJECT_NAME} libserialport)
@@ -21,6 +25,12 @@ if (WIN32)
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(SERIAL REQUIRED libserialport)
+
+	find_package(ICU REQUIRED COMPONENTS i18n data uc)
+
+	pkg_check_modules(SDL2 REQUIRED sdl2)
+	pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
+	pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
 endif()
 
 include_directories(
@@ -30,6 +40,7 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/3rdparty/cpp-httplib
 	${PROJECT_SOURCE_DIR}/3rdparty/mINI/src
 	${PROJECT_SOURCE_DIR}/3rdparty/gulfs/include
+	${SDL2_INCLUDE_DIRS}
 )
 
 add_subdirectory(3rdparty/spdlog)
@@ -55,6 +66,13 @@ target_link_libraries(${PROJECT_NAME}
 	${SERIAL_LIBRARIES}
 	${CMAKE_THREAD_LIBS_INIT}
 	spdlog::spdlog
+)
+
+target_link_libraries(printer
+	${ICU_LIBRARIES}
+	${SDL2_LIBRARIES}
+	${SDL2_IMAGE_LIBRARIES}
+	${SDL2_TTF_LIBRARIES}
 )
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
