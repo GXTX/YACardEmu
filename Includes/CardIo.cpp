@@ -361,11 +361,19 @@ void CardIo::Command_7C_PrintL()
 	switch (currentStep) {
 		case 1:
 			if (!HasCard()) {
-				SetPError(P::ILLEGAL_ERR);
-			} else {
-				if (control == BufferControl::Clear) {
+				SetPError(P::PRINT_ERR);
+			}
+			break;
+		case 2:
+			MoveCard(MovePositions::THERMAL_HEAD);
+			break;
+		case 3:
+			{
+				// FIXME: It seems the phyiscal readers ignore this, or have the ability to split between print "steps", either way, disable this for now
+				/*if (control == BufferControl::Clear) {
 					printBuffer.clear();
-				}
+				}*/
+
 				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
 
 				// FIXME: Do this better.
@@ -381,11 +389,14 @@ void CardIo::Command_7C_PrintL()
 				card.close();
 			}
 			break;
+		case 4:
+			MoveCard(MovePositions::READ_WRITE_HEAD);
+			break;
 		default:
 			break;
 	}
 
-	if (currentStep > 1) {
+	if (currentStep > 4) {
 		runningCommand = false;
 	}
 }
@@ -395,14 +406,20 @@ void CardIo::Command_7D_Erase()
 	switch (currentStep) {
 		case 1:
 			if (!HasCard()) {
-				SetPError(P::ILLEGAL_ERR);
+				SetPError(P::PRINT_ERR);
 			}
+			break;
+		case 2:
+			MoveCard(MovePositions::THERMAL_HEAD);
+			break;
+		case 3:
+			MoveCard(MovePositions::READ_WRITE_HEAD);
 			break;
 		default:
 			break;
 	}
 
-	if (currentStep > 1) {
+	if (currentStep > 3) {
 		runningCommand = false;
 	}
 }
@@ -430,9 +447,7 @@ void CardIo::Command_80_EjectCard()
 		case 1: // FIXME: Special for "Transfer Card Data" in MT2EXP, we need 2 S::RUNNING_COMMAND replies
 			break;
 		case 2:
-			if (HasCard()) {
-				EjectCard();
-			}
+			EjectCard();
 			break;
 		default:
 			break;
@@ -452,7 +467,8 @@ void CardIo::Command_A0_Clean()
 				currentStep--;
 			}
 			break;
-		case 2: // Force a RUNNING_JOB only response
+		case 2:
+			MoveCard(MovePositions::THERMAL_HEAD);
 			break;
 		case 3:
 			EjectCard();
@@ -502,11 +518,18 @@ void CardIo::Command_B0_DispenseCardS31()
 				}
 			}
 			break;
+		case 2:
+			if (GetCardPos() == MovePositions::DISPENSER_THERMAL) {
+				MoveCard(MovePositions::READ_WRITE_HEAD);
+			} else if (!cardSettings.reportDispenserEmpty) {
+				SetPError(P::MOTOR_ERR);
+			}
+			break;
 		default:
 			break;
 	}
 
-	if (currentStep > 1) {
+	if (currentStep > 2) {
 		runningCommand = false;
 	}
 }

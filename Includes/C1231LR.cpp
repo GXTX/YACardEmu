@@ -28,14 +28,14 @@ C1231LR::C1231LR() : CardIo()
 void C1231LR::UpdateRStatus()
 {
 	// We "grab" the card for the user
-	if (localStatus == LR::EJECTING_CARD) {
+	if (localStatus == CardPosition::POS_EJECTED_NOT_REMOVED) {
 		cardSettings.insertedCard = false;
-		localStatus = LR::NO_CARD;
+		MoveCard(MovePositions::NO_CARD);
 	}
 
 	// We require the user to "insert" a card if we're waiting
-	if (cardSettings.insertedCard && localStatus == LR::NO_CARD) {
-		localStatus = LR::HAS_CARD_1;
+	if (cardSettings.insertedCard && localStatus == CardPosition::NO_CARD) {
+		MoveCard(MovePositions::READ_WRITE_HEAD);
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
 			status.s = S::RUNNING_COMMAND;
@@ -45,26 +45,67 @@ void C1231LR::UpdateRStatus()
 
 bool C1231LR::HasCard()
 {
-	return localStatus == LR::HAS_CARD_1;
+	return (localStatus != CardPosition::NO_CARD && localStatus != CardPosition::POS_EJECTED_NOT_REMOVED);
 }
 
 void C1231LR::DispenseCard()
 {
-	if (localStatus != LR::NO_CARD) {
+	if (localStatus != CardPosition::NO_CARD) {
 		SetSError(S::ILLEGAL_COMMAND);
 	} else {
-		localStatus = LR::HAS_CARD_1;
+		MoveCard(MovePositions::DISPENSER_THERMAL);
 	}
 }
 
 void C1231LR::EjectCard()
 {
-	if (localStatus == LR::HAS_CARD_1) {
-		localStatus = LR::EJECTING_CARD;
+	if (localStatus != CardPosition::NO_CARD) {
+		MoveCard(MovePositions::EJECT);
 	}
 }
 
 uint8_t C1231LR::GetRStatus()
 {
 	return static_cast<uint8_t>(localStatus);
+}
+
+void C1231LR::MoveCard(CardIo::MovePositions position)
+{
+	switch (position) {
+		case MovePositions::NO_CARD:
+			localStatus = CardPosition::NO_CARD;
+			break;
+		case MovePositions::READ_WRITE_HEAD:
+			localStatus = CardPosition::POS_MAG;
+			break;
+		case MovePositions::THERMAL_HEAD:
+			localStatus = CardPosition::POS_THERM;
+			break;
+		case MovePositions::DISPENSER_THERMAL:
+			localStatus = CardPosition::POS_THERM_DISP;
+			break;
+		case MovePositions::EJECT:
+			localStatus = CardPosition::POS_EJECTED_NOT_REMOVED;
+			break;
+		default:
+			break;
+	}
+}
+
+CardIo::MovePositions C1231LR::GetCardPos()
+{
+	switch (localStatus) {
+		case CardPosition::NO_CARD:
+			return MovePositions::NO_CARD;
+		case CardPosition::POS_MAG:
+			return MovePositions::READ_WRITE_HEAD;
+		case CardPosition::POS_THERM:
+			return MovePositions::THERMAL_HEAD;
+		case CardPosition::POS_THERM_DISP:
+			return MovePositions::DISPENSER_THERMAL;
+		case CardPosition::POS_EJECTED_NOT_REMOVED:
+			return MovePositions::EJECT;
+		default:
+			return MovePositions::NO_CARD;
+	}
 }

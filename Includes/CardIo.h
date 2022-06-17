@@ -68,6 +68,14 @@ public:
 protected:
 	// Status bytes:
 	//////////////////////////////////////////////
+	enum class MovePositions {
+		NO_CARD,
+		READ_WRITE_HEAD,
+		THERMAL_HEAD,
+		DISPENSER_THERMAL,
+		EJECT
+	};
+
 	enum class P {
 		NO_ERR                 = 0x30,
 		READ_ERR               = 0x31,
@@ -174,6 +182,8 @@ protected:
 	virtual bool HasCard() = 0;
 	virtual void DispenseCard() = 0;
 	virtual void EjectCard() = 0;
+	virtual void MoveCard(MovePositions position) = 0;
+	virtual CardIo::MovePositions GetCardPos() = 0;
 };
 
 #endif

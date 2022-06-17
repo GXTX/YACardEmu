@@ -35,20 +35,23 @@ class C1231LR : public CardIo
 public:
     C1231LR();
 protected:
-	enum class LR {
-		NO_CARD           = 0x30,
-		HAS_CARD_1        = 0x31,
-		CARD_STATUS_ERROR = 0x32,
-		HAS_CARD_2        = 0x33,
-		EJECTING_CARD     = 0x34,
+	enum class CardPosition {
+		NO_CARD                 = 0x30,
+		POS_MAG                 = 0x31,
+		POS_THERM               = 0x32,
+		POS_THERM_DISP          = 0x33,
+		POS_EJECTED_NOT_REMOVED = 0x34,
 	};
 
-    LR localStatus{LR::NO_CARD};
+    CardPosition localStatus{CardPosition::NO_CARD};
     bool HasCard();
     void DispenseCard();
     void EjectCard();
     void UpdateRStatus();
     uint8_t GetRStatus();
+
+    void MoveCard(CardIo::MovePositions position);
+    CardIo::MovePositions GetCardPos();
 };
 
 #endif //C1231LR
