@@ -198,7 +198,7 @@ bool readConfig(SerIo::Settings &serial, C1231LR::Settings &card, int *port)
 int main()
 {
 #ifdef NDEBUG
-	spdlog::set_level(spdlog::level::warn);
+	spdlog::set_level(spdlog::level::info);
 #else
 	spdlog::set_level(spdlog::level::debug);
 	spdlog::enable_backtrace(20);
@@ -222,7 +222,7 @@ int main()
 		return 1;
 	}
 
-	spdlog::warn("Starting API server...");
+	spdlog::info("Starting API server...");
 	std::thread(httpServer, httpPort, &cardHandler->cardSettings).detach();
 
 	SerIo::Status serialStatus;
