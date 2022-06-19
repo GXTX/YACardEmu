@@ -30,28 +30,40 @@
 
 #include "CardIo.h"
 
-class C1231LR : public CardIo
+class C1231BR : public CardIo
 {
 public:
-	C1231LR();
+	C1231BR();
 protected:
 	enum class CardPosition {
-		NO_CARD                 = 0x30,
-		POS_MAG                 = 0x31,
-		POS_THERM               = 0x32,
-		POS_THERM_DISP          = 0x33,
-		POS_EJECTED_NOT_REMOVED = 0x34,
+		NO_CARD        = 0x00,
+		POS_MAG        = 0x24,
+		POS_THERM      = 0x07,
+		POS_THERM_DISP = 0x28,
+		POS_IN_FRONT   = 0x01,
 	};
 
-	CardPosition localStatus{CardPosition::NO_CARD};
+	struct LocalStatus {
+		bool shutter{};
+		bool dispenser{true}; // report full dispenser
+		CardPosition position{CardPosition::NO_CARD};
+
+		uint8_t GetByte() {
+			return (shutter ? 1 : 0) << 6 | dispenser << 5 | static_cast<uint8_t>(position);
+		}
+	};
+
+	LocalStatus localStatus{};
 	bool HasCard();
 	void DispenseCard();
 	void EjectCard();
 	void UpdateRStatus();
 	uint8_t GetRStatus();
 
+	void Command_D0_ShutterControl() override;
+
 	void MoveCard(CardIo::MovePositions position);
 	CardIo::MovePositions GetCardPos();
 };
 
-#endif //C1231LR
+#endif //C1231BR

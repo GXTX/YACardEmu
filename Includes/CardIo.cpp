@@ -567,7 +567,6 @@ void CardIo::Command_B0_DispenseCardS31()
 		runningCommand = false;
 	}
 }
-
 void CardIo::Command_C0_ControlLED()
 {
 	// We don't need to handle this properly but let's leave some notes
@@ -594,6 +593,14 @@ void CardIo::Command_C1_SetRetry()
 		default:
 			status.SoftReset();
 			runningCommand = false;
+	}
+}
+
+void CardIo::Command_D0_ShutterControl()
+{
+	switch (currentStep) {
+		default:
+			SetSError(S::ILLEGAL_COMMAND);
 			break;
 	}
 }

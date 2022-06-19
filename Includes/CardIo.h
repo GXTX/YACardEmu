@@ -163,6 +163,7 @@ protected:
 	void Command_B0_DispenseCardS31();
 	void Command_C0_ControlLED();
 	void Command_C1_SetRetry();
+	virtual void Command_D0_ShutterControl();
 	void Command_E1_SetRTC();
 	void Command_F0_GetVersion();
 	void Command_F1_GetRTC();
