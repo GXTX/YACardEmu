@@ -534,6 +534,15 @@ void CardIo::Command_B0_DispenseCardS31()
 	}
 }
 
+void CardIo::Command_D0_ShutterControl()
+{
+	switch (currentStep) {
+		default:
+			SetSError(S::ILLEGAL_COMMAND);
+			break;
+	}
+}
+
 void CardIo::Command_E1_SetRTC()
 {
 	switch (currentStep) {

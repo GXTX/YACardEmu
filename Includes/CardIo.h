@@ -158,6 +158,7 @@ protected:
 	void Command_80_EjectCard();
 	void Command_A0_Clean();
 	void Command_B0_DispenseCardS31();
+	virtual void Command_D0_ShutterControl();
 	void Command_E1_SetRTC();
 	void Command_F0_GetVersion();
 	void Command_F1_GetRTC();
