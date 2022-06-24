@@ -370,9 +370,9 @@ void CardIo::Command_7C_PrintL()
 		case 3:
 			{
 				// FIXME: It seems the phyiscal readers ignore this, or have the ability to split between print "steps", either way, disable this for now
-				/*if (control == BufferControl::Clear) {
+				//if (control == BufferControl::Clear) {
 					printBuffer.clear();
-				}*/
+				//}
 
 				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
 
