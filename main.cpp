@@ -135,6 +135,54 @@ void httpServer(int port, C1231LR::Settings *card)
 		svr.stop();
 	});
 
+	// REST API
+	svr.Get("/api/v1/cards", [&card](const httplib::Request &, httplib::Response &res) {
+		res.set_content(generateCardListJSON(card->cardPath), "application/json");
+	});
+
+	svr.Get("/api/v1/insertedCard", [&card](const httplib::Request &, httplib::Response &res) {
+		res.set_content(" { \"cardName\":\"" + card->cardName + "\", \"inserted\":" + (card->insertedCard ? "true" : "false") + " }", "application/json");
+	});
+
+	svr.Post("/api/v1/insertedCard", [&card](const httplib::Request &req, httplib::Response &res) {
+		card->insertedCard = true;
+		if (req.has_param("cardname")) {
+			card->cardName = req.get_param_value("cardname");
+		}
+		res.set_content(" { \"cardName\":\"" + card->cardName + "\", \"inserted\":" + (card->insertedCard ? "true" : "false") + " }", "application/json");
+	});
+
+	svr.Delete("/api/v1/insertedCard", [&card](const httplib::Request &, httplib::Response &res) {
+		card->insertedCard = false;
+		res.set_content("null", "application/json");
+	});
+
+	svr.Get("/api/v1/dispenser", [&card](const httplib::Request &, httplib::Response &res) {
+		if (card->reportDispenserEmpty == true) {
+			res.set_content("empty", "text/plain");
+		} else {
+			res.set_content("full", "text/plain");
+		}
+	});
+
+	svr.Post("/api/v1/dispenser", [&card](const httplib::Request &, httplib::Response &res) {
+		card->reportDispenserEmpty = false;
+		if (card->reportDispenserEmpty == true) {
+			res.set_content("empty", "text/plain");
+		} else {
+			res.set_content("full", "text/plain");
+		}
+	});
+
+	svr.Delete("/api/v1/dispenser", [&card](const httplib::Request &, httplib::Response &res) {
+		card->reportDispenserEmpty = true;
+		if (card->reportDispenserEmpty == true) {
+			res.set_content("empty", "text/plain");
+		} else {
+			res.set_content("full", "text/plain");
+		}
+	});
+
 	svr.listen("0.0.0.0", port);
 }
 
