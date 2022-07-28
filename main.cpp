@@ -140,6 +140,10 @@ void httpServer(int port, C1231LR::Settings *card)
 		res.set_content(generateCardListJSON(card->cardPath), "application/json");
 	});
 
+	svr.Get("/api/v1/hasCard", [&card](const httplib::Request &, httplib::Response &res) {
+		res.set_content(card->insertedCard ? "true" : "false", "application/json");
+	});
+
 	svr.Get("/api/v1/insertedCard", [&card](const httplib::Request &, httplib::Response &res) {
 		res.set_content(" { \"cardName\":\"" + card->cardName + "\", \"inserted\":" + (card->insertedCard ? "true" : "false") + " }", "application/json");
 	});

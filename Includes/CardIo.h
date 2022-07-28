@@ -56,6 +56,7 @@ public:
 		std::string cardName{};
 		std::string cardPath{};
 		bool insertedCard{false};
+		bool hasCard{false};
 		bool reportDispenserEmpty{false};
 	};
 
