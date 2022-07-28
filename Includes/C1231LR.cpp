@@ -30,6 +30,7 @@ void C1231LR::UpdateRStatus()
 	// We "grab" the card for the user
 	if (localStatus == CardPosition::POS_EJECTED_NOT_REMOVED) {
 		cardSettings.insertedCard = false;
+		cardSettings.hasCard = false;
 		MoveCard(MovePositions::NO_CARD);
 	}
 
@@ -51,8 +52,10 @@ bool C1231LR::HasCard()
 void C1231LR::DispenseCard()
 {
 	if (localStatus != CardPosition::NO_CARD) {
+		spdlog::info("Error dispensing card - card present?");
 		SetSError(S::ILLEGAL_COMMAND);
 	} else {
+		spdlog::info("Dispensing new card");
 		MoveCard(MovePositions::DISPENSER_THERMAL);
 	}
 }
@@ -60,6 +63,7 @@ void C1231LR::DispenseCard()
 void C1231LR::EjectCard()
 {
 	if (localStatus != CardPosition::NO_CARD) {
+		spdlog::info("Ejecting card");
 		MoveCard(MovePositions::EJECT);
 	}
 }
@@ -74,18 +78,23 @@ void C1231LR::MoveCard(CardIo::MovePositions position)
 	switch (position) {
 		case MovePositions::NO_CARD:
 			localStatus = CardPosition::NO_CARD;
+			cardSettings.hasCard = false;
 			break;
 		case MovePositions::READ_WRITE_HEAD:
 			localStatus = CardPosition::POS_MAG;
+			cardSettings.hasCard = true;
 			break;
 		case MovePositions::THERMAL_HEAD:
 			localStatus = CardPosition::POS_THERM;
+			cardSettings.hasCard = true;
 			break;
 		case MovePositions::DISPENSER_THERMAL:
 			localStatus = CardPosition::POS_THERM_DISP;
+			cardSettings.hasCard = true;
 			break;
 		case MovePositions::EJECT:
 			localStatus = CardPosition::POS_EJECTED_NOT_REMOVED;
+			cardSettings.hasCard = false;
 			break;
 		default:
 			break;

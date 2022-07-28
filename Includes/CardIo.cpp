@@ -98,6 +98,8 @@ void CardIo::Command_33_ReadData2()
 			if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
 				if (!HasCard()) {
 					status.s = S::WAITING_FOR_CARD;
+					spdlog::info("Game requests user to insert card");
+					cardSettings.waitingForCard = true;
 					currentStep--;
 				}
 			} else {
@@ -685,6 +687,10 @@ void CardIo::HandlePacket()
 	UpdateRStatus();
 
 	if (runningCommand) { // 20 is a special case, see function
+		if (cardSettings.waitingForCard) {
+			spdlog::info("Game no lnger requests user to insert card");
+			cardSettings.waitingForCard = false;
+		}
 		switch (currentCommand) {
 			case 0x10: Command_10_Initalize(); break;
 			case 0x20: Command_20_ReadStatus(); break;
