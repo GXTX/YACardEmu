@@ -141,7 +141,11 @@ void httpServer(int port, C1231LR::Settings *card)
 	});
 
 	svr.Get("/api/v1/hasCard", [&card](const httplib::Request &, httplib::Response &res) {
-		res.set_content(card->insertedCard ? "true" : "false", "application/json");
+		res.set_content(card->hasCard ? "true" : "false", "application/json");
+	});
+
+	svr.Get("/api/v1/readyCard", [&card](const httplib::Request &, httplib::Response &res) {
+		res.set_content(card->waitingForCard ? "true" : "false", "application/json");
 	});
 
 	svr.Get("/api/v1/insertedCard", [&card](const httplib::Request &, httplib::Response &res) {
@@ -149,7 +153,9 @@ void httpServer(int port, C1231LR::Settings *card)
 	});
 
 	svr.Post("/api/v1/insertedCard", [&card](const httplib::Request &req, httplib::Response &res) {
-		card->insertedCard = true;
+		if (!req.has_param("loadonly")) {
+			card->insertedCard = true;
+		}
 		if (req.has_param("cardname")) {
 			card->cardName = req.get_param_value("cardname");
 		}
