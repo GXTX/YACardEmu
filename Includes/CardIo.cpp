@@ -181,6 +181,38 @@ void CardIo::Command_33_ReadData2()
 	}
 }
 
+void CardIo::Command_35_GetData()
+{
+	// We don't start at 0 because some systems don't like us immediately replying.
+	// TODO: Should we be moving the card automatically under the read/write head?
+	switch (currentStep) {
+		case 1:
+			if (!HasCard()) {
+				// FIXME: Is this correct?
+				SetPError(P::ILLEGAL_ERR);
+				return;
+			}
+
+			cardData.clear();
+			cardData.resize(NUM_TRACKS);
+			for (int i = 0; i < NUM_TRACKS; i++) {
+				bool res = ReadTrack(cardData.at(i), i);
+				if (!res) {
+					SetPError(P::READ_ERR);
+					return;
+				}
+				std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(commandBuffer));
+			}
+		break;
+		default:
+			break;
+	}
+
+	if (currentStep > 1) {
+		runningCommand = false;
+	}
+}
+
 void CardIo::Command_40_Cancel()
 {
 	switch (currentStep) {
@@ -725,6 +757,7 @@ void CardIo::HandlePacket()
 			case 0x10: Command_10_Initalize(); break;
 			case 0x20: Command_20_ReadStatus(); break;
 			case 0x33: Command_33_ReadData2(); break;
+			case 0x35: Command_35_GetData(); break;
 			case 0x40: Command_40_Cancel(); break;
 			case 0x53: Command_53_WriteData2(); break;
 			case 0x78: Command_78_PrintSettings2(); break;
