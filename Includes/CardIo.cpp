@@ -536,6 +536,18 @@ void CardIo::Command_B0_DispenseCardS31()
 	}
 }
 
+void CardIo::Command_C1_SetRetry()
+{
+	// We don't need to handle this properly but let's leave some notes
+	// currentPacket[0] == 0x31 NONE ~ 0x39 MAX8
+	switch (currentStep) {
+		default:
+			status.SoftReset();
+			runningCommand = false;
+			break;
+	}
+}
+
 void CardIo::Command_E1_SetRTC()
 {
 	switch (currentStep) {
@@ -706,6 +718,7 @@ void CardIo::HandlePacket()
 			case 0x80: Command_80_EjectCard(); break;
 			case 0xA0: Command_A0_Clean(); break;
 			case 0xB0: Command_B0_DispenseCardS31(); break;
+			case 0xC1: Command_C1_SetRetry(); break;
 			case 0xE1: Command_E1_SetRTC(); break;
 			case 0xF0: Command_F0_GetVersion(); break;
 			case 0xF1: Command_F1_GetRTC(); break;
