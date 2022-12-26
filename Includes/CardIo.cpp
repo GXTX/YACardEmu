@@ -168,7 +168,8 @@ void CardIo::Command_33_ReadData2()
 							return;
 					}
 				} else {
-					SetPError(P::ILLEGAL_ERR);
+					// If we don't have a card and we have no other errors, assume this state.
+					status.s = S::WAITING_FOR_CARD;
 				}
 			}
 		break;
@@ -778,6 +779,7 @@ void CardIo::HandlePacket()
 			case 0xB0: Command_B0_DispenseCardS31(); break;
 			case 0xC0: Command_C0_ControlLED(); break;
 			case 0xC1: Command_C1_SetRetry(); break;
+			case 0xD0: Command_D0_ShutterControl(); break;
 			case 0xE1: Command_E1_SetRTC(); break;
 			case 0xF0: Command_F0_GetVersion(); break;
 			case 0xF1: Command_F1_GetRTC(); break;

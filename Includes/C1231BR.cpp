@@ -27,7 +27,20 @@ C1231BR::C1231BR() : CardIo()
 
 void C1231BR::UpdateRStatus()
 {
-	// TODO:
+	// We "grab" the card for the user
+	if (localStatus.position == CardPosition::POS_IN_FRONT) {
+		cardSettings.insertedCard = false;
+		MoveCard(MovePositions::NO_CARD);
+	}
+
+	// We require the user to "insert" a card if we're waiting
+	if (cardSettings.insertedCard && localStatus.position == CardPosition::NO_CARD) {
+		MoveCard(MovePositions::READ_WRITE_HEAD);
+
+		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
+			status.s = S::RUNNING_COMMAND;
+		}
+	}
 }
 
 bool C1231BR::HasCard()
@@ -56,29 +69,78 @@ uint8_t C1231BR::GetRStatus()
 	return localStatus.GetByte();
 }
 
+void C1231BR::Command_A0_Clean()
+{
+	switch (currentStep) {
+		case 1:
+			localStatus.shutter = true;
+			status.s = S::WAITING_FOR_CARD;
+			break;
+		case 2:
+			MoveCard(MovePositions::EJECT); //insert card
+			if (!HasCard()) {
+				currentStep--;
+			}
+			break;
+		case 3:
+			MoveCard(MovePositions::THERMAL_HEAD);
+			break;
+		case 4:
+			EjectCard();
+			break;
+		default:
+			break;
+	}
+
+	if (currentStep > 4) {
+		runningCommand = false;
+	}
+}
+
+
 void C1231BR::Command_D0_ShutterControl()
 {
-	// FIXME: Surely there's more actions, close open, etc.
+	// Only actions are to close and open the shutter
 	enum Action {
+		Close = 0,
 		Open = 1,
 	};
 
 	Action action = static_cast<Action>(currentPacket[0]);
-
 	switch (currentStep) {
+		case 0:
+			switch (action) {
+				case Action::Close:
+					localStatus.shutter = false;
+					break;
+				case Action::Open:
+					localStatus.shutter = true;
+					break;
+				default:
+					break;
+			}
+			break;
 		case 1:
-			if (action == Action::Open) {
-				localStatus.shutter = true;
+			switch (action) {
+				case Action::Close:
+					localStatus.shutter = false;
+					break;
+				case Action::Open:
+					localStatus.shutter = true;
+					break;
+				default:
+					break;
 			}
 			break;
 		default:
 			break;
 	}
-	return;
 
 	if (currentStep > 1) {
 		runningCommand = false;
 	}
+
+	return;
 }
 
 
@@ -97,9 +159,9 @@ void C1231BR::MoveCard(CardIo::MovePositions position)
 		case MovePositions::DISPENSER_THERMAL:
 			localStatus.position = CardPosition::POS_THERM_DISP;
 			break;
-		//case MovePositions::EJECT:
-		//	localStatus.position = CardPosition::POS_EJECTED_NOT_REMOVED;
-		//	break;
+		case MovePositions::EJECT:
+			localStatus.position = CardPosition::POS_IN_FRONT;
+			break;
 		default:
 			break;
 	}
@@ -116,8 +178,8 @@ CardIo::MovePositions C1231BR::GetCardPos()
 			return MovePositions::THERMAL_HEAD;
 		case CardPosition::POS_THERM_DISP:
 			return MovePositions::DISPENSER_THERMAL;
-		//case CardPosition::POS_EJECTED_NOT_REMOVED:
-		//	return MovePositions::EJECT;
+		case CardPosition::POS_IN_FRONT:
+			return MovePositions::EJECT;
 		default:
 			return MovePositions::NO_CARD;
 	}

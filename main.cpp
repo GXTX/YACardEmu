@@ -26,6 +26,7 @@
 #include <csignal>
 #include <string>
 
+#include "C1231BR.h"
 #include "C1231LR.h"
 #include "SerIo.h"
 #include "base64.h"
@@ -97,7 +98,7 @@ std::string generateCardListJSON(std::string basepath)
 	return list;
 }
 
-void httpServer(int port, C1231LR::Settings *card)
+void httpServer(int port, CardIo::Settings *card)
 {
 	httplib::Server svr;
 
@@ -196,7 +197,7 @@ void httpServer(int port, C1231LR::Settings *card)
 	svr.listen("0.0.0.0", port);
 }
 
-bool readConfig(SerIo::Settings &serial, C1231LR::Settings &card, int *port)
+bool readConfig(std::string &device, SerIo::Settings &serial, CardIo::Settings &card, int *port)
 {
 	// Read in config values
 	mINI::INIFile config("config.ini");
@@ -215,6 +216,7 @@ bool readConfig(SerIo::Settings &serial, C1231LR::Settings &card, int *port)
 		card.cardPath = ini["config"]["basepath"];
 		card.cardName = ini["config"]["autoselectedcard"]; // can be empty, we can select via api
 		lport = ini["config"]["apiport"];
+		device = ini["config"]["targetdevice"];
 		serial.devicePath = ini["config"]["serialpath"];
 		lbaud = ini["config"]["serialbaud"];
 		lparity = ini["config"]["serialparity"];
@@ -267,13 +269,28 @@ int main()
 	std::signal(SIGINT, sigHandler);
 	std::signal(SIGTERM, sigHandler);
 
-	C1231LR *cardHandler = new C1231LR();
+
+	CardIo::Settings cardSettings;
+	std::string tgtDevice;
+
 	SerIo *serialHandler = new SerIo();
 	int httpPort = 8080;
 
-	if (!readConfig(serialHandler->portSettings, cardHandler->cardSettings, &httpPort)) {
+	if (!readConfig(tgtDevice, serialHandler->portSettings, cardSettings, &httpPort)) {
 		return 1;
 	}
+
+	CardIo *cardHandler;
+
+	if (tgtDevice == "C1231LR")
+		cardHandler = new C1231LR();
+	else if (tgtDevice == "C1231BR")
+		cardHandler = new C1231BR();
+	else {
+		spdlog::critical("Invalid target device: " + tgtDevice);
+		return 1;
+	}
+	cardHandler->cardSettings = cardSettings;
 
 	if (!serialHandler->Open()) {
 		spdlog::critical("Couldn't initalize the serial controller.");
