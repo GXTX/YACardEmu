@@ -156,7 +156,7 @@ protected:
 	void Command_7D_Erase(); // erase the printed image
 	void Command_7E_PrintBarcode();
 	void Command_80_EjectCard();
-	void Command_A0_Clean();
+	virtual void Command_A0_Clean();
 	void Command_B0_DispenseCardS31();
 	virtual void Command_D0_ShutterControl();
 	void Command_E1_SetRTC();

@@ -19,8 +19,8 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-#ifndef C1231LR_H
-#define C1231LR_H
+#ifndef C1231BR_H
+#define C1231BR_H
 
 #include <vector>
 #include <iostream>
@@ -49,7 +49,7 @@ protected:
 		CardPosition position{CardPosition::NO_CARD};
 
 		uint8_t GetByte() {
-			return (shutter ? 1 : 0) << 6 | dispenser << 5 | static_cast<uint8_t>(position);
+			return (shutter ? 1 : 0) << 7 | (shutter ? 0 : 1) << 6 | (dispenser ? 1 : 0 ) << 5 | static_cast<uint8_t>(position);
 		}
 	};
 
@@ -60,6 +60,7 @@ protected:
 	void UpdateRStatus();
 	uint8_t GetRStatus();
 
+	void Command_A0_Clean() override;
 	void Command_D0_ShutterControl() override;
 
 	void MoveCard(CardIo::MovePositions position);
