@@ -568,6 +568,7 @@ void CardIo::Command_B0_DispenseCardS31()
 		runningCommand = false;
 	}
 }
+
 void CardIo::Command_C0_ControlLED()
 {
 	// We don't need to handle this properly but let's leave some notes

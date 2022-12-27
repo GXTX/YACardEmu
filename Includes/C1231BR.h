@@ -36,11 +36,11 @@ public:
 	C1231BR();
 protected:
 	enum class CardPosition {
-		NO_CARD        = 0x00,
-		POS_MAG        = 0x24,
-		POS_THERM      = 0x07,
-		POS_THERM_DISP = 0x28,
-		POS_IN_FRONT   = 0x01,
+		NO_CARD        = 0b00000,
+		POS_MAG        = 0b00100,
+		POS_THERM      = 0b00111,
+		POS_THERM_DISP = 0b01000,
+		POS_IN_FRONT   = 0b00001,
 	};
 
 	struct LocalStatus {
@@ -49,7 +49,7 @@ protected:
 		CardPosition position{CardPosition::NO_CARD};
 
 		uint8_t GetByte() {
-			return (shutter ? 1 : 0) << 7 | (shutter ? 0 : 1) << 6 | (dispenser ? 1 : 0 ) << 5 | static_cast<uint8_t>(position);
+			return 1 << (shutter ? 7 : 6) | (dispenser ? 1 : 0 ) << 5 | static_cast<uint8_t>(position);
 		}
 	};
 

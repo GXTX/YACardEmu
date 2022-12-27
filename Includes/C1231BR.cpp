@@ -77,6 +77,7 @@ void C1231BR::Command_A0_Clean()
 			status.s = S::WAITING_FOR_CARD;
 			break;
 		case 2:
+			// FIXME: Don't force insert a card
 			MoveCard(MovePositions::EJECT); //insert card
 			if (!HasCard()) {
 				currentStep--;
@@ -97,7 +98,6 @@ void C1231BR::Command_A0_Clean()
 	}
 }
 
-
 void C1231BR::Command_D0_ShutterControl()
 {
 	// Only actions are to close and open the shutter
@@ -107,42 +107,18 @@ void C1231BR::Command_D0_ShutterControl()
 	};
 
 	Action action = static_cast<Action>(currentPacket[0]);
+
 	switch (currentStep) {
-		case 0:
-			switch (action) {
-				case Action::Close:
-					localStatus.shutter = false;
-					break;
-				case Action::Open:
-					localStatus.shutter = true;
-					break;
-				default:
-					break;
-			}
-			break;
-		case 1:
-			switch (action) {
-				case Action::Close:
-					localStatus.shutter = false;
-					break;
-				case Action::Open:
-					localStatus.shutter = true;
-					break;
-				default:
-					break;
-			}
-			break;
 		default:
+			if (action == Action::Open) {
+				localStatus.shutter = true;
+			} else {
+				localStatus.shutter = false;
+			}
+			runningCommand = false;
 			break;
 	}
-
-	if (currentStep > 1) {
-		runningCommand = false;
-	}
-
-	return;
 }
-
 
 void C1231BR::MoveCard(CardIo::MovePositions position)
 {
@@ -184,4 +160,3 @@ CardIo::MovePositions C1231BR::GetCardPos()
 			return MovePositions::NO_CARD;
 	}
 }
-
