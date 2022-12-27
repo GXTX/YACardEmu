@@ -37,9 +37,9 @@ public:
 protected:
 	enum class CardPosition {
 		NO_CARD        = 0b00000,
-		POS_MAG        = 0b00100,
+		POS_MAG        = 0b11000,
 		POS_THERM      = 0b00111,
-		POS_THERM_DISP = 0b01000,
+		POS_THERM_DISP = 0b11100,
 		POS_IN_FRONT   = 0b00001,
 	};
 
