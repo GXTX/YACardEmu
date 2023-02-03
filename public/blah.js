@@ -50,7 +50,7 @@ async function fetchCards() {
 		cards = value
 	}).catch(error => {
 		console.error(error)
-		alert(`Unable to update cards: ${error}`)
+		alert(`Unable to update cards: ${error} : This can happen if you havent created a card.`)
 	})
 }
 
