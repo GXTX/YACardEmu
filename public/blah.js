@@ -41,7 +41,7 @@ function updateCards() {
 }
 
 async function fetchCards() {
-	await fetch('/actions?list').then(response => {
+	await fetch('/api/v1/cards').then(response => {
 		if (!response.ok) {
 			throw new Error(response.statusText)
 		}
