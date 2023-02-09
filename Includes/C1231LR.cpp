@@ -1,7 +1,7 @@
 /*
     YACardEmu
     ----------------
-    Copyright (C) 2020-2022 wutno (https://github.com/GXTX)
+    Copyright (C) 2020-2023 wutno (https://github.com/GXTX)
 
 
     This program is free software; you can redistribute it and/or modify

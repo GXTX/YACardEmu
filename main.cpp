@@ -1,7 +1,7 @@
 /*
     YACardEmu
     ----------------
-    Copyright (C) 2020-2022 wutno (https://github.com/GXTX)
+    Copyright (C) 2020-2023 wutno (https://github.com/GXTX)
 
 
     This program is free software; you can redistribute it and/or modify
@@ -28,7 +28,7 @@
 
 #include "C1231LR.h"
 #include "SerIo.h"
-#include "base64.h"
+#include "WebIo.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
@@ -36,167 +36,18 @@
 #include "ghc/filesystem.hpp"
 
 // Globals
-static const auto delay{std::chrono::microseconds(250)};
-std::atomic<bool> running{true};
+std::atomic<bool> running = true;
+constexpr static auto delay = std::chrono::microseconds(250);
 //
 
-void sigHandler(int sig)
+void SigHandler(int sig)
 {
 	if (sig == SIGINT || sig == SIGTERM) {
 		running = false;
 	}
 }
 
-std::string generateCardListJSON(std::string basepath)
-{
-	std::string list{"["};
-
-	for (const auto &entry: ghc::filesystem::directory_iterator(basepath)) {
-		std::string card{entry.path().string()};
-
-		auto find = card.find(".track_0");
-
-		if (find != std::string::npos) {
-			card.replace(find, 8, "");
-			list.append("{\"name\":\"");
-#ifdef _WIN32
-			list.append(card.substr(card.find_last_of("\\") + 1));
-#else
-			list.append(card.substr(card.find_last_of("/") + 1));
-#endif
-			list.append("\",\"image\":\"");
-
-			auto find2 = card.find(".bin");
-			if (find2 != std::string::npos)
-				card.replace(find2, 4, ".png");
-			
-			std::string base64{};
-
-			if (ghc::filesystem::exists(card)) {
-				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
-
-				base64.resize(ghc::filesystem::file_size(card));
-
-				img.read(reinterpret_cast<char *>(&base64[0]), base64.size());
-				img.close();
-			}
-
-			std::string encoded = base64_encode(base64, false);
-			list.append("data:image/png;base64, ");
-			list.append(encoded);
-			list.append("\"},");
-		}
-	}
-
-	// remove the errant comma
-	if (list.compare("[") != 0) {
-		list.pop_back();
-	}
-
-	list.append("]");
-	return list;
-}
-
-void httpServer(int port, C1231LR::Settings *card)
-{
-	httplib::Server svr;
-
-	svr.set_mount_point("/", "public");
-
-	svr.Get("/actions", [&card](const httplib::Request &req, httplib::Response &res) {
-		if (req.has_param("list")) {
-			res.set_content(generateCardListJSON(card->cardPath), "application/json");
-		} else {
-			if (req.has_param("insert")) {
-				card->insertedCard = true;
-			} else if (req.has_param("remove")) {
-				card->insertedCard = false;
-			}
-
-			if (req.has_param("cardname")) {
-				card->cardName = req.get_param_value("cardname");
-			}
-
-			if (req.has_param("dispenser")) {
-				if (req.get_param_value("dispenser").compare("true") == 0) {
-					card->reportDispenserEmpty = true;
-				} else {
-					card->reportDispenserEmpty = false;
-				}
-			}
-
-			res.set_redirect("/");
-		}
-	});
-
-	svr.Get("/stop", [&svr](const httplib::Request &, httplib::Response &) {
-		spdlog::info("Stopping application...");
-		running = false;
-		svr.stop();
-	});
-
-	// REST API
-	svr.Get("/api/v1/cards", [&card](const httplib::Request &, httplib::Response &res) {
-		res.set_content(generateCardListJSON(card->cardPath), "application/json");
-	});
-
-	svr.Get("/api/v1/hasCard", [&card](const httplib::Request &, httplib::Response &res) {
-		res.set_content(card->hasCard ? "true" : "false", "application/json");
-	});
-
-	svr.Get("/api/v1/readyCard", [&card](const httplib::Request &, httplib::Response &res) {
-		res.set_content(card->waitingForCard ? "true" : "false", "application/json");
-	});
-
-	svr.Get("/api/v1/insertedCard", [&card](const httplib::Request &, httplib::Response &res) {
-		res.set_content(" { \"cardName\":\"" + card->cardName + "\", \"inserted\":" + (card->insertedCard ? "true" : "false") + " }", "application/json");
-	});
-
-	svr.Post("/api/v1/insertedCard", [&card](const httplib::Request &req, httplib::Response &res) {
-		if (!req.has_param("loadonly")) {
-			card->insertedCard = true;
-		}
-		if (req.has_param("cardname")) {
-			card->cardName = req.get_param_value("cardname");
-		}
-		res.set_content(" { \"cardName\":\"" + card->cardName + "\", \"inserted\":" + (card->insertedCard ? "true" : "false") + " }", "application/json");
-	});
-
-	svr.Delete("/api/v1/insertedCard", [&card](const httplib::Request &, httplib::Response &res) {
-		card->insertedCard = false;
-		res.set_content("null", "application/json");
-	});
-
-	svr.Get("/api/v1/dispenser", [&card](const httplib::Request &, httplib::Response &res) {
-		if (card->reportDispenserEmpty == true) {
-			res.set_content("empty", "text/plain");
-		} else {
-			res.set_content("full", "text/plain");
-		}
-	});
-
-	svr.Post("/api/v1/dispenser", [&card](const httplib::Request &, httplib::Response &res) {
-		card->reportDispenserEmpty = false;
-		if (card->reportDispenserEmpty == true) {
-			res.set_content("empty", "text/plain");
-		} else {
-			res.set_content("full", "text/plain");
-		}
-	});
-
-	svr.Delete("/api/v1/dispenser", [&card](const httplib::Request &, httplib::Response &res) {
-		card->reportDispenserEmpty = true;
-		if (card->reportDispenserEmpty == true) {
-			res.set_content("empty", "text/plain");
-		} else {
-			res.set_content("full", "text/plain");
-		}
-	});
-
-	svr.listen("0.0.0.0", port);
-}
-
-bool readConfig(SerIo::Settings &serial, C1231LR::Settings &card, int *port)
+bool ReadConfig(SerIo::Settings &serial, C1231LR::Settings &card, int *port)
 {
 	// Read in config values
 	mINI::INIFile config("config.ini");
@@ -264,14 +115,14 @@ int main()
 	spdlog::set_pattern("[%^%l%$] %v");
 
 	// Handle quitting gracefully via signals
-	std::signal(SIGINT, sigHandler);
-	std::signal(SIGTERM, sigHandler);
+	std::signal(SIGINT, SigHandler);
+	std::signal(SIGTERM, SigHandler);
 
 	C1231LR *cardHandler = new C1231LR();
 	SerIo *serialHandler = new SerIo();
 	int httpPort = 8080;
 
-	if (!readConfig(serialHandler->portSettings, cardHandler->cardSettings, &httpPort)) {
+	if (!ReadConfig(serialHandler->portSettings, cardHandler->cardSettings, &httpPort)) {
 		return 1;
 	}
 
@@ -280,11 +131,10 @@ int main()
 		return 1;
 	}
 
-	spdlog::info("Starting API server...");
-	std::thread(httpServer, httpPort, &cardHandler->cardSettings).detach();
+	std::unique_ptr<WebIo> webHandler = std::make_unique<WebIo>(&cardHandler->cardSettings, httpPort, &running);
 
-	SerIo::Status serialStatus;
-	CardIo::StatusCode cardStatus;
+	SerIo::Status serialStatus = SerIo::Status::Okay;
+	CardIo::StatusCode cardStatus = CardIo::StatusCode::Okay;
 	std::vector<uint8_t> readBuffer{};
 	std::vector<uint8_t> writeBuffer{};
 

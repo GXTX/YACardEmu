@@ -32,11 +32,13 @@
 
 	<div class="row justify-content-center mt-5">
 		<div class="col-6 text-center">
-			<form action="/actions" method="get" class="form-group">
-				<button type="submit" name="insert" class="btn btn-warning">Insert</button>
+			<form action="/api/v1/insertedCard" method="post" class="form-group">
+				<input id="redirect" name="redirect" hidden="true">
+				<button type="submit" name="loadonly" class="btn btn-warning">Insert</button>
 				<!--<button type="submit" name="remove" class="btn btn-danger">Remove</button>-->
 			</form>
-			<form action="/actions" method="get" class="form-group">
+			<form action="/api/v1/insertedCard" method="post" class="form-group">
+				<input id="redirect" name="redirect" hidden="true">
 				<input id="cardname" class="form-control-md" name="cardname" placeholder="card.bin">
 				<button type="submit" class="btn btn-primary">Change</button>
 			</form>
