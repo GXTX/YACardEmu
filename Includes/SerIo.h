@@ -47,14 +47,13 @@ public:
 
 	struct Settings {
 		std::string devicePath{};
-		int baudrate;
-		sp_parity parity;
+		int baudRate = 9600;
+		sp_parity parity = SP_PARITY_NONE;
 	};
 
-	bool isPipe{};
-	Settings portSettings{};
+	SerIo::Settings *m_portSettings = nullptr;
 
-	SerIo();
+	SerIo(SerIo::Settings *settings);
 	~SerIo();
 
 	bool Open();
@@ -63,13 +62,14 @@ public:
 	void SendAck();
 private:
 #ifdef _WIN32
-	HANDLE hPipe{};
+	HANDLE m_pipeHandle = INVALID_HANDLE_VALUE;
 #endif
 
-	sp_port *Port{nullptr};
-	sp_port_config *PortConfig{nullptr};
+	bool m_isPipe = false;
+	sp_port *m_portHandle = nullptr;
+	sp_port_config *m_portConfig = nullptr;
 
-	std::vector<uint8_t> serialBuffer{};
+	std::vector<uint8_t> m_buffer{};
 };
 
 #endif

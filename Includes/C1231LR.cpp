@@ -21,7 +21,7 @@
 
 #include "C1231LR.h"
 
-C1231LR::C1231LR() : CardIo()
+C1231LR::C1231LR(CardIo::Settings *settings) : CardIo(settings)
 {
 }
 
@@ -29,13 +29,13 @@ void C1231LR::UpdateRStatus()
 {
 	// We "grab" the card for the user
 	if (localStatus == CardPosition::POS_EJECTED_NOT_REMOVED) {
-		cardSettings.insertedCard = false;
-		cardSettings.hasCard = false;
+		m_cardSettings->insertedCard = false;
+		m_cardSettings->hasCard = false;
 		MoveCard(MovePositions::NO_CARD);
 	}
 
 	// We require the user to "insert" a card if we're waiting
-	if (cardSettings.insertedCard && localStatus == CardPosition::NO_CARD) {
+	if (m_cardSettings->insertedCard && localStatus == CardPosition::NO_CARD) {
 		MoveCard(MovePositions::READ_WRITE_HEAD);
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
@@ -78,23 +78,23 @@ void C1231LR::MoveCard(CardIo::MovePositions position)
 	switch (position) {
 		case MovePositions::NO_CARD:
 			localStatus = CardPosition::NO_CARD;
-			cardSettings.hasCard = false;
+			m_cardSettings->hasCard = false;
 			break;
 		case MovePositions::READ_WRITE_HEAD:
 			localStatus = CardPosition::POS_MAG;
-			cardSettings.hasCard = true;
+			m_cardSettings->hasCard = true;
 			break;
 		case MovePositions::THERMAL_HEAD:
 			localStatus = CardPosition::POS_THERM;
-			cardSettings.hasCard = true;
+			m_cardSettings->hasCard = true;
 			break;
 		case MovePositions::DISPENSER_THERMAL:
 			localStatus = CardPosition::POS_THERM_DISP;
-			cardSettings.hasCard = true;
+			m_cardSettings->hasCard = true;
 			break;
 		case MovePositions::EJECT:
 			localStatus = CardPosition::POS_EJECTED_NOT_REMOVED;
-			cardSettings.hasCard = false;
+			m_cardSettings->hasCard = false;
 			break;
 		default:
 			break;

@@ -21,54 +21,54 @@
 
 #include "SerIo.h"
 
-SerIo::SerIo()
+SerIo::SerIo(SerIo::Settings *settings)
 {
+	m_portSettings = settings;
+	m_buffer.reserve(512); // max length * 2
 }
 
 SerIo::~SerIo()
 {
-	if (isPipe) {
+	if (m_isPipe) {
 #ifdef _WIN32	
-		CloseHandle(hPipe);
+		CloseHandle(m_pipeHandle);
 #endif
 	} else {
-		sp_close(Port);
+		sp_close(m_portHandle);
 	}	
 }
 
 bool SerIo::Open()
 {
 #ifdef _WIN32
-	if (portSettings.devicePath.find("pipe") != std::string::npos) {
-		hPipe = CreateNamedPipeA(portSettings.devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
+	if (m_portSettings->devicePath.find("pipe") != std::string::npos) {
+		m_pipeHandle = CreateNamedPipeA(m_portSettings->devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
 
-		if (hPipe == INVALID_HANDLE_VALUE) {
+		if (m_pipeHandle == INVALID_HANDLE_VALUE) {
 			spdlog::critical("SerIo::Init: Failed to create pipe");
 			return false;
-		} else {
-			isPipe = true;
-			return true;
 		}
+
+		m_isPipe = true;
+		return true;
 	}
 #endif
 
-	sp_new_config(&PortConfig);
-	sp_set_config_baudrate(PortConfig, portSettings.baudrate);
-	sp_set_config_bits(PortConfig, 8);
-	sp_set_config_parity(PortConfig, portSettings.parity);
-	sp_set_config_stopbits(PortConfig, 1);
-	sp_set_config_flowcontrol(PortConfig, SP_FLOWCONTROL_NONE);
+	sp_new_config(&m_portConfig);
+	sp_set_config_baudrate(m_portConfig, m_portSettings->baudRate);
+	sp_set_config_bits(m_portConfig, 8);
+	sp_set_config_parity(m_portConfig, m_portSettings->parity);
+	sp_set_config_stopbits(m_portConfig, 1);
+	sp_set_config_flowcontrol(m_portConfig, SP_FLOWCONTROL_NONE);
 
-	sp_get_port_by_name(portSettings.devicePath.c_str(), &Port);
+	sp_get_port_by_name(m_portSettings->devicePath.c_str(), &m_portHandle);
 
-	sp_return ret = sp_open(Port, SP_MODE_READ_WRITE);
-
-	if (ret != SP_OK) {
-		spdlog::critical("SerIo::Init: Failed to open {}", portSettings.devicePath);
+	if (sp_open(m_portHandle, SP_MODE_READ_WRITE) != SP_OK) {
+		spdlog::critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
 		return false;
-	} else {
-		sp_set_config(Port, PortConfig);
 	}
+
+	sp_set_config(m_portHandle, m_portConfig);
 
 	return true;
 }
@@ -80,15 +80,15 @@ void SerIo::SendAck()
 	spdlog::debug("SerIo::SendAck: 06");
 
 #ifdef _WIN32
-	if (isPipe) {
+	if (m_isPipe) {
 		DWORD dwRet = 0;
-		WriteFile(hPipe, &ack, 1, &dwRet, NULL);
+		WriteFile(m_pipeHandle, &ack, 1, &dwRet, NULL);
 		return;
 	}
 #endif
 
-	sp_blocking_write(Port, &ack, 1, 0);
-	sp_drain(Port);
+	sp_blocking_write(m_portHandle, &ack, 1, 0);
+	sp_drain(m_portHandle);
 
 	return;
 }
@@ -104,15 +104,15 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 
 	int ret = 0;
 
-	if (isPipe) {
+	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwRet = 0;
-		WriteFile(hPipe, &buffer[0], buffer.size(), &dwRet, NULL);
+		WriteFile(m_pipeHandle, &buffer[0], buffer.size(), &dwRet, NULL);
 		ret = dwRet;
 #endif
 	} else {
-		ret = sp_blocking_write(Port, &buffer[0], buffer.size(), 0);
-		sp_drain(Port);
+		ret = sp_blocking_write(m_portHandle, &buffer[0], buffer.size(), 0);
+		sp_drain(m_portHandle);
 	}
 
 	// TODO: Should we care about write errors?
@@ -130,48 +130,48 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 {
 	int bytes = 0;
 
-	if (isPipe) {
+	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwBytes = 0;
-		if (PeekNamedPipe(hPipe, 0, 0, 0, &dwBytes, 0) == 0) {
+		if (PeekNamedPipe(m_pipeHandle, 0, 0, 0, &dwBytes, 0) == 0) {
 			DWORD error = ::GetLastError();
 			if (error == ERROR_BROKEN_PIPE) {
 				spdlog::warn("Pipe broken! Resetting...");
-				DisconnectNamedPipe(hPipe);
-				ConnectNamedPipe(hPipe, NULL);
+				DisconnectNamedPipe(m_pipeHandle);
+				ConnectNamedPipe(m_pipeHandle, NULL);
 			}
 			return Status::ReadError;
 		}
 		bytes = dwBytes;
 #endif
 	} else {
-		bytes = sp_input_waiting(Port);
+		bytes = sp_input_waiting(m_portHandle);
 	}
 
 	if (bytes < 1) {
 		return Status::ReadError;
 	}
 
-	serialBuffer.clear();
-	serialBuffer.resize(static_cast<size_t>(bytes));
+	m_buffer.clear();
+	m_buffer.resize(static_cast<size_t>(bytes));
 
 	int ret = 0;
 
-	if (isPipe) {
+	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwRet = 0;
-		BOOL bRet = ReadFile(hPipe, &serialBuffer[0], serialBuffer.size(), &dwRet, NULL);
+		BOOL bRet = ReadFile(m_pipeHandle, &m_buffer[0], m_buffer.size(), &dwRet, NULL);
 		ret = bRet;
 #endif
 	} else {
-		ret = sp_nonblocking_read(Port, &serialBuffer[0], serialBuffer.size());
+		ret = sp_nonblocking_read(m_portHandle, &m_buffer[0], m_buffer.size());
 	}
 
 	if (ret <= 0) {
 		return Status::ReadError;
 	}
 
-	std::copy(serialBuffer.begin(), serialBuffer.end(), std::back_inserter(buffer));
+	std::copy(m_buffer.begin(), m_buffer.end(), std::back_inserter(buffer));
 
 	spdlog::debug("SerIo::Read: ");
 	spdlog::debug("{:Xn}", spdlog::to_hex(buffer));

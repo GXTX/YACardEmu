@@ -31,7 +31,7 @@ WebIo::WebIo(CardIo::Settings *card, int port, std::atomic<bool> *running)
 
 WebIo::~WebIo()
 {
-	svr.stop();
+	m_svr.stop();
 }
 
 void WebIo::Spawn()
@@ -42,21 +42,21 @@ void WebIo::Spawn()
 void WebIo::StartServer()
 {
 	spdlog::info("Starting API server...");
-	svr.set_mount_point("/", "public");
+	m_svr.set_mount_point("/", "public");
 
-	svr.Get(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
+	m_svr.Get(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
 		Router(req, res);
 	});
 
-	svr.Post(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
+	m_svr.Post(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
 		Router(req, res);
 	});
 
-	svr.Delete(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
+	m_svr.Delete(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
 		Router(req, res);
 	});
 
-	if (!svr.listen("0.0.0.0", m_port)) {
+	if (!m_svr.listen("0.0.0.0", m_port)) {
 		spdlog::critical("Failed to start API server!");
 	}
 }
@@ -67,7 +67,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 
 	spdlog::debug("WebIo::Router: {0} -> {1}", req.method, route);
 
-	switch (routeValues[route]) {
+	switch (m_routeValues[route]) {
 		case Routes::cards:
 			res.set_content(GenerateCardListJSON(m_card->cardPath), "application/json");
 			break;
@@ -78,7 +78,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			res.set_content(m_card->waitingForCard ? "true" : "false", "application/json");
 		break;
 		case Routes::insertedCard:
-			insertedCard(req, res);
+			InsertedCard(req, res);
 			break;
 		case Routes::dispenser:
 			if (req.method == "DELETE") {
@@ -89,7 +89,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			res.set_content(m_card->reportDispenserEmpty ? "empty" : "full", "text/plain");
 			break;
 		case Routes::stop:
-			svr.stop();
+			m_svr.stop();
 			*g_running = false;
 			break;
 		default:
@@ -99,7 +99,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 	}
 }
 
-void WebIo::insertedCard(const httplib::Request& req, httplib::Response& res)
+void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 {
 	if (req.method == "DELETE") {
 		res.set_content("null", "application/json");

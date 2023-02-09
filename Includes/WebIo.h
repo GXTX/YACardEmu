@@ -48,7 +48,7 @@ public:
 	CardIo::Settings *m_card = nullptr;
 	std::atomic<bool> *g_running = nullptr;
 private:
-	httplib::Server svr = {};
+	httplib::Server m_svr{};
 
 	void Router(const httplib::Request &req, httplib::Response &res);
 	const std::string GenerateCardListJSON(std::string basepath);
@@ -64,19 +64,19 @@ private:
 		stop,
 	};
 
-	std::map<std::string, Routes> routeValues;
+	std::map<std::string, Routes> m_routeValues{};
 
 	void SetupRoutes()
 	{
-		routeValues["cards"]        = Routes::cards;
-		routeValues["hasCard"]      = Routes::hasCard;
-		routeValues["readyCard"]    = Routes::readyCard;
-		routeValues["insertedCard"] = Routes::insertedCard;
-		routeValues["dispenser"]    = Routes::dispenser;
-		routeValues["stop"]         = Routes::stop;
+		m_routeValues["cards"]        = Routes::cards;
+		m_routeValues["hasCard"]      = Routes::hasCard;
+		m_routeValues["readyCard"]    = Routes::readyCard;
+		m_routeValues["insertedCard"] = Routes::insertedCard;
+		m_routeValues["dispenser"]    = Routes::dispenser;
+		m_routeValues["stop"]         = Routes::stop;
 	}
 
-	void insertedCard(const httplib::Request& req, httplib::Response& res);
+	void InsertedCard(const httplib::Request& req, httplib::Response& res);
 };
 
 #endif //WEBIO_H

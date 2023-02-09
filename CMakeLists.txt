@@ -58,12 +58,13 @@ if (MSVC)
 		${CMAKE_THREAD_LIBS_INIT}
 		spdlog::spdlog
 		libserialport
-)
+	)
 else()
 	target_link_libraries(${PROJECT_NAME}
 		${SERIAL_LIBRARIES}
 		${CMAKE_THREAD_LIBS_INIT}
 		spdlog::spdlog
+	)
 endif()
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

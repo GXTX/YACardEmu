@@ -55,17 +55,18 @@ public:
 	struct Settings {
 		std::string cardName{};
 		std::string cardPath{};
-		bool insertedCard{false};
-		bool hasCard{false};
-		bool waitingForCard{false};
-		bool reportDispenserEmpty{false};
+		bool insertedCard = false;
+		bool hasCard = false;
+		bool waitingForCard = false;
+		bool reportDispenserEmpty = false;
+		std::string mech = "C1231LR";
 	};
 
-	CardIo();
+	CardIo(CardIo::Settings *settings);
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
-	Settings cardSettings;
+	CardIo::Settings *m_cardSettings = nullptr;
 	std::string printName = "print.bin";
 protected:
 	// Status bytes:

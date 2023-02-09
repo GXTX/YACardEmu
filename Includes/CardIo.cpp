@@ -21,9 +21,10 @@
 
 #include "CardIo.h"
 
-CardIo::CardIo()
+CardIo::CardIo(CardIo::Settings *settings)
 {
 	startTime = std::time(nullptr);
+	m_cardSettings = settings;
 }
 
 void CardIo::Command_10_Initalize()
@@ -99,7 +100,7 @@ void CardIo::Command_33_ReadData2()
 				if (!HasCard()) {
 					status.s = S::WAITING_FOR_CARD;
 					spdlog::info("Game requests user to insert card");
-					cardSettings.waitingForCard = true;
+					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				}
 			} else {
@@ -413,7 +414,7 @@ void CardIo::Command_7C_PrintL()
 				// FIXME: Do this better.
 				std::ofstream card;
 				std::string writeBack{};
-				std::string fullPath(cardSettings.cardPath.c_str());
+				std::string fullPath(m_cardSettings->cardPath.c_str());
 				fullPath.append(printName);
 
 				std::copy(printBuffer.begin(), printBuffer.end(), std::back_inserter(writeBack));
@@ -533,7 +534,7 @@ void CardIo::Command_B0_DispenseCardS31()
 	switch (currentStep) {
 		case 1:
 			if (mode == Mode::CheckOnly) {
-				if (cardSettings.reportDispenserEmpty) {
+				if (m_cardSettings->reportDispenserEmpty) {
 					status.s = S::DISPENSER_EMPTY;
 				} else {
 					status.s = S::CARD_FULL;
@@ -543,7 +544,7 @@ void CardIo::Command_B0_DispenseCardS31()
 					if (HasCard()) {
 						SetSError(S::ILLEGAL_COMMAND);
 					} else {
-						if (cardSettings.reportDispenserEmpty) {
+						if (m_cardSettings->reportDispenserEmpty) {
 							status.s = S::DISPENSER_EMPTY;
 						} else {
 							DispenseCard();
@@ -555,7 +556,7 @@ void CardIo::Command_B0_DispenseCardS31()
 		case 2:
 			if (GetCardPos() == MovePositions::DISPENSER_THERMAL) {
 				MoveCard(MovePositions::READ_WRITE_HEAD);
-			} else if (!cardSettings.reportDispenserEmpty) {
+			} else if (!m_cardSettings->reportDispenserEmpty) {
 				SetPError(P::MOTOR_ERR);
 			}
 			break;
@@ -672,7 +673,7 @@ void CardIo::Command_F5_CheckBattery()
 
 bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 {
-	std::string fullPath = cardSettings.cardPath + cardSettings.cardName;
+	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
@@ -699,7 +700,7 @@ bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 
 void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
 {
-	std::string fullPath = cardSettings.cardPath + cardSettings.cardName;
+	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
 
 	std::string writeBack{};
@@ -748,10 +749,10 @@ void CardIo::HandlePacket()
 
 	UpdateRStatus();
 
-	if (runningCommand) { // 20 is a special case, see function
-		if (cardSettings.waitingForCard) {
+	if (runningCommand) {
+		if (m_cardSettings->waitingForCard) {
 			spdlog::info("Game no lnger requests user to insert card");
-			cardSettings.waitingForCard = false;
+			m_cardSettings->waitingForCard = false;
 		}
 		switch (currentCommand) {
 			case 0x10: Command_10_Initalize(); break;
