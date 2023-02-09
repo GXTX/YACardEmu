@@ -44,14 +44,14 @@ protected:
 	};
 
     CardPosition localStatus{CardPosition::NO_CARD};
-    bool HasCard();
-    void DispenseCard();
-    void EjectCard();
-    void UpdateRStatus();
-    uint8_t GetRStatus();
+    bool HasCard() override;
+    void DispenseCard() override;
+    void EjectCard() override;
+    void UpdateRStatus() override;
+    uint8_t GetRStatus() override;
 
-    void MoveCard(CardIo::MovePositions position);
-    CardIo::MovePositions GetCardPos();
+    void MoveCard(CardIo::MovePositions position) override;
+    CardIo::MovePositions GetCardPos() override;
 };
 
 #endif //C1231LR

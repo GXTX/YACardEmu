@@ -27,6 +27,7 @@
 #include <string>
 
 #include "C1231LR.h"
+#include "C1231BR.h"
 #include "SerIo.h"
 #include "WebIo.h"
 
@@ -70,6 +71,7 @@ bool ReadConfig()
 		lport = ini["config"]["apiport"];
 		lbaud = ini["config"]["serialbaud"];
 		lparity = ini["config"]["serialparity"];
+		globalSettings.card.mech = ini["config"]["targetdevice"];
 		globalSettings.card.cardPath = ini["config"]["basepath"];
 		globalSettings.card.cardName = ini["config"]["autoselectedcard"];
 		globalSettings.serial.devicePath = ini["config"]["serialpath"];
@@ -126,6 +128,16 @@ int main()
 		return 1;
 	}
 
+	std::unique_ptr<CardIo> cardHandler{};
+	if (globalSettings.card.mech.compare("C1231LR") == 0) {
+		cardHandler = std::make_unique<C1231LR>(&globalSettings.card);
+	} else if (globalSettings.card.mech.compare("C1231BR") == 0) {
+		cardHandler = std::make_unique<C1231BR>(&globalSettings.card);
+	} else {
+		spdlog::critical("Invalid target device: {}", globalSettings.card.mech);
+		return 1;
+	}
+
 	std::unique_ptr<SerIo> serialHandler = std::make_unique<SerIo>(&globalSettings.serial);
 	if (!serialHandler->Open()) {
 		return 1;
@@ -134,8 +146,6 @@ int main()
 	// TODO: Verify service is actually running
 	std::unique_ptr<WebIo> webHandler = std::make_unique<WebIo>(&globalSettings.card, globalSettings.webPort, &running);
 	webHandler->Spawn();
-
-	std::unique_ptr<C1231LR> cardHandler = std::make_unique<C1231LR>(&globalSettings.card);
 
 	// TODO: These don't need to be here, put them in their respective classes
 	SerIo::Status serialStatus = SerIo::Status::Okay;

@@ -63,6 +63,7 @@ public:
 	};
 
 	CardIo(CardIo::Settings *settings);
+	virtual ~CardIo() = default;
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
@@ -147,7 +148,7 @@ protected:
 	void WriteTrack(std::vector<uint8_t> &trackData, int trackNumber);
 
 	// Commands
-	void Command_10_Initalize();
+	virtual void Command_10_Initalize();
 	void Command_20_ReadStatus();
 	void Command_33_ReadData2(); // multi-track read
 	void Command_35_GetData(); // Spit out the entire card
@@ -164,6 +165,7 @@ protected:
 	void Command_B0_DispenseCardS31();
 	void Command_C0_ControlLED();
 	void Command_C1_SetRetry();
+	virtual void Command_D0_ShutterControl();
 	void Command_E1_SetRTC();
 	void Command_F0_GetVersion();
 	void Command_F1_GetRTC();

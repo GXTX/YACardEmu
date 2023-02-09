@@ -9,6 +9,7 @@ add_executable(${PROJECT_NAME}
 	Includes/CardIo.cpp
 	Includes/SerIo.cpp
 	Includes/C1231LR.cpp
+	Includes/C1231BR.cpp
 	Includes/base64.cpp
 	Includes/WebIo.cpp
 )

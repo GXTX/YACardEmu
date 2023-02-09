@@ -6,6 +6,9 @@ basepath = /home/wutno/cards/
 ; Windows
 ;serialpath = COM3
 ;serialpath = \\.\pipe\YACardEmu
+; Which device should we emulate?
+; C1231LR / C1231BR
+targetdevice = C1231LR
 ;
 ; Optional
 ;

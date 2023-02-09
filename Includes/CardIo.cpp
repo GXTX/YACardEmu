@@ -575,6 +575,12 @@ void CardIo::Command_C1_SetRetry()
 	runningCommand = false;
 }
 
+void CardIo::Command_D0_ShutterControl()
+{
+	// Only BR model supports this command
+	SetSError(S::ILLEGAL_COMMAND);
+}
+
 void CardIo::Command_E1_SetRTC()
 {
 	std::stringstream timeStrS{};
@@ -738,6 +744,7 @@ void CardIo::HandlePacket()
 			case 0xB0: Command_B0_DispenseCardS31(); break;
 			case 0xC0: Command_C0_ControlLED(); break;
 			case 0xC1: Command_C1_SetRetry(); break;
+			case 0xD0: Command_D0_ShutterControl(); break;
 			case 0xE1: Command_E1_SetRTC(); break;
 			case 0xF0: Command_F0_GetVersion(); break;
 			case 0xF1: Command_F1_GetRTC(); break;
