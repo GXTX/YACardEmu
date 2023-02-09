@@ -54,12 +54,8 @@ void CardIo::Command_10_Initalize()
 
 void CardIo::Command_20_ReadStatus()
 {
-	switch (currentStep) {
-		default:
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_33_ReadData2()
@@ -91,7 +87,7 @@ void CardIo::Command_33_ReadData2()
 	}
 
 	Mode mode = static_cast<Mode>(currentPacket[0]);
-	BitMode bit = static_cast<BitMode>(currentPacket[1]);
+	//BitMode bit = static_cast<BitMode>(currentPacket[1]);
 	Track track = static_cast<Track>(currentPacket[2]);
 
 	switch (currentStep) {
@@ -216,12 +212,8 @@ void CardIo::Command_35_GetData()
 
 void CardIo::Command_40_Cancel()
 {
-	switch (currentStep) {
-		default:
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_53_WriteData2()
@@ -252,7 +244,7 @@ void CardIo::Command_53_WriteData2()
 	} 
 
 	Mode mode = static_cast<Mode>(currentPacket[0]);
-	BitMode bit = static_cast<BitMode>(currentPacket[1]);
+	//BitMode bit = static_cast<BitMode>(currentPacket[1]);
 	Track track = static_cast<Track>(currentPacket[2]);
 
 	switch (currentStep) {
@@ -275,7 +267,7 @@ void CardIo::Command_53_WriteData2()
 					case Track::Track_1_And_3:
 					case Track::Track_2_And_3:
 						{
-							if (currentPacket.size() - 3 < TRACK_SIZE + 1) {
+							if (currentPacket.size() - 3 < static_cast<size_t>(TRACK_SIZE + 1)) {
 								SetPError(P::SYSTEM_ERR); // FIXME: Should we do this? Or should we just fill in NULL
 								return;
 							}
@@ -310,7 +302,7 @@ void CardIo::Command_53_WriteData2()
 
 							cardData.clear();
 							cardData.resize(NUM_TRACKS);
-							for (int i = 0; i < NUM_TRACKS; i++) {
+							for (uint8_t i = 0; i < NUM_TRACKS; i++) {
 								const uint8_t offset = 3 + (i * TRACK_SIZE);
 								std::copy(currentPacket.begin() + offset, currentPacket.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
 								WriteTrack(cardData.at(i), i);
@@ -337,22 +329,14 @@ void CardIo::Command_53_WriteData2()
 
 void CardIo::Command_78_PrintSettings2()
 {
-	switch (currentStep) {
-		default:
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_7A_RegisterFont()
 {
-	switch (currentStep) {
-		default:
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_7B_PrintImage()
@@ -389,9 +373,9 @@ void CardIo::Command_7C_PrintL()
 		return;
 	}
 
-	Mode mode = static_cast<Mode>(currentPacket[0]);
-	BufferControl control = static_cast<BufferControl>(currentPacket[1]);
-	uint8_t lineOffset = currentPacket[2];
+	//Mode mode = static_cast<Mode>(currentPacket[0]);
+	//BufferControl control = static_cast<BufferControl>(currentPacket[1]);
+	//uint8_t lineOffset = currentPacket[2];
 
 	switch (currentStep) {
 		case 1:
@@ -579,45 +563,32 @@ void CardIo::Command_C0_ControlLED()
 		FastBlink = 0x33,
 	};
 
-	switch (currentStep) {
-		default:
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_C1_SetRetry()
 {
 	// We don't need to handle this properly but let's leave some notes
 	// currentPacket[0] == 0x31 NONE ~ 0x39 MAX8
-	switch (currentStep) {
-		default:
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_E1_SetRTC()
 {
-	switch (currentStep) {
-		default:
-			{
-				std::stringstream timeStrS{};
-				std::string timeStr{};
-				std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(timeStr));
+	std::stringstream timeStrS{};
+	std::string timeStr{};
+	std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(timeStr));
 
-				timeStrS << timeStr;
+	timeStrS << timeStr;
 
-				std::tm *tempTime{};
-				timeStrS >> std::get_time(tempTime, "%y%m%d%H%M%S");
-				setTime = std::mktime(tempTime);
-			}
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	std::tm *tempTime{};
+	timeStrS >> std::get_time(tempTime, "%y%m%d%H%M%S");
+	setTime = std::mktime(tempTime);
+
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_F0_GetVersion()
@@ -662,13 +633,8 @@ void CardIo::Command_F1_GetRTC()
 
 void CardIo::Command_F5_CheckBattery()
 {
-	switch (currentStep) {
-		default:
-			// We don't do anything here because we never report a bad battery.
-			status.SoftReset();
-			runningCommand = false;
-			break;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
@@ -891,7 +857,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 
 	UpdateStatusInBuffer();
 
-	uint8_t count = (commandBuffer.size() + 2);
+	uint8_t count = static_cast<uint8_t>(commandBuffer.size() + 2);
 
 	// Ensure our outgoing buffer is empty.
 	writeBuffer.clear();

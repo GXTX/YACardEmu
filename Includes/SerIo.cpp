@@ -107,7 +107,7 @@ SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
 	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwRet = 0;
-		WriteFile(m_pipeHandle, &buffer[0], buffer.size(), &dwRet, NULL);
+		WriteFile(m_pipeHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &dwRet, NULL);
 		ret = dwRet;
 #endif
 	} else {
@@ -160,7 +160,7 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwRet = 0;
-		BOOL bRet = ReadFile(m_pipeHandle, &m_buffer[0], m_buffer.size(), &dwRet, NULL);
+		BOOL bRet = ReadFile(m_pipeHandle, &m_buffer[0], static_cast<DWORD>(m_buffer.size()), &dwRet, NULL);
 		ret = bRet;
 #endif
 	} else {
