@@ -34,9 +34,12 @@ WebIo::~WebIo()
 	m_svr.stop();
 }
 
-void WebIo::Spawn()
+bool WebIo::Spawn()
 {
 	std::thread(&WebIo::StartServer, this).detach();
+	// Need to wait before checking the status otherwise we'll crash
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	return m_svr.is_running();
 }
 
 void WebIo::StartServer()
@@ -90,6 +93,8 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			break;
 		case Routes::stop:
 			m_svr.stop();
+			// g_running controls the main loop, if we kill it before http is flushed then we'll crash
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 			*g_running = false;
 			break;
 		default:

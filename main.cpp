@@ -143,9 +143,10 @@ int main()
 		return 1;
 	}
 
-	// TODO: Verify service is actually running
 	std::unique_ptr<WebIo> webHandler = std::make_unique<WebIo>(&globalSettings.card, globalSettings.webPort, &running);
-	webHandler->Spawn();
+	if (!webHandler->Spawn()) {
+		return 1;
+	}
 
 	// TODO: These don't need to be here, put them in their respective classes
 	SerIo::Status serialStatus = SerIo::Status::Okay;
