@@ -508,12 +508,13 @@ void CardIo::Command_B0_DispenseCardS31()
 		CheckOnly = 0x32,
 	};
 
+	// Mario Kart GP1 issues this command without options
+	Mode mode{};
 	if (currentPacket.empty()) {
-		SetSError(S::ILLEGAL_COMMAND);
-		return;
+		mode = Mode::Dispense;
+	} else {
+		mode = static_cast<Mode>(currentPacket[0]);
 	}
-
-	Mode mode = static_cast<Mode>(currentPacket[0]);
 
 	switch (currentStep) {
 		case 1:

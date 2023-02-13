@@ -87,5 +87,5 @@ Initial D Arcade Stage Ver.1 : CRP-1231BR-10    | 9600b even
 Initial D Arcade Stage Ver.2 : CRP-1231BR-10    | 9600b even
 Initial D Arcade Stage Ver.3 : CRP-1231BR-10    | 9600b even
 F-Zero AX                    : CRP-1231BR-10    | 9600b even
-Mario Kart Arcade GP         : CRP-1231BR-10    | 9600b none
+Mario Kart Arcade GP         : CRP-1231LR-10NAB | 9600b none
 ```
