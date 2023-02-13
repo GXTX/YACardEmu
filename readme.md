@@ -78,8 +78,14 @@ Info
 If you're wishing to run this on hardware there are some settings you'll need to be aware of.
 
 ```
-MT1: CRP-1231LR-10NAB     | 9600b none
-MT2: CRP-1231LR-10NAB     | 9600b none
-MT3/DX/DX+: CR-S31R-10HS3 | 38400b even
-F-Zero: CRP-1231BR        | 9600b even
+Wangan Maximum Tune 1        : CRP-1231LR-10NAB | 9600b none
+Wangan Maximum Tune 2        : CRP-1231LR-10NAB | 9600b none
+Wangan Maximum Tune 3        : CR-S31R-10HS3    | 38400b even
+Wangan Maximum Tune 3DX      : CR-S31R-10HS3    | 38400b even
+Wangan Maximum Tune 3DX+     : CR-S31R-10HS3    | 38400b even
+Initial D Arcade Stage Ver.1 : CRP-1231BR-10    | 9600b even
+Initial D Arcade Stage Ver.2 : CRP-1231BR-10    | 9600b even
+Initial D Arcade Stage Ver.3 : CRP-1231BR-10    | 9600b even
+F-Zero AX                    : CRP-1231BR-10    | 9600b even
+Mario Kart Arcade GP         : CRP-1231BR-10    | 9600b none
 ```
