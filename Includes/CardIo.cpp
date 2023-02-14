@@ -865,9 +865,6 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 
 	uint8_t count = static_cast<uint8_t>(commandBuffer.size() + 2);
 
-	// Ensure our outgoing buffer is empty.
-	writeBuffer.clear();
-
 	// Send the header bytes
 	writeBuffer.emplace_back(START_OF_TEXT);
 	writeBuffer.emplace_back(count);

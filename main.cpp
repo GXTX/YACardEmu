@@ -151,28 +151,25 @@ int main()
 	// TODO: These don't need to be here, put them in their respective classes
 	SerIo::Status serialStatus = SerIo::Status::Okay;
 	CardIo::StatusCode cardStatus = CardIo::StatusCode::Okay;
-	std::vector<uint8_t> readBuffer{};
-	std::vector<uint8_t> writeBuffer{};
 
 	while (running) {
-		serialStatus = serialHandler->Read(readBuffer);
+		serialStatus = serialHandler->Read();
 
 		// TODO: device read/write should probably be a separate thread
-		if (serialStatus != SerIo::Status::Okay && readBuffer.empty()) {
+		if (serialStatus != SerIo::Status::Okay && serialHandler->m_readBuffer.empty()) {
 			std::this_thread::sleep_for(delay);
 			continue;
 		}
 
-		cardStatus = cardHandler->ReceivePacket(readBuffer);
+		cardStatus = cardHandler->ReceivePacket(serialHandler->m_readBuffer);
 
 		if (cardStatus == CardIo::Okay) {
 			// We need to send our ACK as quick as possible
 			serialHandler->SendAck();
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Do not reply until we get this command
-			writeBuffer.clear();
-			cardHandler->BuildPacket(writeBuffer);
-			serialHandler->Write(writeBuffer);
+			cardHandler->BuildPacket(serialHandler->m_writeBuffer);
+			serialHandler->Write();
 		}
 
 		spdlog::dump_backtrace();

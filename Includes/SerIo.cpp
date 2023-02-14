@@ -24,7 +24,8 @@
 SerIo::SerIo(SerIo::Settings *settings)
 {
 	m_portSettings = settings;
-	m_buffer.reserve(512); // max length * 2
+	m_readBuffer.reserve(512); // max length * 2
+	m_writeBuffer.reserve(512);
 }
 
 SerIo::~SerIo()
@@ -93,40 +94,42 @@ void SerIo::SendAck()
 	return;
 }
 
-SerIo::Status SerIo::Write(std::vector<uint8_t> &buffer)
+SerIo::Status SerIo::Write()
 {
-	if (buffer.empty()) {
+	if (m_writeBuffer.empty()) {
 		return Status::ZeroSizeError;
 	}
 
 	spdlog::debug("SerIo::Write: ");
-	spdlog::debug("{:Xn}", spdlog::to_hex(buffer));
+	spdlog::debug("{:Xn}", spdlog::to_hex(m_writeBuffer));
 
 	int ret = 0;
 
 	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwRet = 0;
-		WriteFile(m_pipeHandle, &buffer[0], static_cast<DWORD>(buffer.size()), &dwRet, NULL);
+		WriteFile(m_pipeHandle, &m_writeBuffer[0], static_cast<DWORD>(m_writeBuffer.size()), &dwRet, NULL);
 		ret = dwRet;
 #endif
 	} else {
-		ret = sp_blocking_write(m_portHandle, &buffer[0], buffer.size(), 0);
+		ret = sp_blocking_write(m_portHandle, &m_writeBuffer[0], m_writeBuffer.size(), 0);
 		sp_drain(m_portHandle);
 	}
 
-	// TODO: Should we care about write errors?
-	if (ret <= 0) {
-		return Status::WriteError;
-	} else if (ret != static_cast<int>(buffer.size())) {
-		spdlog::error("Only wrote {0:X} of {1:X} to the port!", ret, buffer.size());
-		return Status::WriteError;
+	if (ret > 0) {
+		if (ret < static_cast<int>(m_writeBuffer.size())) {
+			spdlog::error("Only wrote {0:X} of {1:X} to the port!", ret, m_writeBuffer.size());
+			m_writeBuffer.erase(m_writeBuffer.begin(), m_writeBuffer.begin() + static_cast<size_t>(ret));
+			return Status::WriteError;
+		}
+		m_writeBuffer.clear();
+		return Status::Okay;
 	}
 
-	return Status::Okay;
+	return Status::WriteError;
 }
 
-SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
+SerIo::Status SerIo::Read()
 {
 	int bytes = 0;
 
@@ -152,29 +155,27 @@ SerIo::Status SerIo::Read(std::vector<uint8_t> &buffer)
 		return Status::ReadError;
 	}
 
-	m_buffer.clear();
-	m_buffer.resize(static_cast<size_t>(bytes));
+	auto originalSize = m_readBuffer.size();
+	m_readBuffer.resize(originalSize + static_cast<size_t>(bytes));
 
 	int ret = 0;
 
 	if (m_isPipe) {
 #ifdef _WIN32
 		DWORD dwRet = 0;
-		BOOL bRet = ReadFile(m_pipeHandle, &m_buffer[0], static_cast<DWORD>(m_buffer.size()), &dwRet, NULL);
+		BOOL bRet = ReadFile(m_pipeHandle, &m_readBuffer[originalSize], static_cast<DWORD>(bytes), &dwRet, NULL);
 		ret = bRet;
 #endif
 	} else {
-		ret = sp_nonblocking_read(m_portHandle, &m_buffer[0], m_buffer.size());
+		ret = sp_nonblocking_read(m_portHandle, &m_readBuffer[originalSize], static_cast<size_t>(bytes));
 	}
 
 	if (ret <= 0) {
 		return Status::ReadError;
 	}
 
-	std::copy(m_buffer.begin(), m_buffer.end(), std::back_inserter(buffer));
-
 	spdlog::debug("SerIo::Read: ");
-	spdlog::debug("{:Xn}", spdlog::to_hex(buffer));
+	spdlog::debug("{:Xn}", spdlog::to_hex(m_readBuffer));
 
 	return Status::Okay;
 }

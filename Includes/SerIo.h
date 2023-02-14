@@ -52,13 +52,15 @@ public:
 	};
 
 	SerIo::Settings *m_portSettings = nullptr;
+	std::vector<uint8_t> m_readBuffer{};
+	std::vector<uint8_t> m_writeBuffer{};
 
 	SerIo(SerIo::Settings *settings);
 	~SerIo();
 
 	bool Open();
-	SerIo::Status Read(std::vector<uint8_t> &buffer);
-	SerIo::Status Write(std::vector<uint8_t> &buffer);
+	SerIo::Status Read();
+	SerIo::Status Write();
 	void SendAck();
 private:
 #ifdef _WIN32
@@ -68,8 +70,6 @@ private:
 	bool m_isPipe = false;
 	sp_port *m_portHandle = nullptr;
 	sp_port_config *m_portConfig = nullptr;
-
-	std::vector<uint8_t> m_buffer{};
 };
 
 #endif
