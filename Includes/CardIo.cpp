@@ -509,10 +509,8 @@ void CardIo::Command_B0_DispenseCardS31()
 	};
 
 	// Mario Kart GP1 issues this command without options
-	Mode mode{};
-	if (currentPacket.empty()) {
-		mode = Mode::Dispense;
-	} else {
+	Mode mode = Mode::Dispense;
+	if (!currentPacket.empty()) {
 		mode = static_cast<Mode>(currentPacket[0]);
 	}
 
