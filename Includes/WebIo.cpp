@@ -133,8 +133,16 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 {
 	std::string list{"["};
 
+	if (!m_card->cardName.empty()) {
+		list.append("{\"name\":\"" + m_card->cardName + "\",\"image\":\"""\"},");
+	}
+
 	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
 		std::string card{entry.path().string()};
+
+		if (card.find(m_card->cardName) != std::string::npos) {
+			continue;
+		}
 
 		auto find = card.find(".track_0");
 
