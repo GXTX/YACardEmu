@@ -32,7 +32,10 @@
 #include <libserialport.h>
 
 #include "spdlog/spdlog.h"
+#include "spdlog/async.h"
 #include "spdlog/fmt/bin_to_hex.h"
+
+extern std::shared_ptr<spdlog::async_logger> logger;
 
 class SerIo
 {

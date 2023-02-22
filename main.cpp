@@ -34,22 +34,39 @@
 #include "httplib.h"
 #include "mini/ini.h"
 #include "spdlog/spdlog.h"
+#include "spdlog/async.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/basic_file_sink.h"
 #include "ghc/filesystem.hpp"
 
 // Globals
 struct Settings {
 	CardIo::Settings card{};
 	SerIo::Settings serial{};
+	std::string webListenHost;
 	int webPort = 8080;
 };
 Settings globalSettings{};
 std::atomic<bool> running{true};
 constexpr static auto delay = std::chrono::microseconds(250);
+std::shared_ptr<spdlog::async_logger> logger;
+
+const char *helptext = 
+	"YACardEmu - A simulator for magnetic card readers\n"
+	"Commandline arguments:\n"
+	"-d : debug log level\n"
+	"-t : trace log level\n"
+	"-f : log to yacardemu.log\n"
+	"-h : show this help text\n"
+	"\n";
+
 //
+
 
 void SigHandler(int sig)
 {
 	if (sig == SIGINT || sig == SIGTERM) {
+		logger->flush();
 		running = false;
 	}
 }
@@ -59,7 +76,7 @@ bool ReadConfig()
 	// Read in config values
 	mINI::INIFile config("config.ini");
 	mINI::INIStructure ini;
-	std::string lport, lbaud, lparity;
+	std::string lhost, lport, lbaud, lparity;
 	
 	// TODO: Generate INI
 	if (!config.read(ini)) {
@@ -68,6 +85,7 @@ bool ReadConfig()
 	}
 
 	if (ini.has("config")) {
+		lhost = ini["config"]["apihost"];
 		lport = ini["config"]["apiport"];
 		lbaud = ini["config"]["serialbaud"];
 		lparity = ini["config"]["serialparity"];
@@ -79,6 +97,12 @@ bool ReadConfig()
 
 	if (globalSettings.card.cardPath.empty()) {
 		globalSettings.card.cardPath = ghc::filesystem::current_path().string();
+	}
+
+	if (lhost.empty()) {
+		globalSettings.webListenHost = "0.0.0.0";
+	} else {
+		globalSettings.webListenHost = lhost;
 	}
 
 	if (lport.empty()) {
@@ -110,19 +134,58 @@ bool ReadConfig()
 	return true;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-#ifdef NDEBUG
-	spdlog::set_level(spdlog::level::info);
-#else
-	spdlog::set_level(spdlog::level::debug);
-	spdlog::enable_backtrace(20);
-#endif
-	spdlog::set_pattern("[%^%l%$] %v");
-
 	// Handle quitting gracefully via signals
 	std::signal(SIGINT, SigHandler);
 	std::signal(SIGTERM, SigHandler);
+
+	// Parse args
+
+#ifdef NDEBUG
+	spdlog::level::level_enum log_level = spdlog::level::info;
+#else
+	spdlog::level::level_enum log_level = spdlog::level::debug;
+#endif
+
+	bool file_log = false;
+	if (argc > 1) {
+		for (int i = 1; i < argc; i++) {
+			std::string arg = argv[i];
+			while (arg[0] == '-') arg.erase(0,1);
+			switch (arg[0]) {
+				case 'd': 
+					log_level = spdlog::level::debug;
+					break;
+				case 't': 
+					log_level = spdlog::level::trace;
+					break;
+				case 'f':
+					file_log = true;
+					break;
+				case 'h':
+				default:
+					std::cout << helptext;
+					return 0;
+			}
+		}
+	}
+
+	// Set up logger
+	spdlog::init_thread_pool(8192, 1);
+	auto stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt >();
+	std::vector<spdlog::sink_ptr> sinks;
+
+	if (file_log) {
+		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("yacardemu.log", true);
+		sinks.push_back(file_sink);
+	}
+
+	sinks.push_back(stdout_sink);
+	logger = std::make_shared<spdlog::async_logger>("main", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
+	logger->set_level(log_level);
+	logger->flush_on(spdlog::level::info);
+	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
 
 	if (!ReadConfig()) {
 		return 1;
@@ -134,7 +197,7 @@ int main()
 	} else if (globalSettings.card.mech.compare("C1231BR") == 0) {
 		cardHandler = std::make_unique<C1231BR>(&globalSettings.card);
 	} else {
-		spdlog::critical("Invalid target device: {}", globalSettings.card.mech);
+		logger->critical("Invalid target device: {}", globalSettings.card.mech);
 		return 1;
 	}
 
@@ -143,7 +206,7 @@ int main()
 		return 1;
 	}
 
-	std::unique_ptr<WebIo> webHandler = std::make_unique<WebIo>(&globalSettings.card, globalSettings.webPort, &running);
+	std::unique_ptr<WebIo> webHandler = std::make_unique<WebIo>(&globalSettings.card, globalSettings.webListenHost, globalSettings.webPort, &running);
 	if (!webHandler->Spawn()) {
 		return 1;
 	}
@@ -171,8 +234,7 @@ int main()
 			cardHandler->BuildPacket(serialHandler->m_writeBuffer);
 			serialHandler->Write();
 		}
-
-		spdlog::dump_backtrace();
+		
 		std::this_thread::sleep_for(delay);
 	}
 

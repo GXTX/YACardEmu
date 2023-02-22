@@ -46,7 +46,7 @@ bool SerIo::Open()
 		m_pipeHandle = CreateNamedPipeA(m_portSettings->devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
 
 		if (m_pipeHandle == INVALID_HANDLE_VALUE) {
-			spdlog::critical("SerIo::Init: Failed to create pipe");
+			logger->critical("SerIo::Init: Failed to create pipe");
 			return false;
 		}
 
@@ -65,7 +65,7 @@ bool SerIo::Open()
 	sp_get_port_by_name(m_portSettings->devicePath.c_str(), &m_portHandle);
 
 	if (sp_open(m_portHandle, SP_MODE_READ_WRITE) != SP_OK) {
-		spdlog::critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
+		logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
 		return false;
 	}
 
@@ -78,7 +78,7 @@ void SerIo::SendAck()
 {
 	constexpr static const uint8_t ack = 0x06;
 
-	spdlog::debug("SerIo::SendAck: 06");
+	logger->trace("SerIo::SendAck: 06");
 
 #ifdef _WIN32
 	if (m_isPipe) {
@@ -100,8 +100,7 @@ SerIo::Status SerIo::Write()
 		return Status::ZeroSizeError;
 	}
 
-	spdlog::debug("SerIo::Write: ");
-	spdlog::debug("{:Xn}", spdlog::to_hex(m_writeBuffer));
+	logger->trace("SerIo::Write: {:Xn}", spdlog::to_hex(m_writeBuffer));
 
 	int ret = 0;
 
@@ -139,7 +138,7 @@ SerIo::Status SerIo::Read()
 		if (PeekNamedPipe(m_pipeHandle, 0, 0, 0, &dwBytes, 0) == 0) {
 			DWORD error = ::GetLastError();
 			if (error == ERROR_BROKEN_PIPE) {
-				spdlog::warn("Pipe broken! Resetting...");
+				logger->warn("Pipe broken! Resetting...");
 				DisconnectNamedPipe(m_pipeHandle);
 				ConnectNamedPipe(m_pipeHandle, NULL);
 			}
@@ -174,8 +173,7 @@ SerIo::Status SerIo::Read()
 		return Status::ReadError;
 	}
 
-	spdlog::debug("SerIo::Read: ");
-	spdlog::debug("{:Xn}", spdlog::to_hex(m_readBuffer));
+	logger->trace("SerIo::Read: {:Xn}", spdlog::to_hex(m_readBuffer));
 
 	return Status::Okay;
 }
