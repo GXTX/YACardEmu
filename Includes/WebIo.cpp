@@ -21,9 +21,10 @@
 
 #include "WebIo.h"
 
-WebIo::WebIo(CardIo::Settings *card, int port, std::atomic<bool> *running)
+WebIo::WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<bool> *running)
 {
 	m_card = card;
+	m_host = host;
 	m_port = port;
 	g_running = running;
 	SetupRoutes();
@@ -59,7 +60,7 @@ void WebIo::StartServer()
 		Router(req, res);
 	});
 
-	if (!m_svr.listen("0.0.0.0", m_port)) {
+	if (!m_svr.listen(m_host.c_str(), m_port)) {
 		spdlog::critical("Failed to start API server!");
 	}
 }

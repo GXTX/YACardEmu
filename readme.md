@@ -89,4 +89,7 @@ Initial D Arcade Stage Ver.3 : CRP-1231BR-10    | 9600b even
 F-Zero AX                    : CRP-1231BR-10    | 9600b even
 Mario Kart Arcade GP         : CRP-1231LR-10NAB | 9600b none
 Mario Kart Arcade GP2        : CRP-1231LR-10NAB | 9600b none
+*Virtual-On Force            : CRP-1231BR-10    | 9600b even
+
+*Requires Sega P/N 838-13661 RS232 converter PCB
 ```

@@ -34,17 +34,21 @@
 #include "base64.h"
 #include "httplib.h"
 #include "spdlog/spdlog.h"
+#include "spdlog/async.h"
 #include "spdlog/fmt/bin_to_hex.h"
+
+extern std::shared_ptr<spdlog::async_logger> logger;
 
 class WebIo
 {
 public:
-	WebIo(CardIo::Settings *card, int port, std::atomic<bool> *running);
+	WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<bool> *running);
 	~WebIo();
 
 	void StartServer();
 	bool Spawn();
 
+	std::string m_host = "";
 	int m_port = 0;
 	CardIo::Settings *m_card = nullptr;
 	std::atomic<bool> *g_running = nullptr;
