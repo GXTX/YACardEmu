@@ -64,8 +64,8 @@ public:
 
 	CardIo(CardIo::Settings *settings);
 	virtual ~CardIo() = default;
-	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
-	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
+	virtual CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
+	virtual CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
 
 	CardIo::Settings *m_cardSettings = nullptr;
 	std::string printName = "print.bin";
@@ -135,8 +135,8 @@ protected:
 	const uint8_t NUM_TRACKS = 3;
 	const std::string versionString = "AP:S1234-5678,OS:S9012-3456,0000";
 
-	uint8_t GetByte(uint8_t **buffer);
-	void HandlePacket();
+	virtual uint8_t GetByte(uint8_t **buffer);
+	virtual void HandlePacket();
 
 	std::vector<std::vector<uint8_t>> cardData{{}, {}, {}};
 

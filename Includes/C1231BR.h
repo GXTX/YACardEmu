@@ -53,9 +53,9 @@ protected:
 		{
 			return 1 << (shutter ? 7 : 6) | (dispenser ? 1 : 0) << 5 | static_cast<uint8_t>(position);
 		}
-	};
+	} localStatus;
 
-	LocalStatus localStatus{};
+	//LocalStatus localStatus{};
 	bool HasCard() override;
 	void DispenseCard() override;
 	void EjectCard() override;
