@@ -28,6 +28,7 @@
 
 #include "C1231LR.h"
 #include "C1231BR.h"
+#include "C1231R.h"
 #include "SerIo.h"
 #include "WebIo.h"
 
@@ -132,7 +133,7 @@ int main()
 	if (globalSettings.card.mech.compare("C1231LR") == 0) {
 		cardHandler = std::make_unique<C1231LR>(&globalSettings.card);
 	} else if (globalSettings.card.mech.compare("C1231BR") == 0) {
-		cardHandler = std::make_unique<C1231BR>(&globalSettings.card);
+		cardHandler = std::make_unique<C1231R>(&globalSettings.card);
 	} else {
 		spdlog::critical("Invalid target device: {}", globalSettings.card.mech);
 		return 1;
