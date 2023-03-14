@@ -674,6 +674,28 @@ bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 
 void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
 {
+	// FIXME: Could this cause problems in games where it saves N track while playing? Perhaps we buffer the save until eject? What if during play we get a save then read? Edit ReadTrack() to perfer cached data?
+	// Should only happen when issued from dispenser, we want to avoid overwriting a previous card
+	if (!m_cardSettings->insertedCard) {
+		auto i = 0;
+		while (true) {
+			auto localCardName = m_cardSettings->cardName + std::to_string(i);
+
+			// Perfenece to not having a number...
+			if (i == 0) {
+				localCardName = m_cardSettings->cardName;
+			}
+
+			auto fullName = localCardName + ".track_" + std::to_string(trackNumber);
+
+			if (!ghc::filesystem::exists(fullName.c_str())) {
+				m_cardSettings->cardName = localCardName;
+				break;
+			}
+			i++;
+		}
+	}
+
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
 
