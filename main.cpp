@@ -17,6 +17,8 @@
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+	Modification: XyLe
 */
 
 #include <iostream>
@@ -59,7 +61,7 @@ bool ReadConfig()
 	// Read in config values
 	mINI::INIFile config("config.ini");
 	mINI::INIStructure ini;
-	std::string lport, lbaud, lparity;
+	std::string lport, lbaud, lparity, isidolmaster;
 	
 	// TODO: Generate INI
 	if (!config.read(ini)) {
@@ -75,6 +77,7 @@ bool ReadConfig()
 		globalSettings.card.cardPath = ini["config"]["basepath"];
 		globalSettings.card.cardName = ini["config"]["autoselectedcard"];
 		globalSettings.serial.devicePath = ini["config"]["serialpath"];
+		isidolmaster = ini["config"]["emulateIdolmaster"];
 	}
 
 	if (globalSettings.card.cardPath.empty()) {
@@ -104,6 +107,19 @@ bool ReadConfig()
 			globalSettings.serial.parity = SP_PARITY_EVEN;
 		} else {
 			globalSettings.serial.parity = SP_PARITY_NONE;
+		}
+	}
+
+	if (isidolmaster.empty()) {
+		globalSettings.card.isidolmaster = false;
+	}
+	else {
+		if (isidolmaster.find("true") != std::string::npos) {
+			globalSettings.card.isidolmaster = true;
+			spdlog::warn("Idolmaster emulation has been activated.");
+		}
+		else {
+			globalSettings.card.isidolmaster = false;
 		}
 	}
 

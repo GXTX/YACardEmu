@@ -59,6 +59,9 @@ public:
 		bool hasCard = false;
 		bool waitingForCard = false;
 		bool reportDispenserEmpty = false;
+		bool isidolmaster = true;
+		bool iscardchange = false;
+		int imascount = 0;
 		std::string mech = "C1231LR";
 	};
 
@@ -151,6 +154,7 @@ protected:
 	virtual void Command_10_Initalize();
 	void Command_20_ReadStatus();
 	void Command_33_ReadData2(); // multi-track read
+	void Command_34_CardEjected(); // card ejected
 	void Command_35_GetData(); // Spit out the entire card
 	void Command_40_Cancel();
 	void Command_53_WriteData2(); // multi-track write

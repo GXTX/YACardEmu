@@ -17,3 +17,5 @@ targetdevice = C1231LR
 ;serialparity = none
 apiport = 8080
 autoselectedcard = card.bin
+; When set to true, it emulates Idolmaster's card change.
+emulateIdolmaster = false

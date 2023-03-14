@@ -17,6 +17,8 @@
     You should have received a copy of the GNU General Public License along
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+	Modification: XyLe
 */
 
 #include "CardIo.h"
@@ -96,6 +98,26 @@ void CardIo::Command_33_ReadData2()
 				if (!HasCard()) {
 					status.s = S::WAITING_FOR_CARD;
 					spdlog::info("Game requests user to insert card");
+					if (m_cardSettings->isidolmaster == true ) {
+						m_cardSettings->iscardchange = true;
+						std::ifstream ifs(m_cardSettings->cardPath + m_cardSettings->cardName + ".track_0");
+						if (ifs) {
+							std::ifstream ifs2(m_cardSettings->cardPath + m_cardSettings->cardName + "_1.track_0");
+							if (ifs2) {
+								spdlog::info("P-card and U-card found. Auto insert card...");
+								m_cardSettings->imascount = 1;
+								m_cardSettings->insertedCard = true;
+							}
+							else {
+								spdlog::warn("I cannot find the second P-card or U-card.");
+								m_cardSettings->imascount = 0;
+							}
+						}
+						else {
+							spdlog::warn("I cannot find the first P-card or U-card.");
+							m_cardSettings->imascount = 0;
+						}
+					}
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				}
@@ -176,6 +198,10 @@ void CardIo::Command_33_ReadData2()
 	if (currentStep > 1) {
 		runningCommand = false;
 	}
+}
+
+void CardIo::Command_34_CardEjected() {
+	
 }
 
 void CardIo::Command_35_GetData()
@@ -467,6 +493,32 @@ void CardIo::Command_80_EjectCard()
 			break;
 		case 2:
 			EjectCard();
+
+			if (m_cardSettings->isidolmaster == true && m_cardSettings->iscardchange == true) {
+				spdlog::info("Changing cards for THE iDOLM@STER...");
+				std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName + ".track_0";
+				std::string fullPath2 = m_cardSettings->cardPath + m_cardSettings->cardName + "_1.track_0";
+				std::string destPath = m_cardSettings->cardPath + m_cardSettings->cardName + ".swap";
+				if (std::rename(fullPath.c_str(), destPath.c_str()) == 0) {
+					if (std::rename(fullPath2.c_str(), fullPath.c_str()) == 0) {
+						if (std::rename(destPath.c_str(), fullPath2.c_str()) == 0) {
+							spdlog::info("Card change is completed.");
+						}
+						else {
+							spdlog::warn("Card change is failed!");
+						}
+					}
+					else {
+						spdlog::warn("Card change is failed!");
+					}
+				}
+				else {
+					spdlog::warn("Card change is failed!");
+				}
+				
+				m_cardSettings->iscardchange = false;
+			}
+
 			break;
 		default:
 			break;
@@ -646,6 +698,7 @@ bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
 {
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 	fullPath.append(".track_" + std::to_string(trackNumber));
+	
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
 		if (ghc::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
@@ -681,6 +734,12 @@ void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
 	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
 	card.write(writeBack.c_str(), writeBack.size());
 	card.close();
+
+	if (m_cardSettings->isidolmaster == true && m_cardSettings->imascount == 0) {
+		std::ofstream(m_cardSettings->cardPath + m_cardSettings->cardName + "_1.track_0");
+		m_cardSettings->imascount++;
+		spdlog::info("A second card has been created.");
+	}
 }
 
 void CardIo::SetPError(P error_code)
@@ -729,6 +788,7 @@ void CardIo::HandlePacket()
 			case 0x10: Command_10_Initalize(); break;
 			case 0x20: Command_20_ReadStatus(); break;
 			case 0x33: Command_33_ReadData2(); break;
+			case 0x34: Command_34_CardEjected(); break;
 			case 0x35: Command_35_GetData(); break;
 			case 0x40: Command_40_Cancel(); break;
 			case 0x53: Command_53_WriteData2(); break;
