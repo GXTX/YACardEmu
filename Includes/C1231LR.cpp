@@ -52,10 +52,10 @@ bool C1231LR::HasCard()
 void C1231LR::DispenseCard()
 {
 	if (localStatus != CardPosition::NO_CARD) {
-		spdlog::info("Error dispensing card - card present?");
+		logger->info("Error dispensing card - card present?");
 		SetSError(S::ILLEGAL_COMMAND);
 	} else {
-		spdlog::info("Dispensing new card");
+		logger->info("Dispensing new card");
 		MoveCard(MovePositions::DISPENSER_THERMAL);
 	}
 }
@@ -63,7 +63,7 @@ void C1231LR::DispenseCard()
 void C1231LR::EjectCard()
 {
 	if (localStatus != CardPosition::NO_CARD) {
-		spdlog::info("Ejecting card");
+		logger->info("Ejecting card");
 		MoveCard(MovePositions::EJECT);
 	}
 }
