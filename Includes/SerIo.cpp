@@ -117,7 +117,7 @@ SerIo::Status SerIo::Write()
 
 	if (ret > 0) {
 		if (ret < static_cast<int>(m_writeBuffer.size())) {
-			spdlog::error("Only wrote {0:X} of {1:X} to the port!", ret, m_writeBuffer.size());
+			logger->error("Only wrote {0:X} of {1:X} to the port!", ret, m_writeBuffer.size());
 			m_writeBuffer.erase(m_writeBuffer.begin(), m_writeBuffer.begin() + static_cast<size_t>(ret));
 			return Status::WriteError;
 		}

@@ -45,7 +45,7 @@ bool WebIo::Spawn()
 
 void WebIo::StartServer()
 {
-	spdlog::info("Starting API server...");
+	logger->info("Starting API server...");
 	m_svr.set_mount_point("/", "public");
 
 	m_svr.Get(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
@@ -61,7 +61,7 @@ void WebIo::StartServer()
 	});
 
 	if (!m_svr.listen(m_host.c_str(), m_port)) {
-		spdlog::critical("Failed to start API server!");
+		logger->critical("Failed to start API server!");
 	}
 }
 
@@ -69,7 +69,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 {
 	const auto route = req.matches[1].str();
 
-	spdlog::debug("WebIo::Router: {0} -> {1}", req.method, route);
+	logger->debug("WebIo::Router: {0} -> {1}", req.method, route);
 
 	switch (m_routeValues[route]) {
 		case Routes::cards:
@@ -99,7 +99,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			*g_running = false;
 			break;
 		default:
-			spdlog::warn("WebIo::Router: Unsupported route \"{}\"", req.path);
+			logger->warn("WebIo::Router: Unsupported route \"{}\"", req.path);
 			res.status = 404;
 			break;
 	}
