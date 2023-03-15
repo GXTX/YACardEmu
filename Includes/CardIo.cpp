@@ -188,8 +188,7 @@ void CardIo::Command_35_GetData()
 			cardData.clear();
 			cardData.resize(NUM_TRACKS);
 			for (int i = 0; i < NUM_TRACKS; i++) {
-				bool res = ReadTrack(cardData.at(i), i);
-				if (!res) {
+				if (cardData.at(i).empty()) {
 					SetPError(P::READ_ERR);
 					return;
 				}
@@ -630,69 +629,6 @@ void CardIo::Command_F5_CheckBattery()
 {
 	status.SoftReset();
 	runningCommand = false;
-}
-
-bool CardIo::ReadTrack(std::vector<uint8_t> &trackData, int trackNumber)
-{
-	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
-	fullPath.append(".track_" + std::to_string(trackNumber));
-
-	if (ghc::filesystem::exists(fullPath.c_str())) {
-		if (ghc::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
-			std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
-			std::string readBack(TRACK_SIZE, 0);
-
-			card.read(&readBack[0], readBack.size());
-			trackData.clear();
-			std::copy(readBack.begin(), readBack.end(), std::back_inserter(trackData));
-			card.close();
-		} else {
-			return false;
-		}
-	} else {
-		// TODO: Is this a desired outcome?
-		std::vector<uint8_t> blank(TRACK_SIZE, 0);
-		WriteTrack(blank, trackNumber);
-		trackData.resize(TRACK_SIZE);
-	}
-
-	return true;
-}
-
-void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
-{
-	// FIXME: Could this cause problems in games where it saves N track while playing? Perhaps we buffer the save until eject? What if during play we get a save then read? Edit ReadTrack() to perfer cached data?
-	// Should only happen when issued from dispenser, we want to avoid overwriting a previous card
-	if (!m_cardSettings->insertedCard) {
-		auto i = 0;
-		while (true) {
-			auto newCardName = m_cardSettings->cardName + std::to_string(i);
-
-			// Perfenece to not having a number...
-			if (i == 0) {
-				newCardName = m_cardSettings->cardName;
-			}
-
-			auto fullName = newCardName + ".track_" + std::to_string(trackNumber);
-
-			if (!ghc::filesystem::exists(fullName.c_str())) {
-				m_cardSettings->cardName = newCardName;
-				break;
-			}
-			i++;
-		}
-	}
-
-	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
-	fullPath.append(".track_" + std::to_string(trackNumber));
-
-	std::string writeBack{};
-	std::copy(trackData.begin(), trackData.end(), std::back_inserter(writeBack));
-
-	std::ofstream card;
-	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
-	card.write(writeBack.c_str(), writeBack.size());
-	card.close();
 }
 
 void CardIo::ClearCardData()

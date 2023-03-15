@@ -144,12 +144,9 @@ protected:
 
 	std::vector<std::vector<uint8_t>> cardData{{}, {}, {}};
 
-	void UpdateStatusBytes();
 	void UpdateStatusInBuffer();
 	void SetPError(P error_code);
 	void SetSError(S error_code);
-	bool ReadTrack(std::vector<uint8_t> &trackData, int trackNumber);
-	void WriteTrack(std::vector<uint8_t> &trackData, int trackNumber);
 
 	void ClearCardData();
 	void ReadCard();
