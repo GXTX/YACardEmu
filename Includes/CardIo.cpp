@@ -671,7 +671,8 @@ void CardIo::WriteCard()
 	if (!m_cardSettings->insertedCard) {
 		auto i = 0;
 		while (true) {
-			auto newCardName = m_cardSettings->cardName + std::to_string(i);
+			auto newCardName = m_cardSettings->cardName;
+			newCardName.insert(newCardName.find(".bin"), std::to_string(i));
 
 			// Perfenece to not having a number...
 			if (i == 0) {
