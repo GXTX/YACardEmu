@@ -107,12 +107,12 @@ void CardIo::Command_33_ReadData2()
 						case Track::Track_3:
 							{
 								const uint8_t ctrack = static_cast<uint8_t>(track) - 0x30;
-								cardData.at(ctrack).clear();
-								bool res = ReadTrack(cardData.at(ctrack), ctrack);
-								if (!res) {
+
+								if (cardData.at(ctrack).empty()) {
 									SetPError(P::READ_ERR);
 									return;
 								}
+
 								std::copy(cardData.at(ctrack).begin(), cardData.at(ctrack).end(), std::back_inserter(commandBuffer));
 							}
 							break;
@@ -131,12 +131,7 @@ void CardIo::Command_33_ReadData2()
 									ctrack = 1; ctrack1 = 2;
 								}
 
-								cardData.at(ctrack).clear();
-								cardData.at(ctrack1).clear();
-
-								bool res = ReadTrack(cardData.at(ctrack), ctrack);
-								res = ReadTrack(cardData.at(ctrack1), ctrack1);
-								if (!res) {
+								if (cardData.at(ctrack).empty() || cardData.at(ctrack1).empty()) {
 									SetPError(P::READ_ERR);
 									return;
 								}
@@ -147,11 +142,8 @@ void CardIo::Command_33_ReadData2()
 							break;
 						case Track::Track_1_2_And_3:
 							{
-								cardData.clear();
-								cardData.resize(NUM_TRACKS);
 								for (int i = 0; i < NUM_TRACKS; i++) {
-									bool res = ReadTrack(cardData.at(i), i);
-									if (!res) {
+									if (cardData.at(i).empty()) {
 										SetPError(P::READ_ERR);
 										return;
 									}
@@ -263,7 +255,6 @@ void CardIo::Command_53_WriteData2()
 							const uint8_t ctrack = static_cast<uint8_t>(track) - 0x30;
 							cardData.at(ctrack).clear();
 							std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(cardData.at(ctrack)));
-							WriteTrack(cardData.at(ctrack), ctrack);
 						}
 						break;
 					case Track::Track_1_And_2:
@@ -291,9 +282,6 @@ void CardIo::Command_53_WriteData2()
 
 							std::copy(currentPacket.begin() + 3, currentPacket.begin() + 3 + TRACK_SIZE, std::back_inserter(cardData.at(ctrack)));
 							std::copy(currentPacket.begin() + 3 + TRACK_SIZE, currentPacket.end(), std::back_inserter(cardData.at(ctrack1)));
-
-							WriteTrack(cardData.at(ctrack), ctrack);
-							WriteTrack(cardData.at(ctrack1), ctrack1);
 						}
 						break;
 					case Track::Track_1_2_And_3:
@@ -308,7 +296,6 @@ void CardIo::Command_53_WriteData2()
 							for (uint8_t i = 0; i < NUM_TRACKS; i++) {
 								const uint8_t offset = 3 + (i * TRACK_SIZE);
 								std::copy(currentPacket.begin() + offset, currentPacket.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
-								WriteTrack(cardData.at(i), i);
 							}
 						}
 						break;
@@ -679,17 +666,17 @@ void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
 	if (!m_cardSettings->insertedCard) {
 		auto i = 0;
 		while (true) {
-			auto localCardName = m_cardSettings->cardName + std::to_string(i);
+			auto newCardName = m_cardSettings->cardName + std::to_string(i);
 
 			// Perfenece to not having a number...
 			if (i == 0) {
-				localCardName = m_cardSettings->cardName;
+				newCardName = m_cardSettings->cardName;
 			}
 
-			auto fullName = localCardName + ".track_" + std::to_string(trackNumber);
+			auto fullName = newCardName + ".track_" + std::to_string(trackNumber);
 
 			if (!ghc::filesystem::exists(fullName.c_str())) {
-				m_cardSettings->cardName = localCardName;
+				m_cardSettings->cardName = newCardName;
 				break;
 			}
 			i++;
@@ -706,6 +693,79 @@ void CardIo::WriteTrack(std::vector<uint8_t> &trackData, int trackNumber)
 	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
 	card.write(writeBack.c_str(), writeBack.size());
 	card.close();
+}
+
+void CardIo::ClearCardData()
+{
+	cardData.clear();
+	cardData.resize(NUM_TRACKS);
+}
+
+void CardIo::ReadCard()
+{
+	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	
+	// TODO: Should we actually be seeding zero's when the file doesn't exist?
+	std::string readBack(CARD_SIZE, 0);
+
+	ClearCardData();
+
+	if (ghc::filesystem::exists(fullPath.c_str())) {
+		if (ghc::filesystem::file_size(fullPath.c_str()) == CARD_SIZE) {
+			std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
+
+			card.read(&readBack[0], readBack.size());
+			card.close();
+		} else {
+			// File exists but isn't the right size, abort
+			return;
+		}
+	}
+
+	auto offset = 0;
+	for (auto i = 0; i < NUM_TRACKS; i++) {
+		std::copy(readBack.begin() + offset, readBack.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
+		offset += TRACK_SIZE;
+	}
+}
+
+void CardIo::WriteCard()
+{
+	// Should only happen when issued from dispenser, we want to avoid overwriting a previous card
+	if (!m_cardSettings->insertedCard) {
+		auto i = 0;
+		while (true) {
+			auto newCardName = m_cardSettings->cardName + std::to_string(i);
+
+			// Perfenece to not having a number...
+			if (i == 0) {
+				newCardName = m_cardSettings->cardName;
+			}
+
+			auto fullName = m_cardSettings->cardPath + newCardName;
+
+			if (!ghc::filesystem::exists(fullName.c_str())) {
+				m_cardSettings->cardName = newCardName;
+				break;
+			}
+			i++;
+		}
+	}
+
+	// TODO: Handle if cardPath doesn't have a trailing slash
+	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+
+	std::string writeBack;
+	for (const auto &data: cardData) {
+		std::copy(data.begin(), data.end(), std::back_inserter(writeBack));
+	}
+
+	std::ofstream card;
+	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
+	card.write(writeBack.c_str(), writeBack.size());
+	card.close();
+
+	ClearCardData();
 }
 
 void CardIo::SetPError(P error_code)

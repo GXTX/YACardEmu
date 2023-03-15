@@ -36,6 +36,7 @@ void C1231LR::UpdateRStatus()
 
 	// We require the user to "insert" a card if we're waiting
 	if (m_cardSettings->insertedCard && localStatus == CardPosition::NO_CARD) {
+		ReadCard();
 		MoveCard(MovePositions::READ_WRITE_HEAD);
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
@@ -65,6 +66,7 @@ void C1231LR::EjectCard()
 	if (localStatus != CardPosition::NO_CARD) {
 		logger->info("Ejecting card");
 		MoveCard(MovePositions::EJECT);
+		WriteCard();
 	}
 }
 

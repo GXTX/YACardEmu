@@ -151,6 +151,10 @@ protected:
 	bool ReadTrack(std::vector<uint8_t> &trackData, int trackNumber);
 	void WriteTrack(std::vector<uint8_t> &trackData, int trackNumber);
 
+	void ClearCardData();
+	void ReadCard();
+	void WriteCard();
+
 	// Commands
 	virtual void Command_10_Initalize();
 	void Command_20_ReadStatus();
