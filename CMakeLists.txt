@@ -96,3 +96,10 @@ if (WIN32)
 			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/public
 	)
 endif()
+
+# Will be removed in a future version
+add_executable(convert
+	convert.cpp
+)
+
+set_target_properties(convert PROPERTIES CXX_STANDARD 14)

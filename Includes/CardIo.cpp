@@ -653,7 +653,10 @@ void CardIo::ReadCard()
 			card.read(&readBack[0], readBack.size());
 			card.close();
 		} else {
-			// File exists but isn't the right size, abort
+			if (ghc::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
+				logger->warn("Use convert.exe to conver this old card to new style");
+			}
+			logger->warn("Incorrect card size");
 			return;
 		}
 	}
