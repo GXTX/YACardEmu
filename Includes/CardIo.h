@@ -33,6 +33,7 @@
 #include <ctime>
 #include <sstream>
 #include <iomanip>
+#include <regex>
 
 #include "spdlog/spdlog.h"
 #include "spdlog/async.h"

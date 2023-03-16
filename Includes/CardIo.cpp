@@ -640,7 +640,7 @@ void CardIo::ClearCardData()
 void CardIo::ReadCard()
 {
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
-	
+
 	// TODO: Should we actually be seeding zero's when the file doesn't exist?
 	std::string readBack(CARD_SIZE, 0);
 
@@ -671,8 +671,20 @@ void CardIo::WriteCard()
 	if (!m_cardSettings->insertedCard) {
 		auto i = 0;
 		while (true) {
-			auto newCardName = m_cardSettings->cardName;
-			newCardName.insert(newCardName.find(".bin"), std::to_string(i));
+			// TODO: It would be nicer if the generated name was abc.123.bin instead of abc.bin.123
+			std::string newCardName = m_cardSettings->cardName;
+
+			// $3 contains any numbers a sqeuence of "*.bin."
+			auto find = std::regex_replace(newCardName, std::regex("(.*)(\\.bin\\.)(\\d+)"), "$3");
+
+			if (newCardName == find) {
+				// Add ".n" after ".bin"
+				newCardName.append("." + std::to_string(i));
+			} else {
+				// Increment the numbers contained in $3
+				find = std::to_string(std::stoi(find) + 1);
+				newCardName = newCardName.substr(0, newCardName.size() - find.size()) + find;
+			}
 
 			// Perfenece to not having a number...
 			if (i == 0) {
