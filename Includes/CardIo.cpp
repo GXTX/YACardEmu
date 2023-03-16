@@ -705,7 +705,9 @@ void CardIo::WriteCard()
 	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 
 	std::string writeBack;
-	for (const auto &data: cardData) {
+	for (auto &data: cardData) {
+		if (data.size() != TRACK_SIZE)
+			data.resize(TRACK_SIZE);
 		std::copy(data.begin(), data.end(), std::back_inserter(writeBack));
 	}
 
