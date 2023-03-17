@@ -1,7 +1,7 @@
 YACardEmu
 ============
 
-YACardEmu (*YetAnother*CardEmu) is a program to emulate the Sanwa CRP-1231LR-10NAB card reader that's found on Wangan Midnight Tune 1, 2, 3, 3DX, and 3DX+ arcade machines by Namco. A longer goal of this project is to be compatible with similar models that line of readers (such as 1231BR).
+YACardEmu (*YetAnother*CardEmu) is a software emulator to emulate a range of magnetic card readers found in various arcade machines. Currently supported models are Sanwa CRP-1231BR-10, the CRP-1231LR-10NAB, and CR-S31R-10HS3 models which are commonly found in games such as Wangan Midnight Tune 3, Virtual-On Force, THE iDOLM@STER, F-Zero, Mario Kart, and Initial D series arcade cabinets.
 
 **Checkout some gameplay videos [here!](https://www.youtube.com/channel/UCle6xQNwROzwYfYMyrnIcBQ)**
 
@@ -72,24 +72,45 @@ cd Release
 YACardEmu.exe
 ```
 
-Info
+Running On Hardware
 ---------
 
-If you're wishing to run this on hardware there are some settings you'll need to be aware of.
+If you're wanting to run this on hardware there are some settings you'll need to be aware of.
 
+SEGA Chihiro
 ```
-Wangan Maximum Tune 1        : CRP-1231LR-10NAB | 9600b none
-Wangan Maximum Tune 2        : CRP-1231LR-10NAB | 9600b none
-Wangan Maximum Tune 3        : CR-S31R-10HS3    | 38400b even
-Wangan Maximum Tune 3DX      : CR-S31R-10HS3    | 38400b even
-Wangan Maximum Tune 3DX+     : CR-S31R-10HS3    | 38400b even
-Initial D Arcade Stage Ver.1 : CRP-1231BR-10    | 9600b even
-Initial D Arcade Stage Ver.2 : CRP-1231BR-10    | 9600b even
-Initial D Arcade Stage Ver.3 : CRP-1231BR-10    | 9600b even
-F-Zero AX                    : CRP-1231BR-10    | 9600b even
-Mario Kart Arcade GP         : CRP-1231LR-10NAB | 9600b none
-Mario Kart Arcade GP2        : CRP-1231LR-10NAB | 9600b none
-*Virtual-On Force            : CRP-1231BR-10    | 9600b even
+Wangan Maximum Tune 1 : CRP-1231LR-10NAB | 9600b none
+Wangan Maximum Tune 2 : CRP-1231LR-10NAB | 9600b none
+```
 
-*Requires Sega P/N 838-13661 RS232 converter PCB
+Namco System N2
+```
+Wangan Maximum Tune 3    : CR-S31R-10HS3 | 38400b even
+Wangan Maximum Tune 3DX  : CR-S31R-10HS3 | 38400b even
+Wangan Maximum Tune 3DX+ : CR-S31R-10HS3 | 38400b even
+```
+
+SEGA Hikaru
+```
+Virtual-On Force (電脳戦機バーチャロン フォース) : CRP-1231BR-10 | 9600b even
+†Requires Sega P/N 838-13661 RS232 converter PCB
+```
+
+Namco System 246
+```
+THE iDOLM@STER (アイドルマスタ) : CRP-1231LR-10NAB | 9600b none
+```
+
+SEGA NAOMI 2
+```
+Initial D Arcade Stage Ver.1 : CRP-1231BR-10 | 9600b even
+Initial D Arcade Stage Ver.2 : CRP-1231BR-10 | 9600b even
+Initial D Arcade Stage Ver.3 : CRP-1231BR-10 | 9600b even
+```
+
+SEGA Triforce
+```
+F-Zero AX             : CRP-1231BR-10    | 9600b even
+Mario Kart Arcade GP  : CRP-1231LR-10NAB | 9600b none
+Mario Kart Arcade GP2 : CRP-1231LR-10NAB | 9600b none
 ```

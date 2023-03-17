@@ -1,13 +1,14 @@
 [config]
 ; basepath MUST end in a trailing slash!
 basepath = /home/wutno/cards/
+;basepath = C:\Temp\cards\
 ; Linux
 ;serialpath = /dev/ttyUSB0
 ; Windows
 ;serialpath = COM3
 ;serialpath = \\.\pipe\YACardEmu
 ; Which device should we emulate?
-; C1231LR / C1231BR
+; C1231LR / C1231BR / S31R
 targetdevice = C1231LR
 ;
 ; Optional

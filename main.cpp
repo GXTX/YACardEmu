@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
 	}
 
 	std::unique_ptr<CardIo> cardHandler{};
-	if (globalSettings.card.mech.compare("C1231LR") == 0) {
+	if (globalSettings.card.mech.compare("C1231LR") == 0 || globalSettings.card.mech.compare("S31R") == 0) {
 		cardHandler = std::make_unique<C1231LR>(&globalSettings.card);
 	} else if (globalSettings.card.mech.compare("C1231BR") == 0) {
 		cardHandler = std::make_unique<C1231BR>(&globalSettings.card);
