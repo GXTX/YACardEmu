@@ -95,7 +95,7 @@ void CardIo::Command_33_ReadData2()
 			if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
 				if (!HasCard()) {
 					status.s = S::WAITING_FOR_CARD;
-					logger->info("Game requests user to insert card");
+					g_logger->info("Game requests user to insert card");
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				}
@@ -153,12 +153,12 @@ void CardIo::Command_33_ReadData2()
 							break;
 						default:
 							SetPError(P::ILLEGAL_ERR);
-							logger->warn("Unknown track read option {0:X}", static_cast<uint8_t>(track));
+							g_logger->warn("Unknown track read option {0:X}", static_cast<uint8_t>(track));
 							return;
 					}
 				} else {
 					status.s = S::WAITING_FOR_CARD;
-					logger->info("Game requests user to insert card");
+					g_logger->info("Game requests user to insert card");
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				}
@@ -300,7 +300,7 @@ void CardIo::Command_53_WriteData2()
 						break;
 					default:
 						SetPError(P::ILLEGAL_ERR);
-						logger->warn("Unknown track write option {0:X}", static_cast<uint8_t>(track));
+						g_logger->warn("Unknown track write option {0:X}", static_cast<uint8_t>(track));
 						return;
 				}
 			}
@@ -654,9 +654,9 @@ void CardIo::ReadCard()
 			card.close();
 		} else {
 			if (ghc::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
-				logger->warn("Use convert.exe to conver this old card to new style");
+				g_logger->warn("Use convert.exe to conver this old card to new style");
 			}
-			logger->warn("Incorrect card size");
+			g_logger->warn("Incorrect card size");
 			return;
 		}
 	}
@@ -740,7 +740,7 @@ void CardIo::UpdateStatusInBuffer()
 	commandBuffer[2] = static_cast<uint8_t>(status.p);
 	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
-	logger->trace("CardIo::UpdateStatusInBuffer: R: {0:X} P: {1:X} S: {2:X}", 
+	g_logger->trace("CardIo::UpdateStatusInBuffer: R: {0:X} P: {1:X} S: {2:X}", 
 		GetRStatus(),
 		static_cast<uint8_t>(status.p),
 		static_cast<uint8_t>(status.s)
@@ -761,7 +761,7 @@ void CardIo::HandlePacket()
 
 	if (runningCommand) {
 		if (m_cardSettings->waitingForCard) {
-			logger->info("Game no longer requests user to insert card");
+			g_logger->info("Game no longer requests user to insert card");
 			m_cardSettings->waitingForCard = false;
 		}
 		switch (currentCommand) {
@@ -788,7 +788,7 @@ void CardIo::HandlePacket()
 			case 0xF1: Command_F1_GetRTC(); break;
 			case 0xF5: Command_F5_CheckBattery(); break;
 			default:
-				logger->warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
+				g_logger->warn("CardIo::HandlePacket: Unhandled command {0:X}", currentCommand);
 				SetSError(S::ILLEGAL_COMMAND);
 				break;
 		}
@@ -812,12 +812,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	uint8_t sync = GetByte(&buffer);
 
 	if (sync == ENQUIRY) {
-		logger->trace("CardIo::ReceivePacket: ENQ");
+		g_logger->trace("CardIo::ReceivePacket: ENQ");
 		readBuffer.erase(readBuffer.begin());
 		HandlePacket();
 		return ServerWaitingReply;
 	} else if (sync != START_OF_TEXT) {
-		logger->warn("CardIo::ReceivePacket: Missing STX!");
+		g_logger->warn("CardIo::ReceivePacket: Missing STX!");
 		readBuffer.erase(readBuffer.begin()); // SLOW!
 		return SyncError;
 	}
@@ -830,12 +830,12 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	// count counts itself but readBuffer will have both the STX and sum, we need to skip these.
 	if (count > readBuffer.size() - 2) {
-		logger->trace("CardIo::ReceivePacket: Waiting for more data");
+		g_logger->trace("CardIo::ReceivePacket: Waiting for more data");
 		return SizeError;
 	}
 
 	if (readBuffer.at(count) != END_OF_TEXT) {
-		logger->debug("CardIo::ReceivePacket: Missing ETX!");
+		g_logger->debug("CardIo::ReceivePacket: Missing ETX!");
 		readBuffer.erase(readBuffer.begin(), readBuffer.begin() + count);
 		return SyntaxError;
 	}
@@ -863,11 +863,11 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	// Verify checksum - skip packet if invalid
 	if (packet_checksum != actual_checksum) {
-		logger->warn("CardIo::ReceivePacket: Read checksum bad!");
+		g_logger->warn("CardIo::ReceivePacket: Read checksum bad!");
 		return ChecksumError;
 	}
 
-	logger->debug("CardIo::ReceivePacket: {:Xn}", spdlog::to_hex(currentPacket));
+	g_logger->debug("CardIo::ReceivePacket: {:Xn}", spdlog::to_hex(currentPacket));
 
 	// FIXME: MT2EXP "Transfer Card Data" interrupts Eject to do a CheckStatus, if we don't actaully eject here the system will error
 	if (currentCommand == 0x80) {
@@ -919,7 +919,7 @@ CardIo::StatusCode CardIo::BuildPacket(std::vector<uint8_t> &writeBuffer)
 	packet_checksum ^= END_OF_TEXT;
 	writeBuffer.emplace_back(packet_checksum);
 
-	logger->debug("CardIo::BuildPacket: {:Xn}", spdlog::to_hex(writeBuffer));
+	g_logger->debug("CardIo::BuildPacket: {:Xn}", spdlog::to_hex(writeBuffer));
 
 	return Okay;
 }

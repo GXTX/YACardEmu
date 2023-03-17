@@ -37,7 +37,7 @@
 #include "spdlog/async.h"
 #include "spdlog/fmt/bin_to_hex.h"
 
-extern std::shared_ptr<spdlog::async_logger> logger;
+extern std::shared_ptr<spdlog::async_logger> g_logger;
 
 class WebIo
 {

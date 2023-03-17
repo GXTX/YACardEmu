@@ -49,7 +49,7 @@ struct Settings {
 Settings globalSettings{};
 std::atomic<bool> running{true};
 constexpr static auto delay = std::chrono::microseconds(250);
-std::shared_ptr<spdlog::async_logger> logger;
+std::shared_ptr<spdlog::async_logger> g_logger;
 
 const char *helptext = 
 	"YACardEmu - A simulator for magnetic card readers\n"
@@ -66,7 +66,7 @@ const char *helptext =
 void SigHandler(int sig)
 {
 	if (sig == SIGINT || sig == SIGTERM) {
-		logger->flush();
+		g_logger->flush();
 		running = false;
 	}
 }
@@ -182,10 +182,10 @@ int main(int argc, char *argv[])
 	}
 
 	sinks.push_back(stdout_sink);
-	logger = std::make_shared<spdlog::async_logger>("main", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-	logger->set_level(log_level);
-	logger->flush_on(spdlog::level::info);
-	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
+	g_logger = std::make_shared<spdlog::async_logger>("main", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
+	g_logger->set_level(log_level);
+	g_logger->flush_on(spdlog::level::info);
+	g_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
 
 	if (!ReadConfig()) {
 		return 1;
@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
 	} else if (globalSettings.card.mech.compare("C1231BR") == 0) {
 		cardHandler = std::make_unique<C1231BR>(&globalSettings.card);
 	} else {
-		logger->critical("Invalid target device: {}", globalSettings.card.mech);
+		g_logger->critical("Invalid target device: {}", globalSettings.card.mech);
 		return 1;
 	}
 

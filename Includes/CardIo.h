@@ -41,7 +41,7 @@
 
 #include "ghc/filesystem.hpp"
 
-extern std::shared_ptr<spdlog::async_logger> logger;
+extern std::shared_ptr<spdlog::async_logger> g_logger;
 
 class CardIo
 {

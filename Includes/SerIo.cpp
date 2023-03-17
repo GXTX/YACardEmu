@@ -46,7 +46,7 @@ bool SerIo::Open()
 		m_pipeHandle = CreateNamedPipeA(m_portSettings->devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
 
 		if (m_pipeHandle == INVALID_HANDLE_VALUE) {
-			logger->critical("SerIo::Init: Failed to create pipe");
+			g_logger->critical("SerIo::Init: Failed to create pipe");
 			return false;
 		}
 
@@ -65,7 +65,7 @@ bool SerIo::Open()
 	sp_get_port_by_name(m_portSettings->devicePath.c_str(), &m_portHandle);
 
 	if (sp_open(m_portHandle, SP_MODE_READ_WRITE) != SP_OK) {
-		logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
+		g_logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
 		return false;
 	}
 
@@ -78,7 +78,7 @@ void SerIo::SendAck()
 {
 	constexpr static const uint8_t ack = 0x06;
 
-	logger->trace("SerIo::SendAck: 06");
+	g_logger->trace("SerIo::SendAck: 06");
 
 #ifdef _WIN32
 	if (m_isPipe) {
@@ -100,7 +100,7 @@ SerIo::Status SerIo::Write()
 		return Status::ZeroSizeError;
 	}
 
-	logger->trace("SerIo::Write: {:Xn}", spdlog::to_hex(m_writeBuffer));
+	g_logger->trace("SerIo::Write: {:Xn}", spdlog::to_hex(m_writeBuffer));
 
 	int ret = 0;
 
@@ -117,7 +117,7 @@ SerIo::Status SerIo::Write()
 
 	if (ret > 0) {
 		if (ret < static_cast<int>(m_writeBuffer.size())) {
-			logger->error("Only wrote {0:X} of {1:X} to the port!", ret, m_writeBuffer.size());
+			g_logger->error("Only wrote {0:X} of {1:X} to the port!", ret, m_writeBuffer.size());
 			m_writeBuffer.erase(m_writeBuffer.begin(), m_writeBuffer.begin() + static_cast<size_t>(ret));
 			return Status::WriteError;
 		}
@@ -138,7 +138,7 @@ SerIo::Status SerIo::Read()
 		if (PeekNamedPipe(m_pipeHandle, 0, 0, 0, &dwBytes, 0) == 0) {
 			DWORD error = ::GetLastError();
 			if (error == ERROR_BROKEN_PIPE) {
-				logger->warn("Pipe broken! Resetting...");
+				g_logger->warn("Pipe broken! Resetting...");
 				DisconnectNamedPipe(m_pipeHandle);
 				ConnectNamedPipe(m_pipeHandle, NULL);
 			}
@@ -173,7 +173,7 @@ SerIo::Status SerIo::Read()
 		return Status::ReadError;
 	}
 
-	logger->trace("SerIo::Read: {:Xn}", spdlog::to_hex(m_readBuffer));
+	g_logger->trace("SerIo::Read: {:Xn}", spdlog::to_hex(m_readBuffer));
 
 	return Status::Okay;
 }
