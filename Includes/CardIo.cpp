@@ -95,7 +95,7 @@ void CardIo::Command_33_ReadData2()
 			if (mode == static_cast<uint8_t>(Mode::CardCapture)) { // don't reply any card info if we get this
 				if (!HasCard()) {
 					status.s = S::WAITING_FOR_CARD;
-					g_logger->info("Game requests user to insert card");
+					g_logger->info("Please insert a card...");
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				}
@@ -158,7 +158,7 @@ void CardIo::Command_33_ReadData2()
 					}
 				} else {
 					status.s = S::WAITING_FOR_CARD;
-					g_logger->info("Game requests user to insert card");
+					g_logger->info("Please insert a card...");
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				}
@@ -185,8 +185,6 @@ void CardIo::Command_35_GetData()
 				return;
 			}
 
-			cardData.clear();
-			cardData.resize(NUM_TRACKS);
 			for (int i = 0; i < NUM_TRACKS; i++) {
 				if (cardData.at(i).empty()) {
 					SetPError(P::READ_ERR);
@@ -647,16 +645,19 @@ void CardIo::ReadCard()
 	ClearCardData();
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
-		if (ghc::filesystem::file_size(fullPath.c_str()) == CARD_SIZE) {
+		auto fileSize = ghc::filesystem::file_size(fullPath.c_str());
+		if (fileSize <= CARD_SIZE) {
 			std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
-
-			card.read(&readBack[0], readBack.size());
+			card.read(&readBack[0], fileSize);
 			card.close();
 		} else {
-			if (ghc::filesystem::file_size(fullPath.c_str()) == TRACK_SIZE) {
-				g_logger->warn("Use convert.exe to conver this old card to new style");
+			if (fileSize == TRACK_SIZE) {
+				g_logger->warn("This file is the correct size for a single track, use the convert.exe program to fix this");
+				std::this_thread::sleep_for(std::chrono::seconds(10));
 			}
 			g_logger->warn("Incorrect card size");
+			// TODO: Don't set this here
+			SetPError(P::READ_ERR);
 			return;
 		}
 	}
@@ -761,7 +762,7 @@ void CardIo::HandlePacket()
 
 	if (runningCommand) {
 		if (m_cardSettings->waitingForCard) {
-			g_logger->info("Game no longer requests user to insert card");
+			g_logger->info("Resetting waiting for card...");
 			m_cardSettings->waitingForCard = false;
 		}
 		switch (currentCommand) {
