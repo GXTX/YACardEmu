@@ -23,7 +23,8 @@
 
 CardIo::CardIo(CardIo::Settings *settings)
 {
-	startTime = std::time(nullptr);
+	startTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	setTime = 0;
 	m_cardSettings = settings;
 }
 
@@ -553,7 +554,7 @@ void CardIo::Command_C0_ControlLED()
 	runningCommand = false;
 }
 
-void CardIo::Command_C1_SetRetry()
+void CardIo::Command_C1_SetPrintRetry()
 {
 	// We don't need to handle this properly but let's leave some notes
 	// currentPacket[0] == 0x31 NONE ~ 0x39 MAX8
@@ -569,15 +570,15 @@ void CardIo::Command_D0_ShutterControl()
 
 void CardIo::Command_E1_SetRTC()
 {
-	std::stringstream timeStrS{};
-	std::string timeStr{};
+	std::stringstream timeStrS;
+	std::string timeStr;
 	std::copy(commandBuffer.begin(), commandBuffer.end(), std::back_inserter(timeStr));
 
 	timeStrS << timeStr;
 
-	std::tm *tempTime{};
-	timeStrS >> std::get_time(tempTime, "%y%m%d%H%M%S");
-	setTime = std::mktime(tempTime);
+	std::tm tempTime = {1};
+	timeStrS >> std::get_time(&tempTime, "%y%m%d%H%M%S");
+	setTime = std::mktime(&tempTime);
 
 	status.SoftReset();
 	runningCommand = false;
@@ -585,42 +586,30 @@ void CardIo::Command_E1_SetRTC()
 
 void CardIo::Command_F0_GetVersion()
 {
-	switch (currentStep) {
-		case 0:
-			std::copy(versionString.begin(), versionString.end(), std::back_inserter(commandBuffer));
-			status.SoftReset();
-			runningCommand = false;
-			break;
-		default:
-			break;
-	}
+	std::copy(versionString.begin(), versionString.end(), std::back_inserter(commandBuffer));
+
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_F1_GetRTC()
 {
-	switch (currentStep) {
-		case 0:
-			{
-				std::string timeStr(13, 0);
-				std::time_t currentTime = std::time(nullptr);
+	std::string timeStr(12, 0);
+	std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-				std::time_t convTime{};
+	std::time_t convTime;
 
-				if (setTime != 0) {
-					convTime = setTime + currentTime - startTime;
-				} else {
-					convTime = currentTime;
-				}
-
-				std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&convTime));
-				std::copy(timeStr.begin(), timeStr.end(), std::back_inserter(commandBuffer));
-			}
-			status.SoftReset();
-			runningCommand = false;
-			break;
-		default:
-			break;
+	if (setTime != 0) {
+		convTime = setTime + currentTime - startTime;
+	} else {
+		convTime = currentTime;
 	}
+
+	std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&convTime));
+	std::copy(timeStr.begin(), timeStr.end(), std::back_inserter(commandBuffer));
+
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_F5_CheckBattery()
@@ -652,7 +641,8 @@ void CardIo::ReadCard()
 			card.close();
 		} else {
 			if (fileSize == TRACK_SIZE) {
-				g_logger->warn("This file is the correct size for a single track, use the convert.exe program to fix this");
+				g_logger->warn("This file is using the track based system, use convert.exe to fix this");
+				// Long enough where the game should complain and someone will notice
 				std::this_thread::sleep_for(std::chrono::seconds(10));
 			}
 			g_logger->warn("Incorrect card size");
@@ -782,7 +772,7 @@ void CardIo::HandlePacket()
 			case 0xA0: Command_A0_Clean(); break;
 			case 0xB0: Command_B0_DispenseCardS31(); break;
 			case 0xC0: Command_C0_ControlLED(); break;
-			case 0xC1: Command_C1_SetRetry(); break;
+			case 0xC1: Command_C1_SetPrintRetry(); break;
 			case 0xD0: Command_D0_ShutterControl(); break;
 			case 0xE1: Command_E1_SetRTC(); break;
 			case 0xF0: Command_F0_GetVersion(); break;

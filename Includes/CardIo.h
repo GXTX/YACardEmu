@@ -170,7 +170,7 @@ protected:
 	void Command_A0_Clean();
 	void Command_B0_DispenseCardS31();
 	void Command_C0_ControlLED();
-	void Command_C1_SetRetry();
+	void Command_C1_SetPrintRetry();
 	virtual void Command_D0_ShutterControl();
 	void Command_E1_SetRTC();
 	void Command_F0_GetVersion();
@@ -187,8 +187,8 @@ protected:
 	std::vector<uint8_t> commandBuffer{0, 0, 0, 0};
 	std::vector<uint8_t> printBuffer{};
 
-	std::time_t startTime{};
-	std::time_t setTime{};
+	std::time_t startTime;
+	std::time_t setTime;
 
 	virtual uint8_t GetRStatus() = 0;
 	virtual void UpdateRStatus() = 0;
