@@ -28,16 +28,20 @@ C1231BR::C1231BR(CardIo::Settings* settings) : CardIo(settings)
 
 void C1231BR::UpdateRStatus()
 {
-	// We "grab" the card for the user
-	if (localStatus.position == CardPosition::POS_IN_FRONT) {
-		m_cardSettings->insertedCard = false;
-		MoveCard(MovePositions::NO_CARD);
+	// FIXME: We shouldn't be checking commands here, but F-Zero AX requires the user NOT to insert the card completely, rather, it appears D0 or 33 is pulling in the card
+	if (currentCommand != 0xD0 && currentCommand != 0x33) {
+		// We "grab" the card for the user
+		if (localStatus.position == CardPosition::POS_IN_FRONT) {
+			m_cardSettings->insertedCard = false;
+			MoveCard(MovePositions::NO_CARD);
+		}
 	}
 
 	// We require the user to "insert" a card if we're waiting
 	if (m_cardSettings->insertedCard && localStatus.position == CardPosition::NO_CARD) {
 		ReadCard();
-		MoveCard(MovePositions::READ_WRITE_HEAD);
+		// We're not actually ejecting here, we're presenting the card to the machine with POS_IN_FRONT
+		MoveCard(MovePositions::EJECT);
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
 			// Make sure the user can actually insert a card
@@ -79,24 +83,12 @@ void C1231BR::Command_10_Initalize()
 		ResetSpecifications = 0x32,
 	};
 
-	Mode mode = static_cast<Mode>(currentPacket[0]);
-
-	switch (currentStep) {
-		case 1:
-			if (mode == Mode::EjectAfter) {
-				localStatus.shutter = true;
-			}
-			if (HasCard()) {
-				EjectCard();
-			}
-			break;
-		default:
-			break;
+	if (static_cast<Mode>(currentPacket[0]) == Mode::EjectAfter) {
+		localStatus.shutter = true;
 	}
+	EjectCard();
 
-	if (currentStep > 1) {
-		runningCommand = false;
-	}
+	runningCommand = false;
 }
 
 void C1231BR::Command_D0_ShutterControl()
@@ -107,13 +99,7 @@ void C1231BR::Command_D0_ShutterControl()
 		Open  = 0x31,
 	};
 
-	Action action = static_cast<Action>(currentPacket[0]);
-
-	if (action == Action::Open) {
-		localStatus.shutter = true;
-	} else {
-		localStatus.shutter = false;
-	}
+	localStatus.shutter = (static_cast<Action>(currentPacket[0]) == Action::Open) ? true : false;
 
 	runningCommand = false;
 }

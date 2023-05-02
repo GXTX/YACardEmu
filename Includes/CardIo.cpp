@@ -31,30 +31,20 @@ CardIo::CardIo(CardIo::Settings *settings)
 void CardIo::Command_10_Initalize()
 {
 	enum Mode {
-		Standard = 0x30, // We actually eject anyway..
+		Standard = 0x30,
 		EjectAfter = 0x31,
 		ResetSpecifications = 0x32,
 	};
 
-	//Mode mode = static_cast<Mode>(currentPacket[0]);
+	EjectCard();
 
-	switch (currentStep) {
-		case 1:
-			if (HasCard()) {
-				EjectCard();
-			}
-			break;
-		default:
-			break;
-	}
-
-	if (currentStep > 1) {
-		runningCommand = false;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_20_ReadStatus()
 {
+	// TODO: We should continue running the previous command tasks, but this is safe enough for most games.
 	status.SoftReset();
 	runningCommand = false;
 }
@@ -99,9 +89,13 @@ void CardIo::Command_33_ReadData2()
 					g_logger->info("Please insert a card...");
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
+				} else {
+					MoveCard(MovePositions::READ_WRITE_HEAD);
 				}
 			} else {
 				if (HasCard()) {
+					MoveCard(MovePositions::READ_WRITE_HEAD);
+
 					switch (track) {
 						case Track::Track_1:
 						case Track::Track_2:
@@ -145,8 +139,8 @@ void CardIo::Command_33_ReadData2()
 							{
 								for (int i = 0; i < NUM_TRACKS; i++) {
 									if (cardData.at(i).empty()) {
-										SetPError(P::READ_ERR);
-										return;
+										SetPError(P::TRACK_2_AND_3_READ_ERR);
+										continue;
 									}
 									std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(commandBuffer));
 								}
@@ -329,19 +323,12 @@ void CardIo::Command_7A_RegisterFont()
 
 void CardIo::Command_7B_PrintImage()
 {
-	switch (currentStep) {
-		case 1:
-			if (!HasCard()) {
-				SetPError(P::ILLEGAL_ERR);
-			}
-			break;
-		default:
-			break;
+	if (!HasCard()) {
+		SetPError(P::PRINT_ERR);
+		return;
 	}
-
-	if (currentStep > 1) {
-		runningCommand = false;
-	}
+	status.SoftReset();
+	runningCommand = false;
 }
 
 void CardIo::Command_7C_PrintL()
@@ -366,16 +353,13 @@ void CardIo::Command_7C_PrintL()
 	//uint8_t lineOffset = currentPacket[2];
 
 	switch (currentStep) {
-		case 1:
-			if (!HasCard()) {
-				SetPError(P::PRINT_ERR);
-			}
-			break;
-		case 2:
-			MoveCard(MovePositions::THERMAL_HEAD);
-			break;
-		case 3:
+		case 0:
 			{
+				if (!HasCard()) {
+					SetPError(P::PRINT_ERR);
+					return;
+				}
+				MoveCard(MovePositions::THERMAL_HEAD);
 				// FIXME: It seems the phyiscal readers ignore this, or have the ability to split between print "steps", either way, disable this for now
 				//if (control == BufferControl::Clear) {
 					printBuffer.clear();
@@ -396,14 +380,14 @@ void CardIo::Command_7C_PrintL()
 				card.close();
 			}
 			break;
-		case 4:
+		case 1:
 			MoveCard(MovePositions::READ_WRITE_HEAD);
 			break;
 		default:
 			break;
 	}
 
-	if (currentStep > 4) {
+	if (currentStep > 1) {
 		runningCommand = false;
 	}
 }
@@ -411,22 +395,21 @@ void CardIo::Command_7C_PrintL()
 void CardIo::Command_7D_Erase()
 {
 	switch (currentStep) {
-		case 1:
+		case 0:
 			if (!HasCard()) {
 				SetPError(P::PRINT_ERR);
+				return;
 			}
-			break;
-		case 2:
 			MoveCard(MovePositions::THERMAL_HEAD);
 			break;
-		case 3:
+		case 1:
 			MoveCard(MovePositions::READ_WRITE_HEAD);
 			break;
 		default:
 			break;
 	}
 
-	if (currentStep > 3) {
+	if (currentStep > 1) {
 		runningCommand = false;
 	}
 }
@@ -451,9 +434,7 @@ void CardIo::Command_7E_PrintBarcode()
 void CardIo::Command_80_EjectCard()
 {
 	switch (currentStep) {
-		case 1: // FIXME: Special for "Transfer Card Data" in MT2EXP, we need 2 S::RUNNING_COMMAND replies
-			break;
-		case 2:
+		case 2: // "Transfer Card Data" in MT2EXP requires 2 S::RUNNING_COMMAND replies
 			EjectCard();
 			break;
 		default:
@@ -496,7 +477,7 @@ void CardIo::Command_B0_DispenseCardS31()
 		CheckOnly = 0x32,
 	};
 
-	// Mario Kart GP1 issues this command without options
+	// MKGP1 issues this command without options
 	Mode mode = Mode::Dispense;
 	if (!currentPacket.empty()) {
 		mode = static_cast<Mode>(currentPacket[0]);
@@ -629,22 +610,18 @@ void CardIo::ReadCard()
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 
 	// TODO: Should we actually be seeding zero's when the file doesn't exist?
-	std::string readBack(CARD_SIZE, 0);
+	std::string readBack;
 
 	ClearCardData();
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
 		auto fileSize = ghc::filesystem::file_size(fullPath.c_str());
-		if (fileSize <= CARD_SIZE) {
+		if (fileSize > 0 && !(fileSize % TRACK_SIZE)) {
 			std::ifstream card(fullPath.c_str(), std::ifstream::in | std::ifstream::binary);
+			readBack.resize(fileSize);
 			card.read(&readBack[0], fileSize);
 			card.close();
 		} else {
-			if (fileSize == TRACK_SIZE) {
-				g_logger->warn("This file is using the track based system, use convert.exe to fix this");
-				// Long enough where the game should complain and someone will notice
-				std::this_thread::sleep_for(std::chrono::seconds(10));
-			}
 			g_logger->warn("Incorrect card size");
 			// TODO: Don't set this here
 			SetPError(P::READ_ERR);
@@ -653,7 +630,7 @@ void CardIo::ReadCard()
 	}
 
 	auto offset = 0;
-	for (auto i = 0; i < NUM_TRACKS; i++) {
+	for (auto i = 0; i < (readBack.size() / TRACK_SIZE); i++) {
 		std::copy(readBack.begin() + offset, readBack.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
 		offset += TRACK_SIZE;
 	}
@@ -699,10 +676,10 @@ void CardIo::WriteCard()
 	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 
 	std::string writeBack;
-	for (auto &data: cardData) {
-		if (data.size() != TRACK_SIZE)
-			data.resize(TRACK_SIZE);
-		std::copy(data.begin(), data.end(), std::back_inserter(writeBack));
+	for (const auto &track : cardData) {
+		if (track.empty())
+			continue;
+		std::copy(track.begin(), track.end(), std::back_inserter(writeBack));
 	}
 
 	std::ofstream card;
@@ -740,12 +717,8 @@ void CardIo::UpdateStatusInBuffer()
 
 void CardIo::HandlePacket()
 {
-	if (!runningCommand) {
-		if (status.s != S::ILLEGAL_COMMAND) {
-			status.s = S::NO_JOB;
-		}
-
-		status.p = P::NO_ERR;
+	if (!runningCommand && status.s != S::ILLEGAL_COMMAND) {
+		status.s = S::NO_JOB;
 	}
 
 	UpdateRStatus();
