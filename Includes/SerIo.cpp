@@ -74,11 +74,11 @@ bool SerIo::Open()
 	return true;
 }
 
-void SerIo::SendAck()
+void SerIo::SendAck(bool okay)
 {
-	constexpr static const uint8_t ack = 0x06;
+	const uint8_t ack = okay ? 0x06 : 0x15;
 
-	g_logger->trace("SerIo::SendAck: 06");
+	g_logger->trace("SerIo::SendAck: {}", ack);
 
 #ifdef _WIN32
 	if (m_isPipe) {

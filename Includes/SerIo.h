@@ -64,7 +64,7 @@ public:
 	bool Open();
 	SerIo::Status Read();
 	SerIo::Status Write();
-	void SendAck();
+	void SendAck(bool okay);
 private:
 #ifdef _WIN32
 	HANDLE m_pipeHandle = INVALID_HANDLE_VALUE;

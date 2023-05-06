@@ -226,9 +226,9 @@ int main(int argc, char *argv[])
 
 		cardStatus = cardHandler->ReceivePacket(serialHandler->m_readBuffer);
 
-		if (cardStatus == CardIo::Okay) {
+		if (cardStatus == CardIo::Okay || cardStatus == CardIo::ChecksumError) {
 			// We need to send our ACK as quick as possible
-			serialHandler->SendAck();
+			serialHandler->SendAck(cardStatus == CardIo::Okay ? true : false);
 		} else if (cardStatus == CardIo::ServerWaitingReply) {
 			// Do not reply until we get this command
 			cardHandler->BuildPacket(serialHandler->m_writeBuffer);

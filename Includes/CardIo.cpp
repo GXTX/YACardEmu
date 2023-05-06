@@ -801,7 +801,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	if (readBuffer.at(count) != END_OF_TEXT) {
 		g_logger->debug("CardIo::ReceivePacket: Missing ETX!");
 		readBuffer.erase(readBuffer.begin(), readBuffer.begin() + count);
-		return SyntaxError;
+		return ChecksumError;
 	}
 
 	// Checksum is calcuated by xoring the entire packet excluding the start and the end
