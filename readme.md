@@ -5,6 +5,10 @@ YACardEmu (*YetAnother*CardEmu) is a software emulator to emulate a range of mag
 
 **Checkout some gameplay videos [here!](https://www.youtube.com/channel/UCle6xQNwROzwYfYMyrnIcBQ)**
 
+Breaking Changes....
+---------
+We've recently remodeled how cards are stored. If your card ends with `.track_n` then you must convert this to a single file. If your `.track_1` or `.track_2` files are empty (aka all zeros) then do **not** add the zero'ed track to the file. The resulting file should have either 69, 138, or 207 bytes in it.
+
 Building
 ---------
 #### Prerequisites
@@ -79,38 +83,38 @@ If you're wanting to run this on hardware there are some settings you'll need to
 
 SEGA Chihiro
 ```
-Wangan Maximum Tune 1 : CRP-1231LR-10NAB | 9600b none
-Wangan Maximum Tune 2 : CRP-1231LR-10NAB | 9600b none
+Wangan Maximum Tune 1 : CRP-1231LR-10NAB | 9600 none
+Wangan Maximum Tune 2 : CRP-1231LR-10NAB | 9600 none
 ```
 
 Namco System N2
 ```
-Wangan Maximum Tune 3    : CR-S31R-10HS3 | 38400b even
-Wangan Maximum Tune 3DX  : CR-S31R-10HS3 | 38400b even
-Wangan Maximum Tune 3DX+ : CR-S31R-10HS3 | 38400b even
+Wangan Maximum Tune 3    : CR-S31R-10HS3 | 38400 even
+Wangan Maximum Tune 3DX  : CR-S31R-10HS3 | 38400 even
+Wangan Maximum Tune 3DX+ : CR-S31R-10HS3 | 38400 even
 ```
 
 SEGA Hikaru
 ```
-Virtual-On Force (電脳戦機バーチャロン フォース) : CRP-1231BR-10 | 9600b even
-†Requires Sega P/N 838-13661 RS232 converter PCB
+Virtual-On Force (電脳戦機バーチャロン フォース) : CRP-1231BR-10 | 9600 even
+†Requires SEGA P/N 838-13661 RS232 converter PCB
 ```
 
 Namco System 246
 ```
-THE iDOLM@STER (アイドルマスタ) : CRP-1231LR-10NAB | 9600b none
+THE iDOLM@STER (アイドルマスタ) : CRP-1231LR-10NAB | 9600 none
 ```
 
 SEGA NAOMI 2
 ```
-Initial D Arcade Stage Ver.1 : CRP-1231BR-10 | 9600b even
-Initial D Arcade Stage Ver.2 : CRP-1231BR-10 | 9600b even
-Initial D Arcade Stage Ver.3 : CRP-1231BR-10 | 9600b even
+Initial D Arcade Stage Ver.1 : CRP-1231BR-10 | 9600 even
+Initial D Arcade Stage Ver.2 : CRP-1231BR-10 | 9600 even
+Initial D Arcade Stage Ver.3 : CRP-1231BR-10 | 9600 even
 ```
 
 SEGA Triforce
 ```
-F-Zero AX             : CRP-1231BR-10    | 9600b even
-Mario Kart Arcade GP  : CRP-1231LR-10NAB | 9600b none
-Mario Kart Arcade GP2 : CRP-1231LR-10NAB | 9600b none
+F-Zero AX             : CRP-1231BR-10    | 9600 even
+Mario Kart Arcade GP  : CRP-1231LR-10NAB | 9600 none
+Mario Kart Arcade GP2 : CRP-1231LR-10NAB | 9600 none
 ```
