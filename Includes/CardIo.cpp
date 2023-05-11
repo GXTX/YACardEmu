@@ -653,8 +653,9 @@ void CardIo::WriteCard()
 				newCardName.append("." + std::to_string(i));
 			} else {
 				// Increment the numbers contained in $3
-				find = std::to_string(std::stoi(find) + 1);
-				newCardName = newCardName.substr(0, newCardName.size() - find.size()) + find;
+				auto strSize = find.size();
+				find = std::to_string(std::stoi(find) + i);
+				newCardName = newCardName.substr(0, newCardName.size() - strSize) + find;
 			}
 
 			// Perfenece to not having a number...
