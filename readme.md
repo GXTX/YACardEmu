@@ -105,6 +105,12 @@ Namco System 246
 THE iDOLM@STER (アイドルマスタ) : CRP-1231LR-10NAB | 9600 none
 ```
 
+SEGA NAOMI
+```
+Derby Owners Club World Edition : CRP-1231BR-10 | 9600 even
+†Requires SEGA P/N 838-13661 RS232 converter PCB
+```
+
 SEGA NAOMI 2
 ```
 Initial D Arcade Stage Ver.1 : CRP-1231BR-10 | 9600 even
