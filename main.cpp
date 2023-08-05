@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
 	g_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
 
 	if (!ReadConfig()) {
-		return 1;
+		goto error;
 	}
 
 	std::unique_ptr<CardIo> cardHandler{};
@@ -198,17 +198,17 @@ int main(int argc, char *argv[])
 		cardHandler = std::make_unique<C1231BR>(&globalSettings.card);
 	} else {
 		g_logger->critical("Invalid target device: {}", globalSettings.card.mech);
-		return 1;
+		goto error;
 	}
 
 	std::unique_ptr<SerIo> serialHandler = std::make_unique<SerIo>(&globalSettings.serial);
 	if (!serialHandler->Open()) {
-		return 1;
+		goto error;
 	}
 
 	std::unique_ptr<WebIo> webHandler = std::make_unique<WebIo>(&globalSettings.card, globalSettings.webListenHost, globalSettings.webPort, &running);
 	if (!webHandler->Spawn()) {
-		return 1;
+		goto error;
 	}
 
 	// TODO: These don't need to be here, put them in their respective classes
@@ -239,4 +239,10 @@ int main(int argc, char *argv[])
 	}
 
 	return 0;
+error:
+#ifdef _WIN32
+	std::cout << "Press any key to close the application...";
+	std::cin.get();
+#endif
+	return 1;
 }
