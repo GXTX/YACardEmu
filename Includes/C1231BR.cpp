@@ -24,24 +24,26 @@
 
 C1231BR::C1231BR(CardIo::Settings* settings) : CardIo(settings)
 {
+	localStatus.position = reinterpret_cast<C1231BR::Position *>(&status.position);
+	*localStatus.position = Position::NO_CARD;
 }
 
-void C1231BR::UpdateRStatus()
+void C1231BR::UpdateState()
 {
 	// FIXME: We shouldn't be checking commands here, but F-Zero AX requires the user NOT to insert the card completely, rather, it appears D0 or 33 is pulling in the card
 	if (currentCommand != 0xD0 && currentCommand != 0x33) {
 		// We "grab" the card for the user
-		if (localStatus.position == CardPosition::POS_IN_FRONT) {
+		if (*localStatus.position == Position::EJECT) {
 			m_cardSettings->insertedCard = false;
-			MoveCard(MovePositions::NO_CARD);
+			*localStatus.position = Position::NO_CARD;
 		}
 	}
 
 	// We require the user to "insert" a card if we're waiting
-	if (m_cardSettings->insertedCard && localStatus.position == CardPosition::NO_CARD) {
+	if (m_cardSettings->insertedCard && *localStatus.position == Position::NO_CARD) {
 		ReadCard();
 		// We're not actually ejecting here, we're presenting the card to the machine with POS_IN_FRONT
-		MoveCard(MovePositions::EJECT);
+		*localStatus.position = Position::EJECT;
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
 			// Make sure the user can actually insert a card
@@ -51,26 +53,21 @@ void C1231BR::UpdateRStatus()
 	}
 }
 
-bool C1231BR::HasCard()
-{
-	return localStatus.position != CardPosition::NO_CARD;
-}
-
 void C1231BR::DispenseCard()
 {
-	localStatus.position = CardPosition::POS_THERM_DISP;
+	*localStatus.position = Position::DISPENSER_THERMAL;
 }
 
 void C1231BR::EjectCard()
 {
-	if (localStatus.position != CardPosition::NO_CARD) {
+	if (*localStatus.position != Position::NO_CARD) {
 		localStatus.shutter  = true;
-		localStatus.position = CardPosition::POS_IN_FRONT;
+		*localStatus.position = Position::EJECT;
 		WriteCard();
 	}
 }
 
-uint8_t C1231BR::GetRStatus()
+uint8_t C1231BR::GetPositionByte()
 {
 	return localStatus.GetByte();
 }
@@ -102,44 +99,4 @@ void C1231BR::Command_D0_ShutterControl()
 	localStatus.shutter = (static_cast<Action>(currentPacket[0]) == Action::Open) ? true : false;
 
 	runningCommand = false;
-}
-
-void C1231BR::MoveCard(CardIo::MovePositions position)
-{
-	switch (position) {
-		case MovePositions::NO_CARD:
-			localStatus.position = CardPosition::NO_CARD;
-			break;
-		case MovePositions::READ_WRITE_HEAD:
-			localStatus.position = CardPosition::POS_MAG;
-			break;
-		case MovePositions::THERMAL_HEAD:
-			localStatus.position = CardPosition::POS_THERM;
-			break;
-		case MovePositions::DISPENSER_THERMAL:
-			localStatus.position = CardPosition::POS_THERM_DISP;
-			break;
-		case MovePositions::EJECT:
-			localStatus.position = CardPosition::POS_IN_FRONT;
-			break;
-		default: break;
-	}
-}
-
-CardIo::MovePositions C1231BR::GetCardPos()
-{
-	switch (localStatus.position) {
-		case CardPosition::NO_CARD:
-			return MovePositions::NO_CARD;
-		case CardPosition::POS_MAG:
-			return MovePositions::READ_WRITE_HEAD;
-		case CardPosition::POS_THERM:
-			return MovePositions::THERMAL_HEAD;
-		case CardPosition::POS_THERM_DISP:
-			return MovePositions::DISPENSER_THERMAL;
-		case CardPosition::POS_IN_FRONT:
-			return MovePositions::EJECT;
-		default:
-			return MovePositions::NO_CARD;
-	}
 }

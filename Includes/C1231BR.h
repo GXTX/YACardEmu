@@ -31,42 +31,39 @@
 
 #include "CardIo.h"
 
-class C1231BR : public CardIo {
+class C1231BR : public CardIo
+{
 public:
 	C1231BR(CardIo::Settings* settings);
-
 protected:
-	enum class CardPosition {
-		NO_CARD        = 0b00000,
-		POS_MAG        = 0b11000,
-		POS_THERM      = 0b00111,
-		POS_THERM_DISP = 0b11100,
-		POS_IN_FRONT   = 0b00001,
-	};
+	enum class Position : uint8_t {
+		NO_CARD           = 0b00000,
+		READ_WRITE_HEAD   = 0b11000,
+		THERMAL_HEAD      = 0b00111,
+		DISPENSER_THERMAL = 0b11100,
+		EJECT             = 0b00001,
+	} override;
 
 	struct LocalStatus {
-		bool shutter = true;
-		bool dispenser = true; // report full dispenser
-		CardPosition position = CardPosition::NO_CARD;
+		bool shutter       = true;
+		bool dispenser     = true; // report full dispenser
+		Position* position = nullptr;
 
 		uint8_t GetByte()
 		{
-			return 1 << (shutter ? 7 : 6) | (dispenser ? 1 : 0) << 5 | static_cast<uint8_t>(position);
+			return 1 << (shutter ? 7 : 6) | (dispenser ? 1 : 0) << 5 | static_cast<uint8_t>(*position);
 		}
 	};
 
-	LocalStatus localStatus{};
-	bool HasCard() override;
+	LocalStatus localStatus = {};
+
 	void DispenseCard() override;
 	void EjectCard() override;
-	void UpdateRStatus() override;
-	uint8_t GetRStatus() override;
+	void UpdateState() override;
+	uint8_t GetPositionByte() override;
 
 	void Command_10_Initalize() override;
 	void Command_D0_ShutterControl() override;
-
-	void MoveCard(CardIo::MovePositions position) override;
-	CardIo::MovePositions GetCardPos() override;
 };
 
 #endif // C1231BR

@@ -33,25 +33,30 @@
 class C1231LR : public CardIo
 {
 public:
-    C1231LR(CardIo::Settings *settings);
+    C1231LR(CardIo::Settings* settings);
 protected:
-	enum class CardPosition {
-		NO_CARD                 = 0x30,
-		POS_MAG                 = 0x31,
-		POS_THERM               = 0x32,
-		POS_THERM_DISP          = 0x33,
-		POS_EJECTED_NOT_REMOVED = 0x34,
-	};
+    enum class Position : uint8_t {
+        NO_CARD           = '0',
+        READ_WRITE_HEAD   = '1',
+        THERMAL_HEAD      = '2',
+        DISPENSER_THERMAL = '3',
+        EJECT             = '4',
+    } override;
 
-    CardPosition localStatus{CardPosition::NO_CARD};
-    bool HasCard() override;
+    struct LocalStatus {
+        Position* position = nullptr;
+
+        uint8_t GetByte() {
+            return static_cast<uint8_t>(*position);
+        }
+    };
+
+    LocalStatus localStatus = {};
+
     void DispenseCard() override;
     void EjectCard() override;
-    void UpdateRStatus() override;
-    uint8_t GetRStatus() override;
-
-    void MoveCard(CardIo::MovePositions position) override;
-    CardIo::MovePositions GetCardPos() override;
+    void UpdateState() override;
+    uint8_t GetPositionByte() override;
 };
 
 #endif //C1231LR

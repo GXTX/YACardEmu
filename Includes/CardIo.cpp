@@ -90,11 +90,11 @@ void CardIo::Command_33_ReadData2()
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				} else {
-					MoveCard(MovePositions::READ_WRITE_HEAD);
+					status.position = Position::READ_WRITE_HEAD;
 				}
 			} else {
 				if (HasCard()) {
-					MoveCard(MovePositions::READ_WRITE_HEAD);
+					status.position = Position::READ_WRITE_HEAD;
 
 					switch (track) {
 						case Track::Track_1:
@@ -359,7 +359,7 @@ void CardIo::Command_7C_PrintL()
 					SetPError(P::PRINT_ERR);
 					return;
 				}
-				MoveCard(MovePositions::THERMAL_HEAD);
+				status.position = Position::THERMAL_HEAD;
 				// FIXME: It seems the phyiscal readers ignore this, or have the ability to split between print "steps", either way, disable this for now
 				//if (control == BufferControl::Clear) {
 					printBuffer.clear();
@@ -381,7 +381,7 @@ void CardIo::Command_7C_PrintL()
 			}
 			break;
 		case 1:
-			MoveCard(MovePositions::READ_WRITE_HEAD);
+			status.position = Position::READ_WRITE_HEAD;
 			break;
 		default:
 			break;
@@ -400,10 +400,10 @@ void CardIo::Command_7D_Erase()
 				SetPError(P::PRINT_ERR);
 				return;
 			}
-			MoveCard(MovePositions::THERMAL_HEAD);
+			status.position = Position::THERMAL_HEAD;
 			break;
 		case 1:
-			MoveCard(MovePositions::READ_WRITE_HEAD);
+			status.position = Position::READ_WRITE_HEAD;
 			break;
 		default:
 			break;
@@ -456,7 +456,7 @@ void CardIo::Command_A0_Clean()
 			}
 			break;
 		case 2:
-			MoveCard(MovePositions::THERMAL_HEAD);
+			status.position = Position::THERMAL_HEAD;
 			break;
 		case 3:
 			EjectCard();
@@ -506,8 +506,8 @@ void CardIo::Command_B0_DispenseCardS31()
 			}
 			break;
 		case 2:
-			if (GetCardPos() == MovePositions::DISPENSER_THERMAL) {
-				MoveCard(MovePositions::READ_WRITE_HEAD);
+			if (status.position == Position::DISPENSER_THERMAL) {
+				status.position = Position::READ_WRITE_HEAD;
 			} else if (!m_cardSettings->reportDispenserEmpty) {
 				SetPError(P::MOTOR_ERR);
 			}
@@ -705,12 +705,12 @@ void CardIo::SetSError(S error_code)
 
 void CardIo::UpdateStatusInBuffer()
 {
-	commandBuffer[1] = GetRStatus();
+	commandBuffer[1] = GetPositionByte();
 	commandBuffer[2] = static_cast<uint8_t>(status.p);
 	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
 	g_logger->trace("CardIo::UpdateStatusInBuffer: R: {0:X} P: {1:X} S: {2:X}", 
-		GetRStatus(),
+		GetPositionByte(),
 		static_cast<uint8_t>(status.p),
 		static_cast<uint8_t>(status.s)
 	);
@@ -722,7 +722,7 @@ void CardIo::HandlePacket()
 		status.s = S::NO_JOB;
 	}
 
-	UpdateRStatus();
+	UpdateState();
 
 	if (runningCommand) {
 		if (m_cardSettings->waitingForCard) {
@@ -852,7 +852,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	commandBuffer.clear();
 	commandBuffer.emplace_back(currentCommand);
-	commandBuffer.emplace_back(GetRStatus());
+	commandBuffer.emplace_back(GetPositionByte());
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.p));
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.s));
 

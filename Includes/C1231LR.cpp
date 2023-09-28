@@ -23,21 +23,23 @@
 
 C1231LR::C1231LR(CardIo::Settings *settings) : CardIo(settings)
 {
+	localStatus.position = reinterpret_cast<Position *>(&status.position);
+	*localStatus.position = Position::NO_CARD;
 }
 
-void C1231LR::UpdateRStatus()
+void C1231LR::UpdateState()
 {
 	// We "grab" the card for the user
-	if (localStatus == CardPosition::POS_EJECTED_NOT_REMOVED) {
+	if (*localStatus.position == Position::EJECT) {
 		m_cardSettings->insertedCard = false;
 		m_cardSettings->hasCard = false;
-		MoveCard(MovePositions::NO_CARD);
+		*localStatus.position = Position::NO_CARD;
 	}
 
 	// We require the user to "insert" a card if we're waiting
-	if (m_cardSettings->insertedCard && localStatus == CardPosition::NO_CARD) {
+	if (m_cardSettings->insertedCard && *localStatus.position == Position::NO_CARD) {
 		ReadCard();
-		MoveCard(MovePositions::READ_WRITE_HEAD);
+		*localStatus.position = Position::READ_WRITE_HEAD;
 
 		if (runningCommand && status.s == S::WAITING_FOR_CARD) {
 			status.s = S::RUNNING_COMMAND;
@@ -45,78 +47,27 @@ void C1231LR::UpdateRStatus()
 	}
 }
 
-bool C1231LR::HasCard()
-{
-	return (localStatus != CardPosition::NO_CARD && localStatus != CardPosition::POS_EJECTED_NOT_REMOVED);
-}
-
 void C1231LR::DispenseCard()
 {
-	if (localStatus != CardPosition::NO_CARD) {
+	if (*localStatus.position != Position::NO_CARD) {
 		g_logger->info("Error dispensing card - card present?");
 		SetSError(S::ILLEGAL_COMMAND);
 	} else {
 		g_logger->info("Dispensing new card");
-		MoveCard(MovePositions::DISPENSER_THERMAL);
+		*localStatus.position = Position::DISPENSER_THERMAL;
 	}
 }
 
 void C1231LR::EjectCard()
 {
-	if (localStatus != CardPosition::NO_CARD) {
+	if (*localStatus.position != Position::NO_CARD) {
 		g_logger->info("Ejecting card");
-		MoveCard(MovePositions::EJECT);
+		*localStatus.position = Position::EJECT;
 		WriteCard();
 	}
 }
 
-uint8_t C1231LR::GetRStatus()
+uint8_t C1231LR::GetPositionByte()
 {
-	return static_cast<uint8_t>(localStatus);
-}
-
-void C1231LR::MoveCard(CardIo::MovePositions position)
-{
-	switch (position) {
-		case MovePositions::NO_CARD:
-			localStatus = CardPosition::NO_CARD;
-			m_cardSettings->hasCard = false;
-			break;
-		case MovePositions::READ_WRITE_HEAD:
-			localStatus = CardPosition::POS_MAG;
-			m_cardSettings->hasCard = true;
-			break;
-		case MovePositions::THERMAL_HEAD:
-			localStatus = CardPosition::POS_THERM;
-			m_cardSettings->hasCard = true;
-			break;
-		case MovePositions::DISPENSER_THERMAL:
-			localStatus = CardPosition::POS_THERM_DISP;
-			m_cardSettings->hasCard = true;
-			break;
-		case MovePositions::EJECT:
-			localStatus = CardPosition::POS_EJECTED_NOT_REMOVED;
-			m_cardSettings->hasCard = false;
-			break;
-		default:
-			break;
-	}
-}
-
-CardIo::MovePositions C1231LR::GetCardPos()
-{
-	switch (localStatus) {
-		case CardPosition::NO_CARD:
-			return MovePositions::NO_CARD;
-		case CardPosition::POS_MAG:
-			return MovePositions::READ_WRITE_HEAD;
-		case CardPosition::POS_THERM:
-			return MovePositions::THERMAL_HEAD;
-		case CardPosition::POS_THERM_DISP:
-			return MovePositions::DISPENSER_THERMAL;
-		case CardPosition::POS_EJECTED_NOT_REMOVED:
-			return MovePositions::EJECT;
-		default:
-			return MovePositions::NO_CARD;
-	}
+	return static_cast<uint8_t>(*localStatus.position);
 }
