@@ -105,6 +105,7 @@ void CardIo::Command_33_ReadData2()
 
 								if (cardData.at(ctrack).empty()) {
 									SetPError(P::READ_ERR);
+									g_logger->trace("CardIo::Command_33_ReadData2: Read error on track {X}", ctrack);
 									return;
 								}
 
@@ -120,9 +121,11 @@ void CardIo::Command_33_ReadData2()
 
 								if (track == Track::Track_1_And_2) {
 									ctrack = 0; ctrack1 = 1;
-								} else if (track == Track::Track_1_And_3) {
+								}
+								else if (track == Track::Track_1_And_3) {
 									ctrack = 0; ctrack1 = 2;
-								} else {
+								}
+								else {
 									ctrack = 1; ctrack1 = 2;
 								}
 
@@ -140,6 +143,7 @@ void CardIo::Command_33_ReadData2()
 								for (int i = 0; i < NUM_TRACKS; i++) {
 									if (cardData.at(i).empty()) {
 										SetPError(P::TRACK_2_AND_3_READ_ERR);
+										g_logger->trace("CardIo::Command_33_ReadData2: Read error on track {X}", i);
 										continue;
 									}
 									std::copy(cardData.at(i).begin(), cardData.at(i).end(), std::back_inserter(commandBuffer));
@@ -621,6 +625,7 @@ void CardIo::ReadCard()
 			readBack.resize(fileSize);
 			card.read(&readBack[0], fileSize);
 			card.close();
+			g_logger->trace("CardIo::ReadCard: {:Xn}", spdlog::to_hex(readBack));
 		} else {
 			g_logger->warn("Incorrect card size");
 			// TODO: Don't set this here
@@ -641,7 +646,7 @@ void CardIo::WriteCard()
 	// Should only happen when issued from dispenser, we want to avoid overwriting a previous card
 	if (!m_cardSettings->insertedCard) {
 		auto i = 0;
-		while (true) {
+		while (i < 1000) {
 			// TODO: It would be nicer if the generated name was abc.123.bin instead of abc.bin.123
 			std::string newCardName = m_cardSettings->cardName;
 
@@ -682,6 +687,9 @@ void CardIo::WriteCard()
 			continue;
 		std::copy(track.begin(), track.end(), std::back_inserter(writeBack));
 	}
+
+	g_logger->trace("CardIo::WriteCard: 0:{0:Xn} 1:{1:Xn} 2:{2:Xn}", spdlog::to_hex(cardData.at(0)), spdlog::to_hex(cardData.at(1)), spdlog::to_hex(cardData.at(2)));
+	g_logger->trace("CardIo::WriteCard: {:Xn}", spdlog::to_hex(writeBack));
 
 	std::ofstream card;
 	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
