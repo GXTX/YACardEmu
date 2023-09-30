@@ -226,6 +226,8 @@ int main(int argc, char *argv[])
 	SerIo::Status serialStatus = SerIo::Status::Okay;
 	CardIo::StatusCode cardStatus = CardIo::StatusCode::Okay;
 
+	g_logger->info("Running...");
+
 	while (running) {
 		serialStatus = serialHandler->Read();
 
