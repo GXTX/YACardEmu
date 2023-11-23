@@ -16,10 +16,7 @@ add_executable(${PROJECT_NAME}
 
 if (WIN32)
 	add_subdirectory(3rdparty/libserialport)
-	add_dependencies(${PROJECT_NAME} libserialport)
-
 	set(SERIAL_INCLUDE_DIRS ${libserialport_SOURCE_DIR})
-	set(SERIAL_LIBRARIES ${libserialport_BINARY_DIR}/${CMAKE_BUILD_TYPE}/libserialport.lib)
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(SERIAL REQUIRED libserialport)
@@ -48,14 +45,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 14)
 
 if (MSVC)
 	target_compile_options(${PROJECT_NAME} PRIVATE /W4)
-	add_definitions(-DWIN32_LEAN_AND_MEAN)
+	add_definitions(-DWIN32_LEAN_AND_MEAN -DLIBSERIALPORT_MSBUILD -DLIBSERIALPORT_STATIC)
 else()
 	target_compile_options(${PROJECT_NAME} PRIVATE -march=native -Wall -Wextra -Wpedantic)
 endif()
 
 if (MSVC)
 	target_link_libraries(${PROJECT_NAME}
-		${SERIAL_LIBRARIES}
 		${CMAKE_THREAD_LIBS_INIT}
 		spdlog::spdlog
 		libserialport
@@ -77,11 +73,6 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 if (WIN32)
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy
-			${libserialport_BINARY_DIR}/${CMAKE_BUILD_TYPE}/libserialport.dll
-			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/libserialport.dll
-	)
-	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy
 			${CMAKE_CURRENT_SOURCE_DIR}/config.ini.sample
 			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/config.ini.sample
 	)
@@ -96,10 +87,3 @@ if (WIN32)
 			${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/public
 	)
 endif()
-
-# Will be removed in a future version
-add_executable(convert
-	convert.cpp
-)
-
-set_target_properties(convert PROPERTIES CXX_STANDARD 14)
