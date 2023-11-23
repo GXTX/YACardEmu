@@ -561,7 +561,7 @@ void CardIo::Command_E1_SetRTC()
 
 	timeStrS << timeStr;
 
-	std::tm tempTime = {1};
+	std::tm tempTime{};
 	timeStrS >> std::get_time(&tempTime, "%y%m%d%H%M%S");
 	setTime = std::mktime(&tempTime);
 
@@ -635,7 +635,7 @@ void CardIo::ReadCard()
 	}
 
 	auto offset = 0;
-	for (auto i = 0; i < (readBack.size() / TRACK_SIZE); i++) {
+	for (size_t i = 0; i < (readBack.size() / TRACK_SIZE); i++) {
 		std::copy(readBack.begin() + offset, readBack.begin() + offset + TRACK_SIZE, std::back_inserter(cardData.at(i)));
 		offset += TRACK_SIZE;
 	}
@@ -691,10 +691,14 @@ void CardIo::WriteCard()
 	g_logger->trace("CardIo::WriteCard: 0:{0:Xn} 1:{1:Xn} 2:{2:Xn}", spdlog::to_hex(cardData.at(0)), spdlog::to_hex(cardData.at(1)), spdlog::to_hex(cardData.at(2)));
 	g_logger->trace("CardIo::WriteCard: {:Xn}", spdlog::to_hex(writeBack));
 
-	std::ofstream card;
-	card.open(fullPath, std::ofstream::out | std::ofstream::binary);
-	card.write(writeBack.c_str(), writeBack.size());
-	card.close();
+	if (writeBack.empty()) {
+		g_logger->warn("CardIo::WriteCard: Attempted to write a zero sized card!");
+	} else {
+		std::ofstream card;
+		card.open(fullPath, std::ofstream::out | std::ofstream::binary);
+		card.write(writeBack.c_str(), writeBack.size());
+		card.close();
+	}
 
 	ClearCardData();
 }
