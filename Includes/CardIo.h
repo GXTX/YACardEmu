@@ -35,6 +35,8 @@
 #include <iomanip>
 #include <regex>
 
+#include "mini/ini.h"
+
 #include "spdlog/spdlog.h"
 #include "spdlog/async.h"
 #include "spdlog/fmt/bin_to_hex.h"

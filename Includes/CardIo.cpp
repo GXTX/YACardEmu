@@ -609,6 +609,7 @@ void CardIo::ClearCardData()
 	cardData.resize(NUM_TRACKS);
 }
 
+// FIXME: Move these into a filesystem access class which will allow better flexability if someone wanted to use NFC cards
 void CardIo::ReadCard()
 {
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
@@ -678,7 +679,13 @@ void CardIo::WriteCard()
 		}
 	}
 
-	// TODO: Handle if cardPath doesn't have a trailing slash
+	if (m_cardSettings->cardPath.back() != '/' || m_cardSettings->cardPath.back() != '\\') {
+#ifdef _WIN32
+		m_cardSettings->cardPath.append("/");
+#else
+		m_cardSettings->cardPath.append("\\");
+#endif
+	}
 	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 
 	std::string writeBack;
@@ -698,6 +705,13 @@ void CardIo::WriteCard()
 		card.open(fullPath, std::ofstream::out | std::ofstream::binary);
 		card.write(writeBack.c_str(), writeBack.size());
 		card.close();
+
+		// FIXME: This is dirty
+		mINI::INIFile config("config.ini");
+		mINI::INIStructure ini;
+		config.read(ini);
+		ini["config"]["autoselectedcard"] = m_cardSettings->cardName;
+		config.write(ini);
 	}
 
 	ClearCardData();

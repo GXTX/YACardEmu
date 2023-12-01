@@ -78,6 +78,7 @@ void SigHandler(int sig)
 	}
 }
 
+// TODO: Handle this elsewhere, feels dirty
 bool ReadConfig()
 {
 	// Read in config values
