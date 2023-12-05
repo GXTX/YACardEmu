@@ -35,9 +35,13 @@ extern std::shared_ptr<spdlog::async_logger> g_logger;
 class Printer
 {
 public:
-	bool RegisterFont(std::vector<uint8_t>&data);
+	bool RegisterFont(std::vector<uint8_t>& data);
+	bool QueuePrintLine(std::vector<uint8_t>& data);
 protected:
+	std::vector<std::vector<uint8_t>> m_printQueue = {};
 	std::vector<SDL_Surface *> m_customGlyphs = { 256, nullptr };
+	
+	void PrintLine();
 
 	std::vector<bool> ConvertToBits(std::vector<uint8_t>& vector)
 	{

@@ -12,7 +12,7 @@ add_executable(${PROJECT_NAME}
 	Includes/C1231BR.cpp
 	Includes/base64.cpp
 	Includes/WebIo.cpp
-    Includes/Printer.cpp
+	Includes/Printer.cpp
 )
 
 if (WIN32)
@@ -22,6 +22,15 @@ if (WIN32)
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(SERIAL REQUIRED libserialport)
+#[[
+	find_package(ICU REQUIRED COMPONENTS i18n data uc)
+
+	pkg_check_modules(SDL2 REQUIRED sdl2)
+	pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
+	pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
+]]#
+endif()
+
 endif()
 
 include_directories(

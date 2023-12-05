@@ -339,24 +339,10 @@ void CardIo::Command_7B_PrintImage()
 
 void CardIo::Command_7C_PrintL()
 {
-	enum Mode {
-		Wait = 0x30, // is it expected to run this in the background after WriteData2?
-		Now = 0x31,
-	};
-
-	enum BufferControl {
-		Clear = 0x30,
-		DontClear = 0x31,
-	};
-
 	if (currentPacket.size() < 3) {
 		SetPError(P::SYSTEM_ERR);
 		return;
 	}
-
-	//Mode mode = static_cast<Mode>(currentPacket[0]);
-	//BufferControl control = static_cast<BufferControl>(currentPacket[1]);
-	//uint8_t lineOffset = currentPacket[2];
 
 	switch (currentStep) {
 		case 0:
@@ -365,25 +351,11 @@ void CardIo::Command_7C_PrintL()
 					SetPError(P::PRINT_ERR);
 					return;
 				}
+
+				m_printer->QueuePrintLine(currentPacket);
+
+				// FIXME: Should we only move the head when we're actually about to print?
 				MoveCard(MovePositions::THERMAL_HEAD);
-				// FIXME: It seems the phyiscal readers ignore this, or have the ability to split between print "steps", either way, disable this for now
-				//if (control == BufferControl::Clear) {
-					printBuffer.clear();
-				//}
-
-				std::copy(currentPacket.begin() + 3, currentPacket.end(), std::back_inserter(printBuffer));
-
-				// FIXME: Do this better.
-				std::ofstream card;
-				std::string writeBack{};
-				std::string fullPath(m_cardSettings->cardPath.c_str());
-				fullPath.append(printName);
-
-				std::copy(printBuffer.begin(), printBuffer.end(), std::back_inserter(writeBack));
-
-				card.open(fullPath, std::ofstream::out | std::ofstream::binary);
-				card.write(writeBack.c_str(), writeBack.size());
-				card.close();
 			}
 			break;
 		case 1:

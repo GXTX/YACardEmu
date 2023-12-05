@@ -30,7 +30,6 @@
 #include "C1231BR.h"
 #include "SerIo.h"
 #include "WebIo.h"
-#include "Printer.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
@@ -227,8 +226,6 @@ int main(int argc, char *argv[])
 	// TODO: These don't need to be here, put them in their respective classes
 	SerIo::Status serialStatus = SerIo::Status::Okay;
 	CardIo::StatusCode cardStatus = CardIo::StatusCode::Okay;
-
-	std::unique_ptr<Printer> printer = std::make_unique<Printer>();
 
 	g_logger->info("Running...");
 
