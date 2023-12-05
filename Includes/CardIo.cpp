@@ -321,6 +321,8 @@ void CardIo::Command_78_PrintSettings2()
 
 void CardIo::Command_7A_RegisterFont()
 {
+	m_printer->RegisterFont(currentPacket);
+
 	status.SoftReset();
 	runningCommand = false;
 }

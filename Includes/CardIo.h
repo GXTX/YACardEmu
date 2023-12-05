@@ -35,6 +35,8 @@
 #include <iomanip>
 #include <regex>
 
+#include "Printer.h"
+
 #include "mini/ini.h"
 
 #include "spdlog/spdlog.h"
@@ -200,6 +202,8 @@ protected:
 	virtual void EjectCard() = 0;
 	virtual void MoveCard(MovePositions position) = 0;
 	virtual CardIo::MovePositions GetCardPos() = 0;
+
+	std::unique_ptr<Printer> m_printer = std::make_unique<Printer>();
 };
 
 #endif

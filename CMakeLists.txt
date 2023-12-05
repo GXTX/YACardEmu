@@ -12,11 +12,13 @@ add_executable(${PROJECT_NAME}
 	Includes/C1231BR.cpp
 	Includes/base64.cpp
 	Includes/WebIo.cpp
+    Includes/Printer.cpp
 )
 
 if (WIN32)
 	add_subdirectory(3rdparty/libserialport)
 	set(SERIAL_INCLUDE_DIRS ${libserialport_SOURCE_DIR})
+	add_subdirectory(3rdparty/SDL EXCLUDE_FROM_ALL)
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(SERIAL REQUIRED libserialport)
@@ -55,6 +57,8 @@ if (MSVC)
 		${CMAKE_THREAD_LIBS_INIT}
 		spdlog::spdlog
 		libserialport
+		SDL2::SDL2main
+		SDL2::SDL2-static
 	)
 else()
 	target_link_libraries(${PROJECT_NAME}
