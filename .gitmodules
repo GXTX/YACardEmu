@@ -13,3 +13,6 @@
 [submodule "3rdparty/libserialport"]
 	path = 3rdparty/libserialport
 	url = https://github.com/GXTX/libserialport.git
+[submodule "3rdparty/SDL"]
+	path = 3rdparty/SDL
+	url = https://github.com/libsdl-org/SDL
