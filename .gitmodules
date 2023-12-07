@@ -16,3 +16,9 @@
 [submodule "3rdparty/SDL"]
 	path = 3rdparty/SDL
 	url = https://github.com/libsdl-org/SDL
+[submodule "3rdparty/utf8"]
+	path = 3rdparty/utf8
+	url = https://github.com/sheredom/utf8.h
+[submodule "3rdparty/libiconv"]
+	path = 3rdparty/libiconv
+	url = https://github.com/GXTX/libiconv-for-Windows

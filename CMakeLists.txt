@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(YACardEmu)
+cmake_policy(SET CMP0079 NEW)
+cmake_policy(SET CMP0077 NEW)
 
 find_package(Threads REQUIRED)
 
@@ -18,7 +20,28 @@ add_executable(${PROJECT_NAME}
 if (WIN32)
 	add_subdirectory(3rdparty/libserialport)
 	set(SERIAL_INCLUDE_DIRS ${libserialport_SOURCE_DIR})
-	add_subdirectory(3rdparty/SDL EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/libiconv)
+
+	set(SDL_ATOMIC FALSE)
+	set(SDL_AUDIO FALSE)
+	set(SDL_VIDEO FALSE)
+	set(SDL_RENDER FALSE)
+	set(SDL_EVENTS FALSE)
+	set(SDL_JOYSTICK FALSE)
+	set(SDL_HAPTIC FALSE)
+	set(SDL_HIDAPI FALSE)
+	set(SDL_POWER FALSE)
+	#set(SDL_THREADS FALSE)
+	set(SDL_TIMERS FALSE)
+	set(SDL_FILESYSTEM FALSE)
+	#set(SDL_LOADSO FALSE)
+	set(SDL_CPUINFO FALSE)
+	set(SDL_SENSOR FALSE)
+	#set(SDL_LOCALE FALSE)
+	add_subdirectory(3rdparty/SDL)
+	target_compile_definitions(SDL2-static PRIVATE HAVE_ICONV=1 HAVE_ICONV_H=1)
+	target_link_libraries(SDL2-static PRIVATE libiconv)
+	target_include_directories(SDL2-static PUBLIC "${PROJECT_SOURCE_DIR}/3rdparty/libiconv/include")
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(SERIAL REQUIRED libserialport)
@@ -31,8 +54,6 @@ else()
 ]]#
 endif()
 
-endif()
-
 include_directories(
 	${SERIAL_INCLUDE_DIRS}
 	${THREAD_INLCUDE_DIRS}
@@ -40,6 +61,8 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/3rdparty/cpp-httplib
 	${PROJECT_SOURCE_DIR}/3rdparty/mINI/src
 	${PROJECT_SOURCE_DIR}/3rdparty/gulfs/include
+	${PROJECT_SOURCE_DIR}/3rdparty/utf8
+	${SDL2_INCLUDE_DIRS}
 )
 
 add_subdirectory(3rdparty/spdlog)
@@ -74,6 +97,12 @@ else()
 		${SERIAL_LIBRARIES}
 		${CMAKE_THREAD_LIBS_INIT}
 		spdlog::spdlog
+#[[
+		${ICU_LIBRARIES}
+		${SDL2_LIBRARIES}
+		${SDL2_IMAGE_LIBRARIES}
+		${SDL2_TTF_LIBRARIES}
+]]#
 	)
 endif()
 

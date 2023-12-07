@@ -30,6 +30,8 @@
 #include "spdlog/async.h"
 #include "spdlog/fmt/bin_to_hex.h"
 
+#include "utf8.h"
+
 extern std::shared_ptr<spdlog::async_logger> g_logger;
 
 class Printer

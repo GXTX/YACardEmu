@@ -82,14 +82,28 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		m_printQueue.clear();
 
 	std::vector<uint8_t> temp = {};
-	std::copy(data.begin() + 2, data.end(), std::back_inserter(temp));
+	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
 	m_printQueue.emplace_back(temp);
+
+	PrintLine();
 
 	return true;
 }
 
 void Printer::PrintLine()
 {
+	std::vector<uint8_t> data = m_printQueue[0];
+	auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&data[0], data.size() + 1);
+	if (converted == nullptr)
+		return;
+
+#if 0
+	utf8_int32_t currentChar2 = 0;
+	//auto i = utf8codepoint(converted, &currentChar);
+	for (auto i = utf8codepoint(converted, &currentChar2); currentChar2 != '\0'; i = utf8codepoint(i, &currentChar2)) {
+		g_logger->warn("{}", currentChar2);
+	}
+#endif
 #if 0
 	TTF_Init();
 
