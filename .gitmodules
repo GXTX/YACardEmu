@@ -22,3 +22,9 @@
 [submodule "3rdparty/libiconv"]
 	path = 3rdparty/libiconv
 	url = https://github.com/GXTX/libiconv-for-Windows
+[submodule "3rdparty/SDL2_ttf"]
+	path = 3rdparty/SDL2_ttf
+	url = https://github.com/libsdl-org/SDL_ttf
+[submodule "3rdparty/SDL2_image"]
+	path = 3rdparty/SDL2_image
+	url = https://github.com/libsdl-org/SDL_image

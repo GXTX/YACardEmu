@@ -50,9 +50,9 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	uint32_t* pixels = static_cast<uint32_t*>(glyph->pixels);
 	SDL_PixelFormat* pixelFormat = glyph->format;
 
-	for (auto i = 0; i < bits.size(); i++) {
+	for (size_t i = 0; i < bits.size(); i++) {
 		if (bits.at(i))
-			pixels[i] = SDL_MapRGBA(pixelFormat, 64, 64, 96, 255);
+			pixels[i] = SDL_MapRGBA(pixelFormat, 0x64, 0x64, 0x96, 0xFF);
 		else
 			pixels[i] = SDL_MapRGBA(pixelFormat, 0, 0, 0, 0);
 	}
@@ -97,14 +97,6 @@ void Printer::PrintLine()
 	if (converted == nullptr)
 		return;
 
-#if 0
-	utf8_int32_t currentChar2 = 0;
-	//auto i = utf8codepoint(converted, &currentChar);
-	for (auto i = utf8codepoint(converted, &currentChar2); currentChar2 != '\0'; i = utf8codepoint(i, &currentChar2)) {
-		g_logger->warn("{}", currentChar2);
-	}
-#endif
-#if 0
 	TTF_Init();
 
 	constexpr const uint8_t defaultFontSize = 36;
@@ -126,33 +118,35 @@ void Printer::PrintLine()
 	constexpr const uint8_t defaultX = 95;
 	constexpr const uint8_t defaultY = 120; // FIXME: Needs to be variable, 120 for vertical, 85 for horiz
 
+	constexpr const SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
+
 	enum Commands {
 		Return = '\r',
 		Double = 0x11,
 		ResetScale = 0x14,
-		Escape = '\e',
+		Escape = 0x1B,
 		UseCustomGlyph = 0x67,
 		SetScale = 0x73,
 	};
 
-	const SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
-
 	for (const auto& x : m_printQueue)
 	{
-		std::string temp(x.begin(), x.end());
-		icu::UnicodeString buffer(temp.c_str(), "shift_jis");
+		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&x[0], x.size() + 1);
+		if (converted == nullptr) {
+			g_logger->error("iconv couldn't convert the string while printing!");
+			return;
+		}
 
-		UChar32 currentChar = {};
 		int xPos = defaultX;
 		int yPos = defaultY;
 		uint8_t xScale = '1';
 		uint8_t yScale = '1';
 		bool yScaleCompensate = false;
 		int maxYSizeForLine = 0;
+		utf8_int32_t currentChar = '\0';
 
-		for (auto i = 0; i < buffer.length(); i++) {
-			currentChar = buffer.char32At(i);
-
+		// FIXME: Have converted be a custom type where we can just iterate with converted[n]
+		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
 			// We need to fix our yPos after resetting from a yScale on the same line
 			if (yScaleCompensate)
 			{
@@ -183,10 +177,12 @@ void Printer::PrintLine()
 				xScale = '1';
 				continue;
 			case Escape: // FIXME: Don't allow this to overflow
-				currentChar = buffer.char32At(++i);
+				i = utf8codepoint(i, &currentChar);
 				if (currentChar == Commands::SetScale) {
-					yScale = buffer.char32At(++i);
-					xScale = buffer.char32At(++i);
+					i = utf8codepoint(i, &currentChar);
+					yScale = currentChar;
+					i = utf8codepoint(i, &currentChar);
+					xScale = currentChar;
 				}
 				continue;
 			}
@@ -209,7 +205,7 @@ void Printer::PrintLine()
 			maxYSizeForLine = scaledGlyph->h > maxYSizeForLine ? scaledGlyph->h : maxYSizeForLine;
 
 			int advance = 0;
-			TTF_GlyphMetrics(font, currentChar, NULL, NULL, NULL, NULL, &advance);
+			TTF_GlyphMetrics32(font, currentChar, NULL, NULL, NULL, NULL, &advance);
 			if (xScale == '1')
 				xPos += advance;
 			else
@@ -220,5 +216,4 @@ void Printer::PrintLine()
 		}
 
 	}
-#endif
 }

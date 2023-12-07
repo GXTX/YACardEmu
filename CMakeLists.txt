@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(YACardEmu)
 cmake_policy(SET CMP0079 NEW)
 cmake_policy(SET CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 find_package(Threads REQUIRED)
 
@@ -38,20 +39,27 @@ if (WIN32)
 	set(SDL_CPUINFO FALSE)
 	set(SDL_SENSOR FALSE)
 	#set(SDL_LOCALE FALSE)
+	set(SDL_INSTALL FALSE)
+	set(SDL_TESTS FALSE)
+	set(BUILD_SHARED_LIBS FALSE)
+	set(SDL2TTF_SAMPLES FALSE)
+	set(SDL2TTF_INSTALL FALSE)
+	set(SDL2TTF_TESTS FALSE)
+	set(SDL2IMAGE_INSTALL FALSE)
+	set(SDL2IMAGE_SAMPLES FALSE)
+	set(SDL2IMAGE_TESTS FALSE)
 	add_subdirectory(3rdparty/SDL)
+	add_subdirectory(3rdparty/SDL2_image)
+	add_subdirectory(3rdparty/SDL2_ttf)
 	target_compile_definitions(SDL2-static PRIVATE HAVE_ICONV=1 HAVE_ICONV_H=1)
 	target_link_libraries(SDL2-static PRIVATE libiconv)
 	target_include_directories(SDL2-static PUBLIC "${PROJECT_SOURCE_DIR}/3rdparty/libiconv/include")
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(SERIAL REQUIRED libserialport)
-#[[
-	find_package(ICU REQUIRED COMPONENTS i18n data uc)
-
 	pkg_check_modules(SDL2 REQUIRED sdl2)
 	pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
 	pkg_check_modules(SDL2_IMAGE REQUIRED SDL2_image)
-]]#
 endif()
 
 include_directories(
@@ -91,18 +99,17 @@ if (MSVC)
 		libserialport
 		SDL2::SDL2main
 		SDL2::SDL2-static
+		SDL2_ttf::SDL2_ttf-static
+		SDL2_image::SDL2_image-static
 	)
 else()
 	target_link_libraries(${PROJECT_NAME}
 		${SERIAL_LIBRARIES}
 		${CMAKE_THREAD_LIBS_INIT}
 		spdlog::spdlog
-#[[
-		${ICU_LIBRARIES}
 		${SDL2_LIBRARIES}
 		${SDL2_IMAGE_LIBRARIES}
 		${SDL2_TTF_LIBRARIES}
-]]#
 	)
 endif()
 
