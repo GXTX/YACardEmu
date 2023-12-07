@@ -42,8 +42,8 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 		32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 	);
 
-	if (glyph == nullptr)
-		return false;
+	//if (glyph == nullptr)
+	//	return false;
 
 	SDL_LockSurface(glyph);
 
@@ -92,13 +92,7 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 
 void Printer::PrintLine()
 {
-	std::vector<uint8_t> data = m_printQueue[0];
-	auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&data[0], data.size() + 1);
-	if (converted == nullptr)
-		return;
-
 	TTF_Init();
-
 	constexpr const uint8_t defaultFontSize = 36;
 	TTF_Font* font = TTF_OpenFont("kochi-gothic-subst.ttf", defaultFontSize);
 	if (font == nullptr)
@@ -117,7 +111,6 @@ void Printer::PrintLine()
 
 	constexpr const uint8_t defaultX = 95;
 	constexpr const uint8_t defaultY = 120; // FIXME: Needs to be variable, 120 for vertical, 85 for horiz
-
 	constexpr const SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
 
 	enum Commands {
@@ -133,7 +126,7 @@ void Printer::PrintLine()
 	{
 		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&x[0], x.size() + 1);
 		if (converted == nullptr) {
-			g_logger->error("iconv couldn't convert the string while printing!");
+			g_logger->error("Printer::PrintLine: iconv couldn't convert the string while printing!");
 			return;
 		}
 
@@ -180,9 +173,9 @@ void Printer::PrintLine()
 				i = utf8codepoint(i, &currentChar);
 				if (currentChar == Commands::SetScale) {
 					i = utf8codepoint(i, &currentChar);
-					yScale = currentChar;
+					yScale = static_cast<uint8_t>(currentChar);
 					i = utf8codepoint(i, &currentChar);
-					xScale = currentChar;
+					xScale = static_cast<uint8_t>(currentChar);
 				}
 				continue;
 			}
@@ -214,6 +207,9 @@ void Printer::PrintLine()
 			SDL_FreeSurface(glyph);
 			SDL_FreeSurface(scaledGlyph);
 		}
-
+		free(converted);
 	}
+	SDL_FreeSurface(cardImage);
+	TTF_CloseFont(font);
+	TTF_Quit();
 }
