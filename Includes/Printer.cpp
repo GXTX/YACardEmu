@@ -42,8 +42,8 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 		32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 	);
 
-	//if (glyph == nullptr)
-	//	return false;
+	if (glyph == nullptr)
+		return false;
 
 	SDL_LockSurface(glyph);
 
@@ -177,6 +177,12 @@ void Printer::PrintLine()
 					i = utf8codepoint(i, &currentChar);
 					xScale = static_cast<uint8_t>(currentChar);
 				}
+				else if (currentChar == Commands::UseCustomGlyph) {
+					i = utf8codepoint(i, &currentChar);
+					SDL_Rect location = { xPos, yPos, 0, 0 };
+					SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, cardImage, &location);
+					xPos += m_customGlyphs.at(currentChar)->w;
+				}
 				continue;
 			}
 
@@ -207,8 +213,9 @@ void Printer::PrintLine()
 			SDL_FreeSurface(glyph);
 			SDL_FreeSurface(scaledGlyph);
 		}
-		free(converted);
+		SDL_free(converted);
 	}
+	IMG_SavePNG(cardImage, "card.png");
 	SDL_FreeSurface(cardImage);
 	TTF_CloseFont(font);
 	TTF_Quit();
