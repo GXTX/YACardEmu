@@ -32,13 +32,12 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	data.erase(data.begin());
 	std::vector<bool> bits = ConvertToBits(data);
 
-	constexpr const uint8_t maxWidth = 24;
-	constexpr const uint8_t maxHeight = 24;
+	constexpr const uint8_t maxDimentions = 24;
 	// FIXME: Doesn't need to be a 32-bit surface
 	SDL_Surface* glyph = SDL_CreateRGBSurface(
 		0,
-		maxWidth,
-		maxHeight,
+		maxDimentions,
+		maxDimentions,
 		32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 	);
 
@@ -59,7 +58,18 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 
 	SDL_UnlockSurface(glyph);
 
-	m_customGlyphs.at(slot) = glyph;
+	// The default 25x25 glyph is just slighly too small to match up with our font, so resize it
+	constexpr const uint8_t newDimentions = 30;
+	SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
+		0,
+		newDimentions,
+		newDimentions,
+		32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
+	);
+	SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
+
+	SDL_FreeSurface(glyph);
+	m_customGlyphs.at(slot) = scaledGlyph;
 
 	return true;
 }
@@ -179,6 +189,14 @@ void Printer::PrintLine()
 				}
 				else if (currentChar == Commands::UseCustomGlyph) {
 					i = utf8codepoint(i, &currentChar);
+					if (currentChar > 0x2F && currentChar < 0x3A || currentChar > 0xFF) {
+						g_logger->warn("Printer::PrintLine: Attempted to use out of range glyph {}", currentChar);
+						continue;
+					}
+					if (m_customGlyphs.at(currentChar) == nullptr) {
+						g_logger->warn("Printer::PrintLine: Game never set glyph {} but tried to use it", currentChar);
+						continue;
+					}
 					SDL_Rect location = { xPos, yPos, 0, 0 };
 					SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, cardImage, &location);
 					xPos += m_customGlyphs.at(currentChar)->w;
