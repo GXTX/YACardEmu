@@ -679,13 +679,14 @@ void CardIo::WriteCard()
 		}
 	}
 
-	if (m_cardSettings->cardPath.back() != '/' || m_cardSettings->cardPath.back() != '\\') {
 #ifdef _WIN32
-		m_cardSettings->cardPath.append("/");
-#else
+	if (m_cardSettings->cardPath.back() != '\\')
 		m_cardSettings->cardPath.append("\\");
+#else
+	if (m_cardSettings->cardPath.back() != '/')
+		m_cardSettings->cardPath.append("/");
 #endif
-	}
+
 	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 
 	std::string writeBack;
