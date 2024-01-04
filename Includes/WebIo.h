@@ -53,7 +53,7 @@ public:
 	CardIo::Settings *m_card = nullptr;
 	std::atomic<bool> *g_running = nullptr;
 private:
-	httplib::Server m_svr{};
+	httplib::Server m_svr = {};
 
 	void Router(const httplib::Request &req, httplib::Response &res);
 	const std::string GenerateCardListJSON(std::string basepath);
@@ -69,7 +69,7 @@ private:
 		stop,
 	};
 
-	std::map<std::string, Routes> m_routeValues{};
+	std::map<std::string, Routes> m_routeValues = {};
 
 	void SetupRoutes()
 	{

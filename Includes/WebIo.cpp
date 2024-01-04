@@ -80,7 +80,7 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			break;
 		case Routes::readyCard:
 			res.set_content(m_card->waitingForCard ? "true" : "false", "application/json");
-		break;
+			break;
 		case Routes::insertedCard:
 			InsertedCard(req, res);
 			break;
@@ -134,21 +134,12 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 {
 	std::string list{"["};
 
-	if (!m_card->cardName.empty()) {
-		list.append("{\"name\":\"" + m_card->cardName + "\",\"image\":\"""\"},");
-	}
-
 	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
 		std::string card{entry.path().string()};
 
-		if (card.find(m_card->cardName) != std::string::npos) {
-			continue;
-		}
-
-		auto find = card.find(".track_0");
+		auto find = card.find(".bin");
 
 		if (find != std::string::npos) {
-			card.replace(find, 8, "");
 			list.append("{\"name\":\"");
 #ifdef _WIN32
 			list.append(card.substr(card.find_last_of("\\") + 1));
@@ -157,31 +148,26 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 #endif
 			// TODO: Support card images
 			list.append("\",\"image\":\"");
-
-#if 0
-			auto find2 = card.find(".bin");
-			if (find2 != std::string::npos) {
-				card.replace(find2, 4, ".png");
+			g_logger->warn("{}", card);
+			find = card.find(".bin");
+			if (find != std::string::npos) {
+				card.replace(find, 4, ".png");
 			}
 
 			std::string base64{};
-
+			g_logger->warn("{}", card);
 			if (ghc::filesystem::exists(card)) {
-				std::ifstream img(card.c_str(),
-				                  std::ifstream::in |
-				                          std::ifstream::binary);
+				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
 
 				base64.resize(ghc::filesystem::file_size(card));
 
-				img.read(reinterpret_cast<char*>(&base64[0]),
-				         base64.size());
+				img.read(reinterpret_cast<char*>(&base64[0]), base64.size());
 				img.close();
 			}
 
 			std::string encoded = base64_encode(base64, false);
 			list.append("data:image/png;base64, ");
 			list.append(encoded);
-#endif
 			list.append("\"},");
 		}
 	}
