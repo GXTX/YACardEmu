@@ -6,7 +6,7 @@ const nextButtonEl = document.getElementById('next')
 const cardNameInput = document.getElementById('cardname')
 
 // This is an event listen to all clicks on the carousel arrows.
-nextButtonEl.addEventListener('click', event => {
+$('#cardControls').on('slid.bs.carousel', function () {
 	const activeCard = carouselInnerDivEl.querySelector('.carousel-item.active')
 	selectedCardName = activeCard.dataset.cardName
 	updateCardNameInput()
