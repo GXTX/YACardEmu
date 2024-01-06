@@ -86,14 +86,19 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		Append = '1',
 	};
 
+	constexpr auto maxOffset = 0x14;
+	uint8_t offset = data[2] & maxOffset;
+
 	// TODO: Handle wait state
 
-	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
-		m_printQueue.clear();
+	// FIXME: Some games issue multiple print commands, we currently don't handle the case where they
+	// clear and then issue more commands
+	//if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
+	//	m_printQueue.clear();
 
 	std::vector<uint8_t> temp = {};
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
-	m_printQueue.emplace_back(temp);
+	m_printQueue.push_back({ offset, temp });
 
 	PrintLine();
 
@@ -115,8 +120,13 @@ void Printer::PrintLine()
 	SDL_Surface* cardImage = IMG_Load("1.png");
 	if (cardImage == nullptr)
 	{
-		g_logger->warn("Printer::PrintLine: Could not create surface from \"1.png\"");
-		return;
+		g_logger->warn("Printer::PrintLine: Could not create surface from \"1.png\" - generating a transparent card");
+		cardImage = SDL_CreateRGBSurface(
+			0,
+			640,
+			1019,
+			32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
+		);
 	}
 
 	constexpr const uint8_t defaultX = 95;
@@ -132,9 +142,9 @@ void Printer::PrintLine()
 		SetScale = 0x73,
 	};
 
-	for (const auto& x : m_printQueue)
+	for (const auto& print : m_printQueue)
 	{
-		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&x[0], x.size() + 1);
+		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&print.data[0], print.data.size() + 1);
 		if (converted == nullptr) {
 			g_logger->error("Printer::PrintLine: iconv couldn't convert the string while printing!");
 			return;
@@ -142,13 +152,17 @@ void Printer::PrintLine()
 
 		int xPos = defaultX;
 		int yPos = defaultY;
-		uint8_t xScale = '1';
-		uint8_t yScale = '1';
+		char xScale = '1';
+		char yScale = '1';
 		bool yScaleCompensate = false;
 		int maxYSizeForLine = 0;
 		utf8_int32_t currentChar = '\0';
 
-		// FIXME: Have converted be a custom type where we can just iterate with converted[n]
+		// We don't run this for 01 line skip as the FontLineSkip isn't the same as our defaultY
+		if (print.offset > 1)
+			yPos += TTF_FontLineSkip(font) * (print.offset - 1);
+
+		// TODO: Have converted be a custom type where we can just iterate with converted[n]
 		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
 			// We need to fix our yPos after resetting from a yScale on the same line
 			if (yScaleCompensate)
@@ -160,8 +174,7 @@ void Printer::PrintLine()
 			// Process the character for command bytes
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
-				if (yScale != '1')
-					TTF_SetFontSize(font, defaultFontSize * static_cast<int>(yScale - '0'));
+				TTF_SetFontSize(font, defaultFontSize * std::atoi(&yScale));
 				yPos += TTF_FontLineSkip(font) + 4; // FIXME: +4 for vertical cards : 0 for horiz
 				TTF_SetFontSize(font, defaultFontSize);
 				xPos = defaultX;
@@ -208,8 +221,8 @@ void Printer::PrintLine()
 			SDL_Surface* glyph = TTF_RenderGlyph32_Blended(font, currentChar, color);
 			SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
 				0,
-				glyph->clip_rect.w * (static_cast<int>(xScale - '0')),
-				glyph->clip_rect.h * (static_cast<int>(yScale - '0')),
+				glyph->clip_rect.w * std::atoi(&xScale),
+				glyph->clip_rect.h * std::atoi(&yScale),
 				32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 			);
 			SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
@@ -223,10 +236,7 @@ void Printer::PrintLine()
 
 			int advance = 0;
 			TTF_GlyphMetrics32(font, currentChar, NULL, NULL, NULL, NULL, &advance);
-			if (xScale == '1')
-				xPos += advance;
-			else
-				xPos += advance * static_cast<int>(xScale - '0');
+			xPos += advance * std::atoi(&xScale);
 
 			SDL_FreeSurface(glyph);
 			SDL_FreeSurface(scaledGlyph);

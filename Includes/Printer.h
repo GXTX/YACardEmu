@@ -42,8 +42,13 @@ public:
 	bool RegisterFont(std::vector<uint8_t>& data);
 	bool QueuePrintLine(std::vector<uint8_t>& data);
 protected:
-	std::vector<std::vector<uint8_t>> m_printQueue = {};
-	std::vector<SDL_Surface *> m_customGlyphs = { 256, nullptr };
+	struct PrintCommand {
+		uint8_t offset = 0;
+		std::vector<uint8_t> data = {};
+	};
+
+	std::vector<PrintCommand> m_printQueue = {};
+	std::vector<SDL_Surface*> m_customGlyphs = { 256, nullptr };
 	
 	void PrintLine();
 
