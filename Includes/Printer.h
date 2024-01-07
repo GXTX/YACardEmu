@@ -47,6 +47,7 @@ public:
 	}
 	~Printer()
 	{
+		PrintLine();
 		SaveCardImage(m_localName);
 		SDL_Quit();
 	}
@@ -71,10 +72,11 @@ protected:
 		std::string temp = cardName;
 		temp.append(".png");
 
+		// FIXME: Allow a pool of images to be randomly chosen
 		if (ghc::filesystem::exists(temp)) {
 			m_cardImage = IMG_Load(temp.c_str());
 			if (m_cardImage == nullptr) {
-				g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface");
+				g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
 				m_cardImage = SDL_CreateRGBSurface(
 					0,
 					640,

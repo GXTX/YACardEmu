@@ -77,8 +77,8 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 {
 	enum Mode {
-		Wait = '0',
-		Now = '1',
+		Now = '0',
+		Wait = '1',
 	};
 
 	enum BufferControl {
@@ -89,42 +89,30 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 	constexpr auto maxOffset = 0x14;
 	uint8_t offset = data[2] & maxOffset;
 
-	// TODO: Handle wait state
-
-	// FIXME: Some games issue multiple print commands, we currently don't handle the case where they
-	// clear and then issue more commands
-	//if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
-	//	m_printQueue.clear();
+	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
+		m_printQueue.clear();
 
 	std::vector<uint8_t> temp = {};
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
 	m_printQueue.push_back({ offset, temp });
 
-	PrintLine();
+	if (static_cast<Mode>(data[0]) == Mode::Now)
+		PrintLine();
 
 	return true;
 }
 
 void Printer::PrintLine()
 {
+	if (m_printQueue.empty())
+		return;
+
 	TTF_Init();
 	constexpr const uint8_t defaultFontSize = 36;
 	TTF_Font* font = TTF_OpenFont("kochi-gothic-subst.ttf", defaultFontSize);
 	if (font == nullptr) {
 		g_logger->warn("Printer::PrintLine: Unable to initialize TTF_Font with \"kochi-gothic-subst.ttf\"");
 		return;
-	}
-
-	// FIXME: Allow a pool of images to be randomly chosen
-	SDL_Surface* cardImage = IMG_Load("1.png");
-	if (cardImage == nullptr) {
-		g_logger->warn("Printer::PrintLine: Could not create surface from \"1.png\" - generating a transparent card");
-		cardImage = SDL_CreateRGBSurface(
-			0,
-			640,
-			1019,
-			32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
-		);
 	}
 
 	constexpr const uint8_t defaultX = 95;
@@ -156,7 +144,7 @@ void Printer::PrintLine()
 		int maxYSizeForLine = 0;
 		utf8_int32_t currentChar = '\0';
 
-		// We don't run this for 01 line skip as the FontLineSkip isn't the same as our defaultY
+		// We don't run this for a single line skip as the FontLineSkip isn't the same as our defaultY
 		if (print.offset > 1)
 			yPos += TTF_FontLineSkip(font) * (print.offset - 1);
 
@@ -208,7 +196,7 @@ void Printer::PrintLine()
 						continue;
 					}
 					SDL_Rect location = { xPos, yPos, 0, 0 };
-					SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, cardImage, &location);
+					SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, m_cardImage, &location);
 					xPos += m_customGlyphs.at(currentChar)->w;
 				}
 				continue;
@@ -226,7 +214,7 @@ void Printer::PrintLine()
 
 			// Final blit
 			SDL_Rect location = { xPos, yPos, 0, 0 };
-			SDL_BlitSurface(scaledGlyph, NULL, cardImage, &location);
+			SDL_BlitSurface(scaledGlyph, NULL, m_cardImage, &location);
 
 			// Used with yScaleCompensate when we reset scale on the same line
 			maxYSizeForLine = scaledGlyph->h > maxYSizeForLine ? scaledGlyph->h : maxYSizeForLine;
@@ -240,8 +228,6 @@ void Printer::PrintLine()
 		}
 		SDL_free(converted);
 	}
-	//IMG_SavePNG(cardImage, "card.png");
-	//SDL_FreeSurface(cardImage);
 	TTF_CloseFont(font);
 	TTF_Quit();
 }
