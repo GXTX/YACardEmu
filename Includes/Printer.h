@@ -32,6 +32,8 @@
 #include "spdlog/async.h"
 #include "spdlog/fmt/bin_to_hex.h"
 
+#include "ghc/filesystem.hpp"
+
 #include "utf8.h"
 
 extern std::shared_ptr<spdlog::async_logger> g_logger;
@@ -39,8 +41,18 @@ extern std::shared_ptr<spdlog::async_logger> g_logger;
 class Printer
 {
 public:
+	Printer(std::string& cardName)
+	{
+		LoadCardImage(cardName);
+	}
+	~Printer()
+	{
+		SaveCardImage(m_localName);
+		SDL_Quit();
+	}
 	bool RegisterFont(std::vector<uint8_t>& data);
 	bool QueuePrintLine(std::vector<uint8_t>& data);
+	std::string m_localName = {};
 protected:
 	struct PrintCommand {
 		uint8_t offset = 0;
@@ -49,8 +61,37 @@ protected:
 
 	std::vector<PrintCommand> m_printQueue = {};
 	std::vector<SDL_Surface*> m_customGlyphs = { 256, nullptr };
+
+	SDL_Surface* m_cardImage = nullptr;
 	
 	void PrintLine();
+
+	void LoadCardImage(std::string& cardName)
+	{
+		std::string temp = cardName;
+		temp.append(".png");
+
+		if (ghc::filesystem::exists(temp)) {
+			m_cardImage = IMG_Load(temp.c_str());
+			if (m_cardImage == nullptr) {
+				g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface");
+				m_cardImage = SDL_CreateRGBSurface(
+					0,
+					640,
+					1019,
+					32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
+				);
+			}
+		}
+	}
+
+	void SaveCardImage(std::string& cardName)
+	{
+		std::string temp = cardName;
+		temp.append(".png");
+		IMG_SavePNG(m_cardImage, temp.c_str());
+		SDL_FreeSurface(m_cardImage);
+	}
 
 	std::vector<bool> ConvertToBits(std::vector<uint8_t>& vector)
 	{

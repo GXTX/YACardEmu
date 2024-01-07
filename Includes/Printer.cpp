@@ -110,16 +110,14 @@ void Printer::PrintLine()
 	TTF_Init();
 	constexpr const uint8_t defaultFontSize = 36;
 	TTF_Font* font = TTF_OpenFont("kochi-gothic-subst.ttf", defaultFontSize);
-	if (font == nullptr)
-	{
+	if (font == nullptr) {
 		g_logger->warn("Printer::PrintLine: Unable to initialize TTF_Font with \"kochi-gothic-subst.ttf\"");
 		return;
 	}
 
 	// FIXME: Allow a pool of images to be randomly chosen
 	SDL_Surface* cardImage = IMG_Load("1.png");
-	if (cardImage == nullptr)
-	{
+	if (cardImage == nullptr) {
 		g_logger->warn("Printer::PrintLine: Could not create surface from \"1.png\" - generating a transparent card");
 		cardImage = SDL_CreateRGBSurface(
 			0,
@@ -165,8 +163,7 @@ void Printer::PrintLine()
 		// TODO: Have converted be a custom type where we can just iterate with converted[n]
 		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
 			// We need to fix our yPos after resetting from a yScale on the same line
-			if (yScaleCompensate)
-			{
+			if (yScaleCompensate) {
 				yPos += maxYSizeForLine - TTF_FontLineSkip(font);
 				yScaleCompensate = false;
 			}
@@ -243,8 +240,8 @@ void Printer::PrintLine()
 		}
 		SDL_free(converted);
 	}
-	IMG_SavePNG(cardImage, "card.png");
-	SDL_FreeSurface(cardImage);
+	//IMG_SavePNG(cardImage, "card.png");
+	//SDL_FreeSurface(cardImage);
 	TTF_CloseFont(font);
 	TTF_Quit();
 }
