@@ -228,6 +228,7 @@ void Printer::PrintLine()
 		}
 		SDL_free(converted);
 	}
+	m_printQueue.clear();
 	TTF_CloseFont(font);
 	TTF_Quit();
 }
