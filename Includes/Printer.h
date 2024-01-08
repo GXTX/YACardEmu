@@ -61,7 +61,8 @@ public:
 		m_localName = cardName;
 		PrintLine();
 		SaveCardImage(m_localName);
-		SDL_FreeSurface(m_cardImage);
+		if (m_cardImage != nullptr)
+			SDL_FreeSurface(m_cardImage);
 		m_localName = "";
 	}
 
@@ -89,16 +90,18 @@ protected:
 		// FIXME: Allow a pool of images to be randomly chosen
 		if (ghc::filesystem::exists(temp)) {
 			m_cardImage = IMG_Load(temp.c_str());
-			if (m_cardImage == nullptr) {
-				g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
-				m_cardImage = SDL_CreateRGBSurface(
-					0,
-					640,
-					1019,
-					32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
-				);
-			}
+			if (m_cardImage != nullptr)
+				return;
+			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
 		}
+
+		// FIXME: Hard coded size
+		m_cardImage = SDL_CreateRGBSurface(
+			0,
+			640,
+			1019,
+			32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
+		);
 	}
 
 	void SaveCardImage(std::string& cardName)
@@ -106,7 +109,6 @@ protected:
 		std::string temp = cardName;
 		temp.append(".png");
 		IMG_SavePNG(m_cardImage, temp.c_str());
-		SDL_FreeSurface(m_cardImage);
 	}
 
 	std::vector<bool> ConvertToBits(std::vector<uint8_t>& vector)

@@ -86,6 +86,9 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		Append = '1',
 	};
 
+	if (m_cardImage == nullptr)
+		LoadCardImage(m_localName);
+
 	constexpr auto maxOffset = 0x14;
 	uint8_t offset = data[2] & maxOffset;
 
