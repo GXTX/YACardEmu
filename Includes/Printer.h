@@ -41,16 +41,30 @@ extern std::shared_ptr<spdlog::async_logger> g_logger;
 class Printer
 {
 public:
-	Printer(std::string& cardName)
+	Printer()
 	{
-		LoadCardImage(cardName);
+		m_customGlyphs.resize(256);
 	}
 	~Printer()
 	{
-		PrintLine();
-		SaveCardImage(m_localName);
 		SDL_Quit();
 	}
+
+	void InsertCard(std::string& cardName)
+	{
+		m_localName = cardName;
+		LoadCardImage(m_localName);
+	}
+
+	void RemoveCard(std::string& cardName)
+	{
+		m_localName = cardName;
+		PrintLine();
+		SaveCardImage(m_localName);
+		SDL_FreeSurface(m_cardImage);
+		m_localName = "";
+	}
+
 	bool RegisterFont(std::vector<uint8_t>& data);
 	bool QueuePrintLine(std::vector<uint8_t>& data);
 	std::string m_localName = {};
@@ -61,7 +75,7 @@ protected:
 	};
 
 	std::vector<PrintCommand> m_printQueue = {};
-	std::vector<SDL_Surface*> m_customGlyphs = { 256, nullptr };
+	std::vector<SDL_Surface*> m_customGlyphs = {};
 
 	SDL_Surface* m_cardImage = nullptr;
 	

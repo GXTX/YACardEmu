@@ -203,7 +203,7 @@ protected:
 	virtual void MoveCard(MovePositions position) = 0;
 	virtual CardIo::MovePositions GetCardPos() = 0;
 
-	std::unique_ptr<Printer> m_printer = nullptr;
+	std::unique_ptr<Printer> m_printer = std::make_unique<Printer>();
 };
 
 #endif

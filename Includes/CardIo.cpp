@@ -478,8 +478,6 @@ void CardIo::Command_B0_DispenseCardS31()
 							status.s = S::DISPENSER_EMPTY;
 						} else {
 							DispenseCard();
-							std::string empty = {};
-							m_printer = std::make_unique<Printer>(empty);
 						}
 					}
 				}
@@ -617,7 +615,7 @@ void CardIo::ReadCard()
 		offset += TRACK_SIZE;
 	}
 
-	m_printer = std::make_unique<Printer>(fullPath);
+	m_printer->InsertCard(fullPath);
 }
 
 void CardIo::WriteCard()
@@ -693,8 +691,7 @@ void CardIo::WriteCard()
 		config.write(ini);
 	}
 
-	m_printer->m_localName = fullPath;
-	m_printer = nullptr; // deconstructor calls SDL_Quit() and writes out the card image
+	m_printer->RemoveCard(fullPath);
 
 	ClearCardData();
 }
