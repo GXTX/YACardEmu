@@ -382,6 +382,7 @@ void CardIo::Command_7D_Erase()
 			break;
 		case 1:
 			MoveCard(MovePositions::READ_WRITE_HEAD);
+			m_printer->Erase();
 			break;
 		default:
 			break;

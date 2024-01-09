@@ -132,10 +132,13 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 
 const std::string WebIo::GenerateCardListJSON(std::string basepath)
 {
-	std::string list{"["};
+	std::string list = "[";
 
 	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
 		std::string card{entry.path().string()};
+
+		if (card.find(".png") != std::string::npos)
+			continue;
 
 		auto find = card.find(".bin");
 
@@ -149,12 +152,15 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 			// TODO: Support card images
 			list.append("\",\"image\":\"");
 			g_logger->warn("{}", card);
+#if 0
 			find = card.find(".bin");
 			if (find != std::string::npos) {
 				card.replace(find, 4, ".png");
 			}
+#endif
+			card.append(".png");
 
-			std::string base64{};
+			std::string base64 = {};
 			g_logger->warn("{}", card);
 			if (ghc::filesystem::exists(card)) {
 				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
@@ -173,9 +179,8 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 	}
 
 	// remove the errant comma
-	if (list.compare("[") != 0) {
+	if (list.compare("[") != 0)
 		list.pop_back();
-	}
 
 	list.append("]");
 	return list;

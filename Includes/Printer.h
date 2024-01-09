@@ -67,6 +67,12 @@ public:
 		m_localName = "";
 	}
 
+	void Erase()
+	{
+		if (m_cardImage != nullptr)
+			SDL_FreeSurface(m_cardImage);
+	}
+
 	bool RegisterFont(std::vector<uint8_t>& data);
 	bool QueuePrintLine(std::vector<uint8_t>& data);
 	std::string m_localName = {};
@@ -80,7 +86,7 @@ protected:
 	std::vector<SDL_Surface*> m_customGlyphs = {};
 
 	SDL_Surface* m_cardImage = nullptr;
-	
+
 	void PrintLine();
 
 	void LoadCardImage(std::string& cardName)

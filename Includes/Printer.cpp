@@ -69,6 +69,8 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
 
 	SDL_FreeSurface(glyph);
+	if (m_customGlyphs.at(slot) != nullptr)
+		SDL_FreeSurface(m_customGlyphs.at(slot));
 	m_customGlyphs.at(slot) = scaledGlyph;
 
 	return true;
@@ -153,6 +155,7 @@ void Printer::PrintLine()
 			TTF_SetFontSize(font, defaultFontSize * 2);
 			yPos += (TTF_FontLineSkip(font) * (print.offset - 1)) + ((print.offset - 1) * 4);
 			TTF_SetFontSize(font, defaultFontSize);
+			g_logger->warn("{:X}", yPos);
 		}
 
 		// TODO: Have converted be a custom type where we can just iterate with converted[n]
@@ -194,12 +197,12 @@ void Printer::PrintLine()
 					}
 					else if (currentChar == Commands::UseCustomGlyph) {
 						i = utf8codepoint(i, &currentChar);
-						if (currentChar > 0x2F && currentChar < 0x3A || currentChar > 0xFF) {
-							g_logger->warn("Printer::PrintLine: Attempted to use out of range glyph {}", currentChar);
+						if (currentChar > 0xFF) {
+							g_logger->warn("Printer::PrintLine: Attempted to use out of range glyph {:X}", currentChar);
 							continue;
 						}
 						if (m_customGlyphs.at(currentChar) == nullptr) {
-							g_logger->warn("Printer::PrintLine: Game never set glyph {} but tried to use it", currentChar);
+							g_logger->warn("Printer::PrintLine: Game never set glyph {:X} but tried to use it", currentChar);
 							continue;
 						}
 						SDL_Rect location = { xPos, yPos, 0, 0 };
