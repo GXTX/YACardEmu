@@ -91,8 +91,9 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 	if (m_cardImage == nullptr)
 		LoadCardImage(m_localName);
 
+	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
 	constexpr auto maxOffset = 0x14;
-	uint8_t offset = data[2] & maxOffset;
+	uint8_t offset = (data[2] < maxOffset) ? data[2] : maxOffset;
 
 	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
 		m_printQueue.clear();
@@ -150,13 +151,8 @@ void Printer::PrintLine()
 		utf8_int32_t currentChar = '\0';
 
 		// We don't run this for a single line skip as the FontLineSkip isn't the same as our defaultY
-		if (print.offset > 1) {
-			// Line skips use the double scale skip size
-			TTF_SetFontSize(font, defaultFontSize * 2);
+		if (print.offset > 1)
 			yPos += (TTF_FontLineSkip(font) * (print.offset - 1)) + ((print.offset - 1) * 4);
-			TTF_SetFontSize(font, defaultFontSize);
-			g_logger->warn("{:X}", yPos);
-		}
 
 		// TODO: Have converted be a custom type where we can just iterate with converted[n]
 		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
