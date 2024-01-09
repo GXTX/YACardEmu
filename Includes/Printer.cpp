@@ -148,8 +148,12 @@ void Printer::PrintLine()
 		utf8_int32_t currentChar = '\0';
 
 		// We don't run this for a single line skip as the FontLineSkip isn't the same as our defaultY
-		if (print.offset > 1)
-			yPos += TTF_FontLineSkip(font) * (print.offset - 1);
+		if (print.offset > 1) {
+			// Line skips use the double scale skip size
+			TTF_SetFontSize(font, defaultFontSize * 2);
+			yPos += (TTF_FontLineSkip(font) * (print.offset - 1)) + ((print.offset - 1) * 4);
+			TTF_SetFontSize(font, defaultFontSize);
+		}
 
 		// TODO: Have converted be a custom type where we can just iterate with converted[n]
 		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
@@ -162,47 +166,47 @@ void Printer::PrintLine()
 			// Process the character for command bytes
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
-				TTF_SetFontSize(font, defaultFontSize * std::atoi(&yScale));
-				yPos += TTF_FontLineSkip(font) + 4; // FIXME: +4 for vertical cards : 0 for horiz
-				TTF_SetFontSize(font, defaultFontSize);
-				xPos = defaultX;
-				yScale = '1';
-				xScale = '1';
-				yScaleCompensate = false;
-				maxYSizeForLine = 0;
-				continue;
-			case Double:
-				yScale = '2';
-				continue;
-			case ResetScale:
-				if (yScale != '1')
-					yScaleCompensate = true;
-				yScale = '1';
-				xScale = '1';
-				continue;
-			case Escape: // FIXME: Don't allow this to overflow
-				i = utf8codepoint(i, &currentChar);
-				if (currentChar == Commands::SetScale) {
+					TTF_SetFontSize(font, defaultFontSize * std::atoi(&yScale));
+					yPos += TTF_FontLineSkip(font) + 4; // FIXME: +4 for vertical cards : 0 for horiz
+					TTF_SetFontSize(font, defaultFontSize);
+					xPos = defaultX;
+					yScale = '1';
+					xScale = '1';
+					yScaleCompensate = false;
+					maxYSizeForLine = 0;
+					continue;
+				case Double:
+					yScale = '2';
+					continue;
+				case ResetScale:
+					if (yScale != '1')
+						yScaleCompensate = true;
+					yScale = '1';
+					xScale = '1';
+					continue;
+				case Escape: // FIXME: Don't allow this to overflow
 					i = utf8codepoint(i, &currentChar);
-					yScale = static_cast<uint8_t>(currentChar);
-					i = utf8codepoint(i, &currentChar);
-					xScale = static_cast<uint8_t>(currentChar);
-				}
-				else if (currentChar == Commands::UseCustomGlyph) {
-					i = utf8codepoint(i, &currentChar);
-					if (currentChar > 0x2F && currentChar < 0x3A || currentChar > 0xFF) {
-						g_logger->warn("Printer::PrintLine: Attempted to use out of range glyph {}", currentChar);
-						continue;
+					if (currentChar == Commands::SetScale) {
+						i = utf8codepoint(i, &currentChar);
+						yScale = static_cast<uint8_t>(currentChar);
+						i = utf8codepoint(i, &currentChar);
+						xScale = static_cast<uint8_t>(currentChar);
 					}
-					if (m_customGlyphs.at(currentChar) == nullptr) {
-						g_logger->warn("Printer::PrintLine: Game never set glyph {} but tried to use it", currentChar);
-						continue;
+					else if (currentChar == Commands::UseCustomGlyph) {
+						i = utf8codepoint(i, &currentChar);
+						if (currentChar > 0x2F && currentChar < 0x3A || currentChar > 0xFF) {
+							g_logger->warn("Printer::PrintLine: Attempted to use out of range glyph {}", currentChar);
+							continue;
+						}
+						if (m_customGlyphs.at(currentChar) == nullptr) {
+							g_logger->warn("Printer::PrintLine: Game never set glyph {} but tried to use it", currentChar);
+							continue;
+						}
+						SDL_Rect location = { xPos, yPos, 0, 0 };
+						SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, m_cardImage, &location);
+						xPos += m_customGlyphs.at(currentChar)->w;
 					}
-					SDL_Rect location = { xPos, yPos, 0, 0 };
-					SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, m_cardImage, &location);
-					xPos += m_customGlyphs.at(currentChar)->w;
-				}
-				continue;
+					continue;
 			}
 
 			// FIXME: Solid does not function as expected, scaled characters aren't blitted, Blended works, also doesn't need to be 32bit depth

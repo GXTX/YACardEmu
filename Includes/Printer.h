@@ -60,9 +60,10 @@ public:
 	{
 		m_localName = cardName;
 		PrintLine();
-		SaveCardImage(m_localName);
-		if (m_cardImage != nullptr)
+		if (m_cardImage != nullptr) {
+			SaveCardImage(m_localName);
 			SDL_FreeSurface(m_cardImage);
+		}
 		m_localName = "";
 	}
 
