@@ -63,14 +63,17 @@ public:
 		if (m_cardImage != nullptr) {
 			SaveCardImage(m_localName);
 			SDL_FreeSurface(m_cardImage);
+			m_cardImage = nullptr;
 		}
 		m_localName = "";
 	}
 
 	void Erase()
 	{
-		if (m_cardImage != nullptr)
+		if (m_cardImage != nullptr) {
 			SDL_FreeSurface(m_cardImage);
+			m_cardImage = nullptr;
+		}
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);

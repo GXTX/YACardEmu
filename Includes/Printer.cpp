@@ -93,7 +93,7 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 
 	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
 	constexpr auto maxOffset = 0x14;
-	uint8_t offset = (data[2] < maxOffset) ? data[2] : maxOffset;
+	uint8_t offset = data[2];
 
 	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
 		m_printQueue.clear();
