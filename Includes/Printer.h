@@ -79,6 +79,9 @@ public:
 	bool RegisterFont(std::vector<uint8_t>& data);
 	bool QueuePrintLine(std::vector<uint8_t>& data);
 	std::string m_localName = {};
+
+	// Default state is a vertical card on the mechs
+	bool m_horizontalCard = false;
 protected:
 	struct PrintCommand {
 		uint8_t offset = 0;

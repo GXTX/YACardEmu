@@ -149,15 +149,8 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 #else
 			list.append(card.substr(card.find_last_of("/") + 1));
 #endif
-			// TODO: Support card images
+
 			list.append("\",\"image\":\"");
-			g_logger->warn("{}", card);
-#if 0
-			find = card.find(".bin");
-			if (find != std::string::npos) {
-				card.replace(find, 4, ".png");
-			}
-#endif
 			card.append(".png");
 
 			std::string base64 = {};

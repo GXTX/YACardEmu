@@ -24,7 +24,7 @@
 bool Printer::RegisterFont(std::vector<uint8_t>& data)
 {
 	// Real data size is 0x48, but the first byte indicates slot position
-	constexpr const uint8_t glyphDataLength = 0x49;
+	constexpr uint8_t glyphDataLength = 0x49;
 	if (data.size() != glyphDataLength)
 		return false;
 
@@ -32,7 +32,7 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	data.erase(data.begin());
 	std::vector<bool> bits = ConvertToBits(data);
 
-	constexpr const uint8_t maxDimentions = 24;
+	constexpr uint8_t maxDimentions = 24;
 	// FIXME: Doesn't need to be a 32-bit surface
 	SDL_Surface* glyph = SDL_CreateRGBSurface(
 		0,
@@ -59,7 +59,7 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	SDL_UnlockSurface(glyph);
 
 	// The default 25x25 glyph is just slighly too small to match up with our font, so resize it
-	constexpr const uint8_t newDimentions = 30;
+	constexpr uint8_t newDimentions = 30;
 	SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
 		0,
 		newDimentions,
@@ -92,8 +92,8 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		LoadCardImage(m_localName);
 
 	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
-	constexpr auto maxOffset = 0x14;
-	uint8_t offset = data[2];
+	constexpr uint8_t maxOffset = 0x14;
+	const uint8_t offset = data[2] < maxOffset ? data[2] : maxOffset;
 
 	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
 		m_printQueue.clear();
@@ -114,16 +114,17 @@ void Printer::PrintLine()
 		return;
 
 	TTF_Init();
-	constexpr const uint8_t defaultFontSize = 36;
+	constexpr uint8_t defaultFontSize = 36;
 	TTF_Font* font = TTF_OpenFont("kochi-gothic-subst.ttf", defaultFontSize);
 	if (font == nullptr) {
 		g_logger->warn("Printer::PrintLine: Unable to initialize TTF_Font with \"kochi-gothic-subst.ttf\"");
 		return;
 	}
 
-	constexpr const uint8_t defaultX = 95;
-	constexpr const uint8_t defaultY = 120; // FIXME: Needs to be variable, 120 for vertical, 85 for horiz
-	constexpr const SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
+	constexpr uint8_t defaultX = 95; // This is good for *most* cards
+	const uint8_t defaultY = m_horizontalCard ? 85 : 120;
+	constexpr SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
+	constexpr uint8_t verticalCardOffset = 4;
 
 	enum Commands {
 		Return = '\r',
@@ -151,8 +152,11 @@ void Printer::PrintLine()
 		utf8_int32_t currentChar = '\0';
 
 		// We don't run this for a single line skip as the FontLineSkip isn't the same as our defaultY
-		if (print.offset > 1)
-			yPos += (TTF_FontLineSkip(font) * (print.offset - 1)) + ((print.offset - 1) * 4);
+		if (print.offset > 1) {
+			yPos += TTF_FontLineSkip(font) * (print.offset - 1);
+			if (!m_horizontalCard)
+				yPos += (print.offset - 1) * verticalCardOffset;
+		}
 
 		// TODO: Have converted be a custom type where we can just iterate with converted[n]
 		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
@@ -166,7 +170,7 @@ void Printer::PrintLine()
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
 					TTF_SetFontSize(font, defaultFontSize * std::atoi(&yScale));
-					yPos += TTF_FontLineSkip(font) + 4; // FIXME: +4 for vertical cards : 0 for horiz
+					yPos += TTF_FontLineSkip(font) + m_horizontalCard ? 0 : verticalCardOffset;
 					TTF_SetFontSize(font, defaultFontSize);
 					xPos = defaultX;
 					yScale = '1';
@@ -208,7 +212,7 @@ void Printer::PrintLine()
 					continue;
 			}
 
-			// FIXME: Solid does not function as expected, scaled characters aren't blitted, Blended works, also doesn't need to be 32bit depth
+			// TODO: Solid produces a better glyph but with non-transparent backgrounds
 			SDL_Surface* glyph = TTF_RenderGlyph32_Blended(font, currentChar, color);
 			SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
 				0,
@@ -227,6 +231,12 @@ void Printer::PrintLine()
 
 			int advance = 0;
 			TTF_GlyphMetrics32(font, currentChar, NULL, NULL, NULL, NULL, &advance);
+			// TODO: F-Zero AX has odd spacing, if we use the default spacing it's too much, but it works for every other game?
+#if 0
+			if (currentChar == 0x20)
+				xPos += 15 * std::atoi(&xScale);
+			else
+#endif
 			xPos += advance * std::atoi(&xScale);
 
 			SDL_FreeSurface(glyph);
