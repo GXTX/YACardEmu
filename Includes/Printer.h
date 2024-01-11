@@ -23,6 +23,7 @@
 #define PRINTER_H
 
 #include <vector>
+#include <random>
 
 #include <SDL2/SDL.h>
 #include <SDL_ttf.h>
@@ -100,7 +101,6 @@ protected:
 		std::string temp = cardName;
 		temp.append(".png");
 
-		// FIXME: Allow a pool of images to be randomly chosen
 		if (ghc::filesystem::exists(temp)) {
 			m_cardImage = IMG_Load(temp.c_str());
 			if (m_cardImage != nullptr)
@@ -108,11 +108,39 @@ protected:
 			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
 		}
 
-		// FIXME: Hard coded size
+		std::string cwd = ghc::filesystem::current_path().string();
+#ifdef _WIN32
+		if (cwd.back() != '\\')
+			cwd.append("\\images\\");
+#else
+		if (cwd.back() != '/')
+			cwd.append("/images/");
+#endif
+
+		g_logger->warn("{}", cwd);
+		std::vector<std::string> images = {};
+
+		for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
+			if (entry.path().string().find(".png") != std::string::npos)
+				images.emplace_back(entry.path().string());
+		}
+
+		if (!images.empty()) {
+			std::random_device dev;
+			std::mt19937 twist(dev());
+			std::uniform_int_distribution<std::mt19937::result_type> rng(0, static_cast<uint8_t>(images.size()));
+
+			m_cardImage = IMG_Load(images.at(rng(twist)).c_str());
+			if (m_cardImage != nullptr)
+				return;
+			g_logger->warn("Printer::LoadCardImage: IMG_Load failed to load the random base card image");
+		}
+
+		// Everything else failed, we *need* a surface... So let's generate a transparent one
 		m_cardImage = SDL_CreateRGBSurface(
 			0,
-			640,
-			1019,
+			(m_horizontalCard ? 1019 : 640),
+			(m_horizontalCard ? 640 : 1019),
 			32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 		);
 	}

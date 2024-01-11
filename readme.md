@@ -5,9 +5,9 @@ YACardEmu (*YetAnother*CardEmu) is a software emulator to emulate a range of mag
 
 **Checkout some gameplay videos [here!](https://www.youtube.com/channel/UCle6xQNwROzwYfYMyrnIcBQ)**
 
-Breaking Changes....
+Card images!
 ---------
-We've recently remodeled how cards are stored. If your card ends with `.track_n` then you must convert this to a single file. If your `.track_1` or `.track_2` files are empty (aka all zeros) then do **not** add the zero'ed track to the file. The resulting file should have either 69, 138, or 207 bytes in it.
+Card images are now working! Place base images in a folder called `images` in the same folder as `YACardEmu.exe`, and the application will randomly choose one when the game calls to save. You'll see afterwards that a image will be placed in the same folder as your cards with your card name. The UI will also display this when picking a card. Enjoy.
 
 Building
 ---------
@@ -16,7 +16,7 @@ Building
 Ubuntu / Debian / Raspbian
 
 ```sh
-sudo apt install build-essential cmake pkg-config libserialport-dev
+sudo apt install build-essential cmake pkg-config libserialport-dev libsdl2-2.0-0 libsdl2-image-2.0-0 libsdl2-ttf-2.0-0
 ```
 
 Windows
