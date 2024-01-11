@@ -170,7 +170,7 @@ void Printer::PrintLine()
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
 					TTF_SetFontSize(font, defaultFontSize * std::atoi(&yScale));
-					yPos += TTF_FontLineSkip(font) + m_horizontalCard ? 0 : verticalCardOffset;
+					yPos += TTF_FontLineSkip(font) + (m_horizontalCard ? 0 : verticalCardOffset);
 					TTF_SetFontSize(font, defaultFontSize);
 					xPos = defaultX;
 					yScale = '1';

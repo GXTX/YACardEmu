@@ -154,7 +154,6 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 			card.append(".png");
 
 			std::string base64 = {};
-			g_logger->warn("{}", card);
 			if (ghc::filesystem::exists(card)) {
 				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
 

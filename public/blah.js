@@ -34,7 +34,7 @@ function updateCards() {
 		carouselImage.src = card.image
 		carouselImage.alt = card.name
 		carouselDiv.dataset.cardName = card.name
-		carouselImage.className = 'd-block w-100'
+		carouselImage.className = 'd-block w-100 img-responsive center-block'
 		carouselDiv.appendChild(carouselImage)
 		carouselInnerDivEl.appendChild(carouselDiv);
 	})
