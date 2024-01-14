@@ -111,13 +111,13 @@ protected:
 		std::string cwd = ghc::filesystem::current_path().string();
 #ifdef _WIN32
 		if (cwd.back() != '\\')
-			cwd.append("\\images\\");
+			cwd.append("\\");
+		cwd.append("images\\");
 #else
 		if (cwd.back() != '/')
-			cwd.append("/images/");
+			cwd.append("/");
+		cwd.append("images/");
 #endif
-
-		g_logger->warn("{}", cwd);
 		std::vector<std::string> images = {};
 
 		if (ghc::filesystem::is_directory(cwd)) {
