@@ -145,8 +145,8 @@ void Printer::PrintLine()
 
 		int xPos = defaultX;
 		int yPos = defaultY;
-		char xScale = '1';
-		char yScale = '1';
+		std::string xScale = "1";
+		std::string yScale = "1";
 		bool yScaleCompensate = false;
 		int maxYSizeForLine = 0;
 		utf8_int32_t currentChar = '\0';
@@ -169,7 +169,7 @@ void Printer::PrintLine()
 			// Process the character for command bytes
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
-					TTF_SetFontSize(font, defaultFontSize * std::atoi(&yScale));
+					TTF_SetFontSize(font, defaultFontSize * std::atoi(yScale.c_str()));
 					yPos += TTF_FontLineSkip(font) + (m_horizontalCard ? 0 : verticalCardOffset);
 					TTF_SetFontSize(font, defaultFontSize);
 					xPos = defaultX;
@@ -182,7 +182,7 @@ void Printer::PrintLine()
 					yScale = '2';
 					continue;
 				case ResetScale:
-					if (yScale != '1')
+					if (yScale[0] != '1')
 						yScaleCompensate = true;
 					yScale = '1';
 					xScale = '1';
@@ -216,8 +216,8 @@ void Printer::PrintLine()
 			SDL_Surface* glyph = TTF_RenderGlyph32_Blended(font, currentChar, color);
 			SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
 				0,
-				glyph->clip_rect.w * std::atoi(&xScale),
-				glyph->clip_rect.h * std::atoi(&yScale),
+				glyph->clip_rect.w * std::atoi(xScale.c_str()),
+				glyph->clip_rect.h * std::atoi(yScale.c_str()),
 				32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
 			);
 			SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
@@ -237,7 +237,7 @@ void Printer::PrintLine()
 				xPos += 15 * std::atoi(&xScale);
 			else
 #endif
-			xPos += advance * std::atoi(&xScale);
+			xPos += advance * std::atoi(xScale.c_str());
 
 			SDL_FreeSurface(glyph);
 			SDL_FreeSurface(scaledGlyph);
