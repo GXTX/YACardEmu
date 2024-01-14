@@ -111,24 +111,29 @@ protected:
 		std::string cwd = ghc::filesystem::current_path().string();
 #ifdef _WIN32
 		if (cwd.back() != '\\')
-			cwd.append("\\images\\");
+			cwd.append("\\");
+		cwd.append("images\\");
 #else
 		if (cwd.back() != '/')
-			cwd.append("/images/");
+			cwd.append("/");
+		cwd.append("images/");
 #endif
-
-		g_logger->warn("{}", cwd);
 		std::vector<std::string> images = {};
 
-		for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
-			if (entry.path().string().find(".png") != std::string::npos)
-				images.emplace_back(entry.path().string());
+		if (ghc::filesystem::is_directory(cwd)) {
+			for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
+				if (entry.path().string().find(".png") != std::string::npos)
+					images.emplace_back(entry.path().string());
+			}
+		} else {
+			// FIXME: Create the folder for the user
+			g_logger->warn("Printer::LoadCardImage: Image folder does not exist");
 		}
 
 		if (!images.empty()) {
 			std::random_device dev;
 			std::mt19937 twist(dev());
-			std::uniform_int_distribution<std::mt19937::result_type> rng(0, static_cast<uint8_t>(images.size()));
+			std::uniform_int_distribution<std::mt19937::result_type> rng(0, static_cast<uint8_t>(images.size()) - 1);
 
 			m_cardImage = IMG_Load(images.at(rng(twist)).c_str());
 			if (m_cardImage != nullptr)
