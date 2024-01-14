@@ -120,9 +120,13 @@ protected:
 		g_logger->warn("{}", cwd);
 		std::vector<std::string> images = {};
 
-		for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
-			if (entry.path().string().find(".png") != std::string::npos)
-				images.emplace_back(entry.path().string());
+		if(ghc::filesystem::is_directory(cwd)){
+			for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
+				if (entry.path().string().find(".png") != std::string::npos)
+					images.emplace_back(entry.path().string());
+			}
+		} else {
+			g_logger->warn("Printer::LoadCardImage: Image folder does not exist");
 		}
 
 		if (!images.empty()) {
