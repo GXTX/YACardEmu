@@ -137,7 +137,7 @@ void Printer::PrintLine()
 
 	for (const auto& print : m_printQueue)
 	{
-		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)&print.data[0], print.data.size() + 1);
+		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)print.data.data(), print.data.size());
 		if (converted == nullptr) {
 			g_logger->error("Printer::PrintLine: iconv couldn't convert the string while printing!");
 			return;
@@ -234,7 +234,7 @@ void Printer::PrintLine()
 			// TODO: F-Zero AX has odd spacing, if we use the default spacing it's too much, but it works for every other game?
 #if 0
 			if (currentChar == 0x20)
-				xPos += 15 * std::atoi(&xScale);
+				xPos += 15 * std::atoi(xScale.c_str());
 			else
 #endif
 			xPos += advance * std::atoi(xScale.c_str());
