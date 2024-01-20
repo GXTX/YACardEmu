@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <random>
+#include <thread>
 
 #include <SDL2/SDL.h>
 #include <SDL_ttf.h>
@@ -60,6 +61,11 @@ public:
 	void RemoveCard(std::string& cardName)
 	{
 		m_localName = cardName;
+		std::thread(&Printer::DetachedRemove, this).detach();
+	}
+
+	void DetachedRemove()
+	{
 		PrintLine();
 		if (m_cardImage != nullptr) {
 			SaveCardImage(m_localName);
@@ -82,8 +88,11 @@ public:
 	std::string m_localName = {};
 
 	// Default state is a vertical card on the mechs
-	bool m_horizontalCard = false;
+	bool m_isHorizontalCard = false;
+
 protected:
+	static constexpr uint8_t maxCustomGylphDimensions = 30;
+
 	struct PrintCommand {
 		uint8_t offset = 0;
 		std::vector<uint8_t> data = {};
@@ -142,12 +151,7 @@ protected:
 		}
 
 		// Everything else failed, we *need* a surface... So let's generate a transparent one
-		m_cardImage = SDL_CreateRGBSurface(
-			0,
-			(m_horizontalCard ? 1019 : 640),
-			(m_horizontalCard ? 640 : 1019),
-			32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
-		);
+		m_cardImage = QuickCreateSurface((m_isHorizontalCard ? 1019 : 640), (m_isHorizontalCard ? 640 : 1019));
 	}
 
 	void SaveCardImage(std::string& cardName)
@@ -168,6 +172,12 @@ protected:
 			}
 		}
 		return temp;
+	}
+
+	// FIXME: Doesn't need to be a 32-bit surface
+	SDL_Surface* QuickCreateSurface(int x, int y)
+	{
+		return SDL_CreateRGBSurface(0, x, y, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
 	}
 };
 

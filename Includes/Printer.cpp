@@ -32,15 +32,8 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	data.erase(data.begin());
 	std::vector<bool> bits = ConvertToBits(data);
 
-	constexpr uint8_t maxDimentions = 24;
-	// FIXME: Doesn't need to be a 32-bit surface
-	SDL_Surface* glyph = SDL_CreateRGBSurface(
-		0,
-		maxDimentions,
-		maxDimentions,
-		32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
-	);
-
+	constexpr uint8_t dimensions = 24;
+	SDL_Surface* glyph = QuickCreateSurface(dimensions, dimensions);
 	if (glyph == nullptr)
 		return false;
 
@@ -59,13 +52,7 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	SDL_UnlockSurface(glyph);
 
 	// The default 25x25 glyph is just slighly too small to match up with our font, so resize it
-	constexpr uint8_t newDimentions = 30;
-	SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
-		0,
-		newDimentions,
-		newDimentions,
-		32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
-	);
+	SDL_Surface* scaledGlyph = QuickCreateSurface(maxCustomGylphDimensions, maxCustomGylphDimensions);
 	SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
 
 	SDL_FreeSurface(glyph);
@@ -103,7 +90,7 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 	m_printQueue.push_back({ offset, temp });
 
 	if (static_cast<Mode>(data[0]) == Mode::Now)
-		PrintLine();
+		std::thread(&Printer::PrintLine, this).detach();
 
 	return true;
 }
@@ -122,7 +109,7 @@ void Printer::PrintLine()
 	}
 
 	constexpr uint8_t defaultX = 95; // This is good for *most* cards
-	const uint8_t defaultY = m_horizontalCard ? 85 : 120;
+	const uint8_t defaultY = m_isHorizontalCard ? 85 : 120;
 	constexpr SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
 	constexpr uint8_t verticalCardOffset = 4;
 
@@ -153,15 +140,15 @@ void Printer::PrintLine()
 
 		// We don't run this for a single line skip as the FontLineSkip isn't the same as our defaultY
 		if (print.offset > 1) {
-			yPos += TTF_FontLineSkip(font) * (print.offset - 1);
-			if (!m_horizontalCard)
-				yPos += (print.offset - 1) * verticalCardOffset;
+			yPos += TTF_FontLineSkip(font) * (print.offset);
+			if (!m_isHorizontalCard)
+				yPos += (print.offset) * (verticalCardOffset - 2); // Don't ask
 		}
 
 		// TODO: Have converted be a custom type where we can just iterate with converted[n]
 		for (auto i = utf8codepoint(converted, &currentChar); currentChar != '\0'; i = utf8codepoint(i, &currentChar)) {
 			// We need to fix our yPos after resetting from a yScale on the same line
-			if (yScaleCompensate) {
+			if (yScaleCompensate && maxYSizeForLine) {
 				yPos += maxYSizeForLine - TTF_FontLineSkip(font);
 				yScaleCompensate = false;
 			}
@@ -170,7 +157,7 @@ void Printer::PrintLine()
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
 					TTF_SetFontSize(font, defaultFontSize * std::atoi(yScale.c_str()));
-					yPos += TTF_FontLineSkip(font) + (m_horizontalCard ? 0 : verticalCardOffset);
+					yPos += TTF_FontLineSkip(font) + (m_isHorizontalCard ? 0 : verticalCardOffset);
 					TTF_SetFontSize(font, defaultFontSize);
 					xPos = defaultX;
 					yScale = '1';
@@ -206,20 +193,28 @@ void Printer::PrintLine()
 							continue;
 						}
 						SDL_Rect location = { xPos, yPos, 0, 0 };
-						SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, m_cardImage, &location);
-						xPos += m_customGlyphs.at(currentChar)->w;
+
+						if (xScale[0] != '1' || yScale[0] != '1') {
+							auto scaledCustomGlyph = QuickCreateSurface(maxCustomGylphDimensions * std::atoi(xScale.c_str()), maxCustomGylphDimensions * std::atoi(yScale.c_str()));
+							SDL_BlitScaled(m_customGlyphs.at(currentChar), NULL, scaledCustomGlyph, NULL);
+							if (yScale[0] != '1')
+								location.y -= (scaledCustomGlyph->h / std::atoi(yScale.c_str()));
+							SDL_BlitSurface(scaledCustomGlyph, NULL, m_cardImage, &location);
+							xPos += scaledCustomGlyph->w;
+							SDL_FreeSurface(scaledCustomGlyph);
+							scaledCustomGlyph = nullptr;
+						}
+						else {
+							SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, m_cardImage, &location);
+							xPos += m_customGlyphs.at(currentChar)->w;
+						}
 					}
 					continue;
 			}
 
 			// TODO: Solid produces a better glyph but with non-transparent backgrounds
 			SDL_Surface* glyph = TTF_RenderGlyph32_Blended(font, currentChar, color);
-			SDL_Surface* scaledGlyph = SDL_CreateRGBSurface(
-				0,
-				glyph->clip_rect.w * std::atoi(xScale.c_str()),
-				glyph->clip_rect.h * std::atoi(yScale.c_str()),
-				32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000
-			);
+			SDL_Surface* scaledGlyph = QuickCreateSurface(glyph->clip_rect.w * std::atoi(xScale.c_str()), glyph->clip_rect.h * std::atoi(yScale.c_str()));
 			SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
 
 			// Final blit
@@ -237,7 +232,7 @@ void Printer::PrintLine()
 				xPos += 15 * std::atoi(xScale.c_str());
 			else
 #endif
-			xPos += advance * std::atoi(xScale.c_str());
+				xPos += advance * std::atoi(xScale.c_str());
 
 			SDL_FreeSurface(glyph);
 			SDL_FreeSurface(scaledGlyph);
