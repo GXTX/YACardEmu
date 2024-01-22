@@ -38,6 +38,7 @@ WebIo::~WebIo()
 bool WebIo::Spawn()
 {
 	std::thread(&WebIo::StartServer, this).detach();
+
 	// Need to wait before checking the status otherwise we'll crash
 	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	return m_svr.is_running();
@@ -60,9 +61,8 @@ void WebIo::StartServer()
 		Router(req, res);
 	});
 
-	if (!m_svr.listen(m_host.c_str(), m_port)) {
+	if (!m_svr.listen(m_host.c_str(), m_port))
 		g_logger->critical("Failed to start API server!");
-	}
 }
 
 void WebIo::Router(const httplib::Request &req, httplib::Response &res)
@@ -85,11 +85,10 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			InsertedCard(req, res);
 			break;
 		case Routes::dispenser:
-			if (req.method == "DELETE") {
+			if (req.method == "DELETE")
 				m_card->reportDispenserEmpty = true;
-			} else if (req.method == "POST") {
+			else if (req.method == "POST")
 				m_card->reportDispenserEmpty = false;
-			}
 			res.set_content(m_card->reportDispenserEmpty ? "empty" : "full", "text/plain");
 			break;
 		case Routes::stop:
@@ -113,13 +112,10 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 	}
 
 	if (req.method == "POST") {
-		if (req.has_param("loadonly")) {
+		if (req.has_param("loadonly"))
 			m_card->insertedCard = true;
-		}
-
-		if (req.has_param("cardname")) {
+		if (req.has_param("cardname"))
 			m_card->cardName = req.get_param_value("cardname");
-		}
 	}
 
 	if (req.has_param("redirect")) {
@@ -135,29 +131,31 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 	std::string list = "[";
 
 	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
-		std::string card{entry.path().string()};
+		std::string fullCardPath{entry.path().string()};
 
-		if (card.find(".png") != std::string::npos)
+		if (fullCardPath.find(".png") != std::string::npos)
 			continue;
 
-		auto find = card.find(".bin");
+		auto find = fullCardPath.find(".bin");
 
 		if (find != std::string::npos) {
 			list.append("{\"name\":\"");
+
+			std::string card = fullCardPath.substr(fullCardPath.find_last_of("\\") + 1);
 #ifdef _WIN32
-			list.append(card.substr(card.find_last_of("\\") + 1));
+			list.append(card);
 #else
-			list.append(card.substr(card.find_last_of("/") + 1));
+			list.append(card);
 #endif
 
 			list.append("\",\"image\":\"");
-			card.append(".png");
+			fullCardPath.append(".png");
 
 			std::string base64 = {};
-			if (ghc::filesystem::exists(card)) {
-				std::ifstream img(card.c_str(), std::ifstream::in | std::ifstream::binary);
+			if (ghc::filesystem::exists(fullCardPath)) {
+				std::ifstream img(fullCardPath.c_str(), std::ifstream::in | std::ifstream::binary);
 
-				base64.resize(ghc::filesystem::file_size(card));
+				base64.resize(ghc::filesystem::file_size(fullCardPath));
 
 				img.read(reinterpret_cast<char*>(&base64[0]), base64.size());
 				img.close();
@@ -166,7 +164,13 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 			std::string encoded = base64_encode(base64, false);
 			list.append("data:image/png;base64, ");
 			list.append(encoded);
-			list.append("\"},");
+
+			// Have the current card be the active item on the carousel
+			list.append("\", \"active\":");
+			if (card == m_card->cardName)
+				list.append("true},");
+			else
+				list.append("false},");
 		}
 	}
 

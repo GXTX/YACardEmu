@@ -71,6 +71,7 @@ private:
 
 	std::map<std::string, Routes> m_routeValues = {};
 
+	// FIXME: Bad bad bad
 	void SetupRoutes()
 	{
 		m_routeValues["cards"]        = Routes::cards;

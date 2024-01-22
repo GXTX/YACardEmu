@@ -17,12 +17,11 @@ function updateCards() {
 	while (carouselInnerDivEl.firstChild) {
 		carouselInnerDivEl.removeChild(carouselInnerDivEl.firstChild)
 	}
-	let firstCard = true
 	// Insert each card into the carousel.
 	cards.forEach(card => {
 		const carouselDiv = document.createElement('div')
 		// If this is the first card we want to set it as active and set the value of the input to the card name.
-		if (firstCard) {
+		if (card.active == true) {
 			carouselDiv.className = "carousel-item active"
 			firstCard = false
 			selectedCardName = card.name
