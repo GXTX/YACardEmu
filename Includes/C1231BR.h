@@ -34,7 +34,7 @@
 class C1231BR : public CardIo {
 public:
 	C1231BR(CardIo::Settings* settings);
-
+	~C1231BR() { EjectCard(); }
 protected:
 	enum class CardPosition {
 		NO_CARD        = 0b00000,

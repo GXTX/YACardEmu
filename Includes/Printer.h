@@ -49,6 +49,7 @@ public:
 	}
 	~Printer()
 	{
+		DetachedRemove();
 		SDL_Quit();
 	}
 
