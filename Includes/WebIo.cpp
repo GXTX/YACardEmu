@@ -141,10 +141,11 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 		if (find != std::string::npos) {
 			list.append("{\"name\":\"");
 
-			std::string card = fullCardPath.substr(fullCardPath.find_last_of("\\") + 1);
 #ifdef _WIN32
+			std::string card = fullCardPath.substr(fullCardPath.find_last_of("\\") + 1);
 			list.append(card);
 #else
+			std::string card = fullCardPath.substr(fullCardPath.find_last_of("/") + 1);
 			list.append(card);
 #endif
 
