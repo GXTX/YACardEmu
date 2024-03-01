@@ -41,8 +41,8 @@
 
 // Globals
 struct Settings {
-	CardIo::Settings card{};
-	SerIo::Settings serial{};
+	CardIo::Settings card = {};
+	SerIo::Settings serial = {};
 	std::string webListenHost;
 	int webPort = 8080;
 };

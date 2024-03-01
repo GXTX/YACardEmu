@@ -24,6 +24,11 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#define SP_PRIV
+#include "libserialport_internal.h"
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
 #include <iostream>
@@ -69,7 +74,6 @@ private:
 #ifdef _WIN32
 	HANDLE m_pipeHandle = INVALID_HANDLE_VALUE;
 #endif
-
 	bool m_isPipe = false;
 	sp_port *m_portHandle = nullptr;
 	sp_port_config *m_portConfig = nullptr;

@@ -30,13 +30,13 @@ SerIo::SerIo(SerIo::Settings *settings)
 
 SerIo::~SerIo()
 {
+#ifdef _WIN32
 	if (m_isPipe) {
-#ifdef _WIN32	
 		CloseHandle(m_pipeHandle);
+		return;
+	}
 #endif
-	} else {
-		sp_close(m_portHandle);
-	}	
+	sp_close(m_portHandle);
 }
 
 bool SerIo::Open()
@@ -65,6 +65,16 @@ bool SerIo::Open()
 	sp_get_port_by_name(m_portSettings->devicePath.c_str(), &m_portHandle);
 
 	if (sp_open(m_portHandle, SP_MODE_READ_WRITE) != SP_OK) {
+#ifdef __linux
+		g_logger->info("SerIo::Init: Failed to open as a serial tty -- attemping to open as regular FD", m_portSettings->devicePath);
+		m_portHandle = static_cast<sp_port*>(std::malloc(sizeof(sp_port)));
+		m_portHandle->name = const_cast<char*>(m_portSettings->devicePath.c_str());
+		m_portHandle->fd = open(m_portSettings->devicePath.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NDELAY);
+		if (m_portHandle->fd > 0)
+			return true;
+		else
+			std::free(m_portHandle);
+#endif
 		g_logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
 		return false;
 	}
@@ -104,16 +114,15 @@ SerIo::Status SerIo::Write()
 
 	int ret = 0;
 
-	if (m_isPipe) {
 #ifdef _WIN32
+	if (m_isPipe) {
 		DWORD dwRet = 0;
 		WriteFile(m_pipeHandle, &m_writeBuffer[0], static_cast<DWORD>(m_writeBuffer.size()), &dwRet, NULL);
 		ret = dwRet;
+	} else
 #endif
-	} else {
-		ret = sp_blocking_write(m_portHandle, &m_writeBuffer[0], m_writeBuffer.size(), 0);
-		sp_drain(m_portHandle);
-	}
+	ret = sp_blocking_write(m_portHandle, &m_writeBuffer[0], m_writeBuffer.size(), 0);
+	sp_drain(m_portHandle);
 
 	if (ret > 0) {
 		if (ret < static_cast<int>(m_writeBuffer.size())) {
@@ -132,8 +141,8 @@ SerIo::Status SerIo::Read()
 {
 	int bytes = 0;
 
-	if (m_isPipe) {
 #ifdef _WIN32
+	if (m_isPipe) {
 		DWORD dwBytes = 0;
 		if (PeekNamedPipe(m_pipeHandle, 0, 0, 0, &dwBytes, 0) == 0) {
 			DWORD error = ::GetLastError();
@@ -145,10 +154,9 @@ SerIo::Status SerIo::Read()
 			return Status::ReadError;
 		}
 		bytes = dwBytes;
+	} else
 #endif
-	} else {
 		bytes = sp_input_waiting(m_portHandle);
-	}
 
 	if (bytes < 1) {
 		return Status::ReadError;
@@ -159,15 +167,14 @@ SerIo::Status SerIo::Read()
 
 	int ret = 0;
 
-	if (m_isPipe) {
 #ifdef _WIN32
+	if (m_isPipe) {
 		DWORD dwRet = 0;
 		BOOL bRet = ReadFile(m_pipeHandle, &m_readBuffer[originalSize], static_cast<DWORD>(bytes), &dwRet, NULL);
 		ret = bRet;
+	} else
 #endif
-	} else {
 		ret = sp_nonblocking_read(m_portHandle, &m_readBuffer[originalSize], static_cast<size_t>(bytes));
-	}
 
 	if (ret <= 0) {
 		return Status::ReadError;

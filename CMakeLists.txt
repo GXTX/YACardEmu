@@ -70,6 +70,7 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/3rdparty/mINI/src
 	${PROJECT_SOURCE_DIR}/3rdparty/gulfs/include
 	${PROJECT_SOURCE_DIR}/3rdparty/utf8
+	${PROJECT_SOURCE_DIR}/3rdparty/libserialport
 	${SDL2_INCLUDE_DIRS}
 )
 
