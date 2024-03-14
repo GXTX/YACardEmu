@@ -588,6 +588,7 @@ void CardIo::ClearCardData()
 void CardIo::ReadCard()
 {
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	g_logger->debug("CardIo::ReadCard: Reading card data from - {}", fullPath);
 
 	// TODO: Should we actually be seeding zero's when the file doesn't exist?
 	std::string readBack;
@@ -656,15 +657,8 @@ void CardIo::WriteCard()
 		}
 	}
 
-#ifdef _WIN32
-	if (m_cardSettings->cardPath.back() != '\\')
-		m_cardSettings->cardPath.append("\\");
-#else
-	if (m_cardSettings->cardPath.back() != '/')
-		m_cardSettings->cardPath.append("/");
-#endif
-
 	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	g_logger->debug("CardIo::WriteCard: Writing card data to {}", fullPath);
 
 	std::string writeBack;
 	for (const auto &track : cardData) {

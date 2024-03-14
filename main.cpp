@@ -107,6 +107,14 @@ bool ReadConfig()
 		globalSettings.card.cardPath = ghc::filesystem::current_path().string();
 	}
 
+#ifdef _WIN32
+	if (globalSettings.card.cardPath.back() != '\\')
+		globalSettings.card.cardPath.append("\\");
+#else
+	if (globalSettings.card.cardPath.back() != '/')
+		globalSettings.card.cardPath.append("/");
+#endif
+
 	if (lhost.empty()) {
 		globalSettings.webListenHost = "0.0.0.0";
 	} else {
