@@ -41,20 +41,6 @@ SerIo::~SerIo()
 
 bool SerIo::Open()
 {
-#ifdef _WIN32
-	if (m_portSettings->devicePath.find("pipe") != std::string::npos) {
-		m_pipeHandle = CreateNamedPipeA(m_portSettings->devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
-
-		if (m_pipeHandle == INVALID_HANDLE_VALUE) {
-			g_logger->critical("SerIo::Init: Failed to create pipe");
-			return false;
-		}
-
-		m_isPipe = true;
-		return true;
-	}
-#endif
-
 	sp_new_config(&m_portConfig);
 	sp_set_config_baudrate(m_portConfig, m_portSettings->baudRate);
 	sp_set_config_bits(m_portConfig, 8);
@@ -66,7 +52,7 @@ bool SerIo::Open()
 
 	if (sp_open(m_portHandle, SP_MODE_READ_WRITE) != SP_OK) {
 #ifdef __linux
-		g_logger->info("SerIo::Init: Failed to open as a serial tty -- attemping to open as regular FD", m_portSettings->devicePath);
+		g_logger->warn("SerIo::Init: Failed to open as a serial tty -- attemping to open as regular FD", m_portSettings->devicePath);
 		m_portHandle = static_cast<sp_port*>(std::malloc(sizeof(sp_port)));
 		m_portHandle->name = const_cast<char*>(m_portSettings->devicePath.c_str());
 		m_portHandle->fd = open(m_portSettings->devicePath.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NDELAY);
@@ -74,6 +60,17 @@ bool SerIo::Open()
 			return true;
 		else
 			std::free(m_portHandle);
+#endif
+#ifdef _WIN32
+	if (m_portSettings->devicePath.find("pipe") != std::string::npos) {
+		g_logger->warn("SerIo::Init: Failed to open COM port -- attempting to open as a named pipe");
+		m_pipeHandle = CreateNamedPipeA(m_portSettings->devicePath.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 0, 0, NMPWAIT_USE_DEFAULT_WAIT, NULL);
+
+		if (m_pipeHandle != INVALID_HANDLE_VALUE) {
+			m_isPipe = true;
+			return true;
+		}
+	}
 #endif
 		g_logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
 		return false;
