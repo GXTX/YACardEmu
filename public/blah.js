@@ -18,18 +18,20 @@ function updateCards() {
 		carouselInnerDivEl.removeChild(carouselInnerDivEl.firstChild)
 	}
 	// Insert each card into the carousel.
+	let foundActive = false;
 	cards.forEach(card => {
 		const carouselDiv = document.createElement('div')
 		// If this is the first card we want to set it as active and set the value of the input to the card name.
 		if (card.active == true) {
 			carouselDiv.className = "carousel-item active"
-			firstCard = false
+			foundActive = true
 			selectedCardName = card.name
 			updateCardNameInput()
 		} else {
 			carouselDiv.className = "carousel-item"
 		}
 		const carouselImage = document.createElement('img')
+		carouselDiv.id = card.name
 		carouselImage.src = card.image
 		carouselImage.alt = card.name
 		carouselDiv.dataset.cardName = card.name
@@ -37,6 +39,12 @@ function updateCards() {
 		carouselDiv.appendChild(carouselImage)
 		carouselInnerDivEl.appendChild(carouselDiv);
 	})
+
+	if (!foundActive) {
+		const item = document.getElementById(cards[0].name)
+		item.className = "carousel-item active"
+		cardNameInput.value = cards[0].name
+	}
 }
 
 async function fetchCards() {
