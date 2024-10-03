@@ -65,6 +65,7 @@ const char *helptext =
 void WaitForInput()
 {
 #ifdef _WIN32
+	g_logger->flush();
 	std::cout << "Press any key to close the application...";
 	std::cin.get();
 #endif
