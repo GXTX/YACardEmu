@@ -75,15 +75,21 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		Append = '1',
 	};
 
-	if (m_cardImage == nullptr)
-		LoadCardImage(m_localName);
-
 	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
 	constexpr uint8_t maxOffset = 0x14;
 	const uint8_t offset = data[2] < maxOffset ? data[2] : maxOffset;
 
-	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear)
+	bool skip_printed_image = false;
+	if (static_cast<BufferControl>(data[1]) == BufferControl::Clear) {
+		if (m_eraseOnClear) {
+			Erase();
+			skip_printed_image = true;
+		}
 		m_printQueue.clear();
+	}
+	
+	if (m_cardImage == nullptr)
+		LoadCardImage(m_localName, skip_printed_image);
 
 	std::vector<uint8_t> temp = {};
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
