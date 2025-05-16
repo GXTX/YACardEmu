@@ -233,16 +233,14 @@ int main(int argc, char *argv[])
 	}
 
 	// TODO: These don't need to be here, put them in their respective classes
-	SerIo::Status serialStatus = SerIo::Status::Okay;
+	//SerIo::Status serialStatus = SerIo::Status::Okay;
 	CardIo::StatusCode cardStatus = CardIo::StatusCode::Okay;
 
 	g_logger->info("Running...");
 
 	while (running) {
-		serialStatus = serialHandler->Read();
-
 		// TODO: device read/write should probably be a separate thread
-		if (serialStatus != SerIo::Status::Okay && serialHandler->m_readBuffer.empty()) {
+		if (serialHandler->Read() != SerIo::Status::Okay && serialHandler->m_readBuffer.empty()) {
 			std::this_thread::sleep_for(delay);
 			continue;
 		}
