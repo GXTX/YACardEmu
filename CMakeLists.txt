@@ -10,6 +10,7 @@ find_package(Threads REQUIRED)
 add_executable(${PROJECT_NAME}
 	main.cpp
 	Includes/CardIo.cpp
+	Includes/Fileio.cpp
 	Includes/SerIo.cpp
 	Includes/C1231LR.cpp
 	Includes/C1231BR.cpp
