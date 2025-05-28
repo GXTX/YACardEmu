@@ -52,6 +52,7 @@ class CardIo
 public:
 	enum StatusCode {
 		Okay,
+		SendAck,
 		SizeError,
 		SyncError,
 		SyntaxError,
@@ -71,10 +72,13 @@ public:
 		std::string mech = "C1231LR";
 	};
 
+	CardIo::StatusCode m_status = StatusCode::Okay;
+
 	CardIo(CardIo::Settings *settings);
 	virtual ~CardIo() = default;
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
+	CardIo::StatusCode CardIo::Process(std::vector<uint8_t>& read, std::vector<uint8_t>& write);
 
 	CardIo::Settings *m_cardSettings = nullptr;
 	std::string printName = "print.bin";
@@ -139,6 +143,7 @@ protected:
 	const uint8_t END_OF_TEXT = 0x03;
 	const uint8_t ENQUIRY = 0x05;
 	const uint8_t ACK = 0x06;
+	const uint8_t NACK = 0x15;
 	const uint8_t CARD_SIZE = 0xCF;
 	const uint8_t TRACK_SIZE = 0x45;
 	const uint8_t NUM_TRACKS = 3;

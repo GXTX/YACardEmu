@@ -232,32 +232,17 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	// TODO: These don't need to be here, put them in their respective classes
-	SerIo::Status serialStatus = SerIo::Status::Okay;
-	CardIo::StatusCode cardStatus = CardIo::StatusCode::Okay;
-
 	g_logger->info("Running...");
-
 	while (running) {
-		serialStatus = serialHandler->Read();
-
 		// TODO: device read/write should probably be a separate thread
-		if (serialStatus != SerIo::Status::Okay && serialHandler->m_readBuffer.empty()) {
+		if (serialHandler->Read() != SerIo::Status::Okay && serialHandler->m_readBuffer.empty()) {
 			std::this_thread::sleep_for(delay);
 			continue;
 		}
 
-		cardStatus = cardHandler->ReceivePacket(serialHandler->m_readBuffer);
+		cardHandler->Process(serialHandler->m_readBuffer, serialHandler->m_writeBuffer);
+		serialHandler->Write();
 
-		if (cardStatus == CardIo::Okay || cardStatus == CardIo::ChecksumError) {
-			// We need to send our ACK as quick as possible
-			serialHandler->SendAck(cardStatus == CardIo::Okay ? true : false);
-		} else if (cardStatus == CardIo::ServerWaitingReply) {
-			// Do not reply until we get this command
-			cardHandler->BuildPacket(serialHandler->m_writeBuffer);
-			serialHandler->Write();
-		}
-		
 		std::this_thread::sleep_for(delay);
 	}
 

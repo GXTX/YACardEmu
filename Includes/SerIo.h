@@ -63,6 +63,9 @@ public:
 	std::vector<uint8_t> m_readBuffer{};
 	std::vector<uint8_t> m_writeBuffer{};
 
+	// TODO: Not used
+	//SerIo::Status m_status = Status::Okay;
+
 	SerIo(SerIo::Settings *settings);
 	~SerIo();
 

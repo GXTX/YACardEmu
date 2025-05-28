@@ -769,6 +769,20 @@ uint8_t CardIo::GetByte(uint8_t **buffer)
 	return value;
 }
 
+CardIo::StatusCode CardIo::Process(std::vector<uint8_t> &read, std::vector<uint8_t> &write)
+{
+	m_status = ReceivePacket(read);
+
+	if (m_status == Okay)
+		write.emplace_back(ACK);
+	else if (m_status == ChecksumError)
+		write.emplace_back(NACK);
+	else if (m_status == ServerWaitingReply)
+		BuildPacket(write);
+
+	return m_status;
+}
+
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 {
 	uint8_t *buffer = &readBuffer[0];
