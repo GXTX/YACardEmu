@@ -41,7 +41,7 @@ jobs:
           cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
           cmake --build . --config ${{ matrix.configuration }}
         shell: cmd
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: YACardEmu-${{ matrix.configuration }}
           path: build/${{ matrix.configuration }}
@@ -57,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Re-zip artifacts
