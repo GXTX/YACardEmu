@@ -1,7 +1,7 @@
 /*
     YACardEmu
     ----------------
-    Copyright (C) 2020-2023 wutno (https://github.com/GXTX)
+    Copyright (C) 2020-2025 wutno (https://github.com/GXTX)
     Copyright (C) 2022-2023 tugpoat (https://github.com/tugpoat)
 
 
