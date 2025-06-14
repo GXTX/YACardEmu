@@ -36,23 +36,26 @@ public:
     C1231LR(CardIo::Settings *settings);
     ~C1231LR() { EjectCard(); }
 protected:
-	enum class CardPosition {
-		NO_CARD                 = 0x30,
-		POS_MAG                 = 0x31,
-		POS_THERM               = 0x32,
-		POS_THERM_DISP          = 0x33,
-		POS_EJECTED_NOT_REMOVED = 0x34,
-	};
+    // True "R" values
+    static constexpr std::array<uint8_t, static_cast<size_t>(R::MAX_POSITIONS)> positionValues{ {
+        0x30,
+        0x34,
+        0x31,
+        0x32,
+        0x33
+    } };
 
-    CardPosition localStatus{CardPosition::NO_CARD};
-    bool HasCard() override;
-    void DispenseCard() override;
-    void EjectCard() override;
-    void UpdateRStatus() override;
-    uint8_t GetRStatus() override;
+    uint8_t GetPositionValue() override
+    {
+        return positionValues[static_cast<uint8_t>(status.r)];
+    }
 
-    void MoveCard(CardIo::MovePositions position) override;
-    CardIo::MovePositions GetCardPos() override;
+    void ProcessNewPosition() override;
+
+    bool HasCard() override
+    {
+        return (status.r != R::NO_CARD && status.r != R::EJECT);
+    }
 };
 
 #endif //C1231LR

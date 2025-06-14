@@ -90,11 +90,11 @@ void CardIo::Command_33_ReadData2()
 					m_cardSettings->waitingForCard = true;
 					currentStep--;
 				} else {
-					MoveCard(MovePositions::READ_WRITE_HEAD);
+					MoveCard(R::READ_WRITE_HEAD);
 				}
 			} else {
 				if (HasCard()) {
-					MoveCard(MovePositions::READ_WRITE_HEAD);
+					MoveCard(R::READ_WRITE_HEAD);
 
 					switch (track) {
 						case Track::Track_1:
@@ -355,11 +355,11 @@ void CardIo::Command_7C_PrintL()
 				m_printer->QueuePrintLine(currentPacket);
 
 				// FIXME: Should we only move the head when we're actually about to print?
-				MoveCard(MovePositions::THERMAL_HEAD);
+				MoveCard(R::THERMAL_HEAD);
 			}
 			break;
 		case 1:
-			MoveCard(MovePositions::READ_WRITE_HEAD);
+			MoveCard(R::READ_WRITE_HEAD);
 			break;
 		default:
 			break;
@@ -378,10 +378,10 @@ void CardIo::Command_7D_Erase()
 				SetPError(P::PRINT_ERR);
 				return;
 			}
-			MoveCard(MovePositions::THERMAL_HEAD);
+			MoveCard(R::THERMAL_HEAD);
 			break;
 		case 1:
-			MoveCard(MovePositions::READ_WRITE_HEAD);
+			MoveCard(R::READ_WRITE_HEAD);
 			m_printer->Erase();
 			break;
 		default:
@@ -435,7 +435,7 @@ void CardIo::Command_A0_Clean()
 			}
 			break;
 		case 2:
-			MoveCard(MovePositions::THERMAL_HEAD);
+			MoveCard(R::THERMAL_HEAD);
 			break;
 		case 3:
 			EjectCard();
@@ -485,8 +485,8 @@ void CardIo::Command_B0_DispenseCardS31()
 			}
 			break;
 		case 2:
-			if (GetCardPos() == MovePositions::DISPENSER_THERMAL) {
-				MoveCard(MovePositions::READ_WRITE_HEAD);
+			if (status.r == R::DISPENSER_THERMAL) {
+				MoveCard(R::READ_WRITE_HEAD);
 			} else if (!m_cardSettings->reportDispenserEmpty) {
 				SetPError(P::MOTOR_ERR);
 			}
@@ -705,14 +705,14 @@ void CardIo::SetSError(S error_code)
 
 void CardIo::UpdateStatusInBuffer()
 {
-	commandBuffer[1] = GetRStatus();
+	commandBuffer[1] = GetPositionValue();
 	commandBuffer[2] = static_cast<uint8_t>(status.p);
 	commandBuffer[3] = static_cast<uint8_t>(status.s);
 
 	g_logger->trace("CardIo::UpdateStatusInBuffer: R: {0:X} P: {1:X} S: {2:X}", 
-		GetRStatus(),
-		static_cast<uint8_t>(status.p),
-		static_cast<uint8_t>(status.s)
+		commandBuffer[1],
+		commandBuffer[2],
+		commandBuffer[3]
 	);
 }
 
@@ -722,7 +722,7 @@ void CardIo::HandlePacket()
 		status.s = S::NO_JOB;
 	}
 
-	UpdateRStatus();
+	ProcessNewPosition();
 
 	if (runningCommand) {
 		if (m_cardSettings->waitingForCard) {
@@ -866,7 +866,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	commandBuffer.clear();
 	commandBuffer.emplace_back(currentCommand);
-	commandBuffer.emplace_back(GetRStatus());
+	commandBuffer.emplace_back(GetPositionValue());
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.p));
 	commandBuffer.emplace_back(static_cast<uint8_t>(status.s));
 
