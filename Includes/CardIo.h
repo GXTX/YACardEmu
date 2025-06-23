@@ -75,7 +75,7 @@ public:
 	virtual ~CardIo() = default;
 	CardIo::StatusCode BuildPacket(std::vector<uint8_t> &readBuffer);
 	CardIo::StatusCode ReceivePacket(std::vector<uint8_t> &writeBuffer);
-	CardIo::StatusCode CardIo::Process(std::vector<uint8_t>& read, std::vector<uint8_t>& write);
+	CardIo::StatusCode Process(std::vector<uint8_t>& read, std::vector<uint8_t>& write);
 
 	CardIo::Settings *m_cardSettings = nullptr;
 	std::string printName = "print.bin";
