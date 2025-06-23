@@ -37,7 +37,8 @@ public:
 	~C1231BR() { EjectCard(); }
 protected:
 	// True "R" values
-	static constexpr std::array<uint8_t, static_cast<size_t>(R::MAX_POSITIONS)> positionValues{ {
+        // FIXME: constexpr
+	const std::array<uint8_t, static_cast<size_t>(R::MAX_POSITIONS)> positionValues{ {
 		0b00000,
 		0b00001,
 		0b11000,
