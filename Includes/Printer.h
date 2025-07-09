@@ -74,6 +74,7 @@ public:
 			m_cardImage = nullptr;
 		}
 		m_localName = "";
+		m_eraseOnClear = false;
 	}
 
 	void Erase()
@@ -82,6 +83,11 @@ public:
 			SDL_FreeSurface(m_cardImage);
 			m_cardImage = nullptr;
 		}
+	}
+	
+	void SetPrintMethod(uint8_t method) {
+		m_eraseOnClear = method == 0x30;
+		g_logger->trace("Printer::SetPrintMethod: m_eraseOnClear = {}", m_eraseOnClear);
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -102,20 +108,24 @@ protected:
 	std::vector<PrintCommand> m_printQueue = {};
 	std::vector<SDL_Surface*> m_customGlyphs = {};
 
+	bool m_eraseOnClear = false;
+
 	SDL_Surface* m_cardImage = nullptr;
 
 	void PrintLine();
 
-	void LoadCardImage(std::string& cardName)
+	void LoadCardImage(std::string& cardName, bool skip_printed_image = false)
 	{
-		std::string temp = cardName;
-		temp.append(".png");
+		if (!skip_printed_image) {
+			std::string temp = cardName;
+			temp.append(".png");
 
-		if (ghc::filesystem::exists(temp)) {
-			m_cardImage = IMG_Load(temp.c_str());
-			if (m_cardImage != nullptr)
-				return;
-			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
+			if (ghc::filesystem::exists(temp)) {
+				m_cardImage = IMG_Load(temp.c_str());
+				if (m_cardImage != nullptr)
+					return;
+				g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
+			}
 		}
 
 		std::string cwd = ghc::filesystem::current_path().string();
