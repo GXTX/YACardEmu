@@ -64,7 +64,9 @@ bool SerIo::Open()
 
 	sp_get_port_by_name(m_portSettings->devicePath.c_str(), &m_portHandle);
 
-	if (sp_open(m_portHandle, SP_MODE_READ_WRITE) != SP_OK) {
+	auto status = sp_open(m_portHandle, SP_MODE_READ_WRITE);
+	if (status != SP_OK) {
+		g_logger->warn("SerIo::Init: {}", sp_last_error_message());
 #ifdef __linux
 		g_logger->info("SerIo::Init: Failed to open as a serial tty -- attemping to open as regular FD", m_portSettings->devicePath);
 		m_portHandle = static_cast<sp_port*>(std::malloc(sizeof(sp_port)));
