@@ -143,6 +143,8 @@ bool ReadConfig()
 	} else {
 		if (lparity.find("even") != std::string::npos) {
 			globalSettings.serial.parity = SP_PARITY_EVEN;
+		} else if (lparity.find("odd") != std::string::npos) {
+			globalSettings.serial.parity = SP_PARITY_ODD;
 		} else {
 			globalSettings.serial.parity = SP_PARITY_NONE;
 		}

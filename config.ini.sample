@@ -13,7 +13,7 @@
 ; Optional
 ;
 ;serialbaud = 9600
-; Acceptable even & none
+; Acceptable none/even/odd
 ;serialparity = none
 apiport = 8080
 autoselectedcard = card.bin
