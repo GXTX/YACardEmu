@@ -103,6 +103,8 @@ Virtual-On Force (電脳戦機バーチャロン フォース) : CRP-1231BR-10 |
 Namco System 246
 ```
 THE iDOLM@STER (アイドルマスタ) : CRP-1231LR-10NAB | 9600 none
+Dragon Chronicle Online (ドラゴンクロニクルオンライン) : CRP-1231LR-10NAB | 4800 none
+Dragon Chronicle: Legend of the Master Ark (ドラゴンクロニクル: マスターアークの伝説) : CRP-1231LR-10NAB | 4800 none
 ```
 
 SEGA NAOMI
