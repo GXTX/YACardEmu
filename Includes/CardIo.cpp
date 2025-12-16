@@ -317,6 +317,9 @@ void CardIo::Command_78_PrintSettings2()
 {
 	status.SoftReset();
 	runningCommand = false;
+
+	if (currentPacket.size() >= 2)
+		m_printer->SetPrintMethod(currentPacket[1]);
 }
 
 void CardIo::Command_7A_RegisterFont()
