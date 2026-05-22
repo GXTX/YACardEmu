@@ -129,6 +129,7 @@ protected:
 			s = S::NO_JOB;
 		}
 
+		// Using SoftReset to avoid sending unneeded RUNNING_COMMAND for single step commands
 		void SoftReset()
 		{
 			p = P::NO_ERR;

@@ -167,7 +167,9 @@ void CardIo::Command_33_ReadData2()
 			break;
 	}
 
-	if (currentStep > 1) {
+	if (currentStep >= 1) {
+		// FIXME: Hack to stop us from replying multiple times with card data, likely an issue with 0x35 as well
+		status.SoftReset();
 		runningCommand = false;
 	}
 }
@@ -727,8 +729,6 @@ void CardIo::HandlePacket()
 	ProcessNewPosition();
 
 	if (runningCommand) {
-		status.s = S::RUNNING_COMMAND;
-
 		if (m_cardSettings->waitingForCard) {
 			g_logger->info("Resetting waiting for card...");
 			m_cardSettings->waitingForCard = false;
@@ -864,6 +864,7 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	// TODO: Do all of this below better...
 	status.SoftReset();
+	status.s = S::RUNNING_COMMAND;
 	runningCommand = true;
 	currentStep = 0;
 
