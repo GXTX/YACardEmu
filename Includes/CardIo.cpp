@@ -204,6 +204,8 @@ void CardIo::Command_35_GetData()
 void CardIo::Command_40_Cancel()
 {
 	status.SoftReset();
+	// Hardware sets this when receiving Cancel
+	status.s = S::ILLEGAL_COMMAND;
 	runningCommand = false;
 }
 
@@ -725,6 +727,8 @@ void CardIo::HandlePacket()
 	ProcessNewPosition();
 
 	if (runningCommand) {
+		status.s = S::RUNNING_COMMAND;
+
 		if (m_cardSettings->waitingForCard) {
 			g_logger->info("Resetting waiting for card...");
 			m_cardSettings->waitingForCard = false;
@@ -860,7 +864,6 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 
 	// TODO: Do all of this below better...
 	status.SoftReset();
-	status.s = S::RUNNING_COMMAND;
 	runningCommand = true;
 	currentStep = 0;
 
