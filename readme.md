@@ -23,7 +23,7 @@ Windows
 
 **[Precompiled Windows binaries can be found here.](https://github.com/GXTX/YACardEmu/tags)**
 
-1. [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
+1. [Visual Studio 2026](https://visualstudio.microsoft.com/vs/)
     * C++ desktop development
     * Windows Universal CRT SDK
     * C++ CMake tools for Windows
@@ -47,20 +47,28 @@ Windows
 1. If you don't have CMake installed, open `___ Native Tools Command Prompt for VS 20##`.
 2. `git clone --recursive https://github.com/GXTX/YACardEmu`
 3. `cd` to the `YACardEmu` directory.
-4. Run these commands.
-    1. `mkdir build & cd build`
-    2. `cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release`
-        * VS2022 17.0 or later is required.
-5. `cmake --build . --config Release`
-6. All the required files will be in `build\Release`
+4. Run command with CMake option `cmake -B build -S . -DCMAKE_POLICY_VERSION_MINIMUM=3.5`
+*Newer CMake version (>3.5) will not work but error. This command force to define legacy CMake.
+6. `cd build`
+7. `cmake --build . --config Release`
+8. All the required files will be in `build\Release`
 
-Running
+Getting Started
 ---------
 
-You must have a USB to RS232 (or a physical serial port) connected to your machine. Configuration is made via both a `config.ini` file & via a web portal / API.
-To access the web portal point your browser to `http://YOURIPHERE:8080/`, this web page is where you'll choose your card and insert your card.
+Configuration is made via both a `config.ini` file & via a web portal / API.
+After YACardEmu.exe running, go to `http://YOURIPHERE:8080/` on your browser, this web page is where you'll choose your card and insert your card.
+You cannot choose or insert the virtual card but select via your virtual local network (browser).
+The card automatically ejected each game ended. You will inset the card every time except in-game continue chosen.
+
+For CXBX-R (Sega Chihiro Emulator) and Flycast (Sega Naomi / Naomi2 Emulator), it is recommended to insert or eject card by in-game cofigurated key (gamepad button).
+User no longer need to toggle card on the browser.
+
+Wangan Midnight Maximum Tune 1/2 will generate "廃車カード / Discarded Vehicle Card" automatically after card reached the limits.
 
 Editing `config.ini` to point to where you want your cards stored is required.
+If you choose the different directory outside YACardEmu.exe, another config.ini automatically generated in the card folders.
+These 2 config.ini should be located the right place.
 
 Ubuntu
 
@@ -72,14 +80,19 @@ cp ../config.ini.sample config.ini
 Windows
 
 ```
-cd Release
-YACardEmu.exe
+[config]
+apiport = 8080
+basepath = C:\Users\xxxx\xxxx\yacard\./
+serialpath = \\.\pipe\YACardEmu
+targetdevice = xxxx
+autoselectedcard = card1.bin
 ```
 
-Running On Hardware
+Running On The Real Card Reader
 ---------
 
-If you're wanting to run this on hardware there are some settings you'll need to be aware of.
+You must have a USB to RS232 (or a physical serial port) connected to your machine.
+If you're wanting to run this on the real hardware there are some settings you'll need to be aware of.
 
 SEGA Chihiro
 ```
