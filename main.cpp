@@ -30,6 +30,7 @@
 #include "C1231BR.h"
 #include "SerIo.h"
 #include "WebIo.h"
+#include "CardName.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
@@ -102,6 +103,11 @@ bool ReadConfig()
 		globalSettings.card.cardPath = ini["config"]["basepath"];
 		globalSettings.card.cardName = ini["config"]["autoselectedcard"];
 		globalSettings.serial.devicePath = ini["config"]["serialpath"];
+	}
+
+	if (!globalSettings.card.cardName.empty() && !CardName::IsValid(globalSettings.card.cardName)) {
+		g_logger->warn("Ignoring invalid autoselectedcard \"{}\" in config.ini", globalSettings.card.cardName);
+		globalSettings.card.cardName.clear();
 	}
 
 	if (globalSettings.card.cardPath.empty()) {

@@ -33,6 +33,7 @@
 #include <array>
 
 #include "Printer.h"
+#include "CardName.h"
 
 #include "mini/ini.h"
 

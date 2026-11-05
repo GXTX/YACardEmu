@@ -591,13 +591,19 @@ void CardIo::ClearCardData()
 // FIXME: Move these into a filesystem access class which will allow better flexability if someone wanted to use NFC cards
 void CardIo::ReadCard()
 {
+	ClearCardData();
+
+	if (!CardName::IsValid(m_cardSettings->cardName)) {
+		g_logger->warn("CardIo::ReadCard: Refusing to read invalid card name \"{}\"", m_cardSettings->cardName);
+		SetPError(P::READ_ERR);
+		return;
+	}
+
 	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
 	g_logger->debug("CardIo::ReadCard: Reading card data from - {}", fullPath);
 
 	// TODO: Should we actually be seeding zero's when the file doesn't exist?
 	std::string readBack;
-
-	ClearCardData();
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
 		auto fileSize = ghc::filesystem::file_size(fullPath.c_str());
@@ -626,6 +632,13 @@ void CardIo::ReadCard()
 
 void CardIo::WriteCard()
 {
+	if (!CardName::IsValid(m_cardSettings->cardName)) {
+		g_logger->warn("CardIo::WriteCard: Refusing to write invalid card name \"{}\"", m_cardSettings->cardName);
+		m_printer->Erase();
+		ClearCardData();
+		return;
+	}
+
 	// Should only happen when issued from dispenser, we want to avoid overwriting a previous card
 	if (!m_cardSettings->insertedCard) {
 		auto i = 0;

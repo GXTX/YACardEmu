@@ -20,6 +20,7 @@
 */
 
 #include "WebIo.h"
+#include "CardName.h"
 
 WebIo::WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<bool> *running)
 {
@@ -112,6 +113,14 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 	}
 
 	if (req.method == "POST") {
+		// Validate first so a rejected request doesn't change any state
+		if (req.has_param("cardname") && !CardName::IsValid(req.get_param_value("cardname"))) {
+			g_logger->warn("WebIo::InsertedCard: Rejected invalid card name");
+			res.status = 400;
+			res.set_content("{ \"error\":\"invalid cardname\" }", "application/json");
+			return;
+		}
+
 		if (req.has_param("loadonly"))
 			m_card->insertedCard = true;
 		if (req.has_param("cardname"))
