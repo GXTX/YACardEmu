@@ -26,6 +26,9 @@
 #include <iostream>
 #include <fstream>
 #include <atomic>
+#include <mutex>
+#include <string>
+#include <utility>
 #include <ctime>
 #include <sstream>
 #include <iomanip>
@@ -60,14 +63,32 @@ public:
 		DontReply,
 	};
 
+	// Shared between the main loop and the web server thread. The flags are atomics
+	// and the card name is only reachable through the accessors below, cardPath and
+	// mech are set once before any thread starts and are read-only afterwards.
 	struct Settings {
-		std::string cardName{};
 		std::string cardPath{};
-		bool insertedCard = false;
-		bool hasCard = false;
-		bool waitingForCard = false;
-		bool reportDispenserEmpty = false;
+		std::atomic<bool> insertedCard{ false };
+		std::atomic<bool> hasCard{ false };
+		std::atomic<bool> waitingForCard{ false };
+		std::atomic<bool> reportDispenserEmpty{ false };
 		std::string mech = "C1231LR";
+
+		std::string GetCardName() const
+		{
+			std::lock_guard<std::mutex> lock(m_cardNameMutex);
+			return m_cardName;
+		}
+
+		void SetCardName(std::string name)
+		{
+			std::lock_guard<std::mutex> lock(m_cardNameMutex);
+			m_cardName = std::move(name);
+		}
+
+	private:
+		mutable std::mutex m_cardNameMutex{};
+		std::string m_cardName{};
 	};
 
 	CardIo::StatusCode m_status = StatusCode::Okay;

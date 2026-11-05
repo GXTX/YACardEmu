@@ -105,7 +105,8 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 		return;
 	}
 
-	switch (m_routeValues[route]) {
+	const auto routeIt = m_routeValues.find(route);
+	switch (routeIt != m_routeValues.end() ? routeIt->second : Routes::undefined) {
 		case Routes::cards:
 			res.set_content(GenerateCardListJSON(m_card->cardPath), "application/json");
 			break;
@@ -163,7 +164,7 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 		if (req.has_param("loadonly"))
 			m_card->insertedCard = true;
 		if (req.has_param("cardname"))
-			m_card->cardName = req.get_param_value("cardname");
+			m_card->SetCardName(req.get_param_value("cardname"));
 	}
 
 	if (req.has_param("redirect")) {
@@ -171,12 +172,13 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 		return;
 	}
 
-	res.set_content(" { \"cardname\":\"" + m_card->cardName + "\", \"inserted\":" + (m_card->insertedCard ? "true" : "false") + " }", "application/json");
+	res.set_content(" { \"cardname\":\"" + m_card->GetCardName() + "\", \"inserted\":" + (m_card->insertedCard ? "true" : "false") + " }", "application/json");
 }
 
 const std::string WebIo::GenerateCardListJSON(std::string basepath)
 {
 	std::string list = "[";
+	const std::string selectedCard = m_card->GetCardName();
 
 	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
 		std::string fullCardPath{entry.path().string()};
@@ -216,7 +218,7 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 
 			// Have the current card be the active item on the carousel
 			list.append("\", \"active\":");
-			if (card == m_card->cardName)
+			if (card == selectedCard)
 				list.append("true},");
 			else
 				list.append("false},");

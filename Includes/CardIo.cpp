@@ -593,13 +593,14 @@ void CardIo::ReadCard()
 {
 	ClearCardData();
 
-	if (!CardName::IsValid(m_cardSettings->cardName)) {
-		g_logger->warn("CardIo::ReadCard: Refusing to read invalid card name \"{}\"", m_cardSettings->cardName);
+	const std::string cardName = m_cardSettings->GetCardName();
+	if (!CardName::IsValid(cardName)) {
+		g_logger->warn("CardIo::ReadCard: Refusing to read invalid card name \"{}\"", cardName);
 		SetPError(P::READ_ERR);
 		return;
 	}
 
-	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	std::string fullPath = m_cardSettings->cardPath + cardName;
 	g_logger->debug("CardIo::ReadCard: Reading card data from - {}", fullPath);
 
 	// TODO: Should we actually be seeding zero's when the file doesn't exist?
@@ -632,8 +633,10 @@ void CardIo::ReadCard()
 
 void CardIo::WriteCard()
 {
-	if (!CardName::IsValid(m_cardSettings->cardName)) {
-		g_logger->warn("CardIo::WriteCard: Refusing to write invalid card name \"{}\"", m_cardSettings->cardName);
+	// The web thread can change the selected card at any time, so work on one snapshot
+	std::string cardName = m_cardSettings->GetCardName();
+	if (!CardName::IsValid(cardName)) {
+		g_logger->warn("CardIo::WriteCard: Refusing to write invalid card name \"{}\"", cardName);
 		m_printer->Erase();
 		ClearCardData();
 		return;
@@ -644,7 +647,7 @@ void CardIo::WriteCard()
 		auto i = 0;
 		while (i < 1000) {
 			// TODO: It would be nicer if the generated name was abc.123.bin instead of abc.bin.123
-			std::string newCardName = m_cardSettings->cardName;
+			std::string newCardName = cardName;
 
 			// $3 contains any numbers a sqeuence of "*.bin."
 			auto find = std::regex_replace(newCardName, std::regex("(.*)(\\.bin\\.)(\\d+)"), "$3");
@@ -661,20 +664,21 @@ void CardIo::WriteCard()
 
 			// Perfenece to not having a number...
 			if (i == 0) {
-				newCardName = m_cardSettings->cardName;
+				newCardName = cardName;
 			}
 
 			auto fullName = m_cardSettings->cardPath + newCardName;
 
 			if (!ghc::filesystem::exists(fullName.c_str())) {
-				m_cardSettings->cardName = newCardName;
+				cardName = newCardName;
+				m_cardSettings->SetCardName(cardName);
 				break;
 			}
 			i++;
 		}
 	}
 
-	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	auto fullPath = m_cardSettings->cardPath + cardName;
 	g_logger->debug("CardIo::WriteCard: Writing card data to {}", fullPath);
 
 	std::string writeBack;
@@ -699,7 +703,7 @@ void CardIo::WriteCard()
 		mINI::INIFile config("config.ini");
 		mINI::INIStructure ini;
 		config.read(ini);
-		ini["config"]["autoselectedcard"] = m_cardSettings->cardName;
+		ini["config"]["autoselectedcard"] = cardName;
 		config.write(ini);
 	}
 

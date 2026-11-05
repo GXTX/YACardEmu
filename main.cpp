@@ -101,13 +101,16 @@ bool ReadConfig()
 		lparity = ini["config"]["serialparity"];
 		globalSettings.card.mech = ini["config"]["targetdevice"];
 		globalSettings.card.cardPath = ini["config"]["basepath"];
-		globalSettings.card.cardName = ini["config"]["autoselectedcard"];
+		globalSettings.card.SetCardName(ini["config"]["autoselectedcard"]);
 		globalSettings.serial.devicePath = ini["config"]["serialpath"];
 	}
 
-	if (!globalSettings.card.cardName.empty() && !CardName::IsValid(globalSettings.card.cardName)) {
-		g_logger->warn("Ignoring invalid autoselectedcard \"{}\" in config.ini", globalSettings.card.cardName);
-		globalSettings.card.cardName.clear();
+	{
+		const std::string selected = globalSettings.card.GetCardName();
+		if (!selected.empty() && !CardName::IsValid(selected)) {
+			g_logger->warn("Ignoring invalid autoselectedcard \"{}\" in config.ini", selected);
+			globalSettings.card.SetCardName("");
+		}
 	}
 
 	if (globalSettings.card.cardPath.empty()) {
