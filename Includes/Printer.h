@@ -25,6 +25,12 @@
 #include <vector>
 #include <random>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <string>
 
 #include <SDL2/SDL.h>
 #include <SDL_ttf.h>
@@ -43,15 +49,35 @@ extern std::shared_ptr<spdlog::async_logger> g_logger;
 class Printer
 {
 public:
+	// Rendering and saving the card image happens on a single worker thread, so print jobs
+	// never overlap and nothing keeps running (detached) after the Printer is gone.
+	//
+	// Every job gets its own copy of what it needs (print queue, image reference, glyphs),
+	// taken on the thread that drives CardIo. Everything else in this class is only ever
+	// touched by that thread, so no locking is needed outside of the job queue.
 	Printer()
 	{
 		m_customGlyphs.resize(256);
+		m_worker = std::thread(&Printer::WorkerLoop, this);
 	}
 	~Printer()
 	{
-		DetachedRemove();
+		{
+			std::lock_guard<std::mutex> lock(m_jobMutex);
+			m_stopWorker = true;
+		}
+		m_jobCv.notify_all();
+		if (m_worker.joinable())
+			m_worker.join(); // Outstanding jobs are finished before the worker exits
+
+		// Whatever card is still in the printer gets saved, same as when it's removed
+		MakeFinishJob(m_localName)();
+		m_localName.clear();
 		SDL_Quit();
 	}
+
+	Printer(const Printer&) = delete;
+	Printer& operator=(const Printer&) = delete;
 
 	void InsertCard(std::string& cardName)
 	{
@@ -61,27 +87,14 @@ public:
 
 	void RemoveCard(std::string& cardName)
 	{
-		m_localName = cardName;
-		std::thread(&Printer::DetachedRemove, this).detach();
-	}
-
-	void DetachedRemove()
-	{
-		PrintLine();
-		if (m_cardImage != nullptr) {
-			SaveCardImage(m_localName);
-			SDL_FreeSurface(m_cardImage);
-			m_cardImage = nullptr;
-		}
-		m_localName = "";
+		// Takes the queue and image away from us now, so the next card can start right away
+		Enqueue(MakeFinishJob(cardName));
+		m_localName.clear();
 	}
 
 	void Erase()
 	{
-		if (m_cardImage != nullptr) {
-			SDL_FreeSurface(m_cardImage);
-			m_cardImage = nullptr;
-		}
+		m_cardImage.reset();
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -99,12 +112,34 @@ protected:
 		std::vector<uint8_t> data = {};
 	};
 
+	// Surfaces are reference counted so a job that is still drawing on (or with) one keeps it
+	// alive even if the card is removed or the game registers a new glyph in the meantime
+	using Surface = std::shared_ptr<SDL_Surface>;
+	static Surface MakeSurface(SDL_Surface* surface)
+	{
+		return surface != nullptr ? Surface(surface, SDL_FreeSurface) : Surface();
+	}
+
 	std::vector<PrintCommand> m_printQueue = {};
-	std::vector<SDL_Surface*> m_customGlyphs = {};
+	std::vector<Surface> m_customGlyphs = {};
 
-	SDL_Surface* m_cardImage = nullptr;
+	Surface m_cardImage = nullptr;
 
-	void PrintLine();
+	// Worker thread and its job queue
+	std::mutex m_jobMutex = {};
+	std::condition_variable m_jobCv = {};
+	std::deque<std::function<void()>> m_jobs = {};
+	bool m_stopWorker = false;
+	std::thread m_worker = {};
+
+	void Enqueue(std::function<void()> job);
+	void WorkerLoop();
+
+	// Draws the queued lines onto image, runs on the worker thread (or after it has stopped)
+	void RenderLines(const std::vector<PrintCommand>& queue, SDL_Surface* image, const std::vector<Surface>& glyphs, bool horizontal);
+
+	// Takes the pending lines and the card image and returns a job that prints and saves them
+	std::function<void()> MakeFinishJob(const std::string& cardName);
 
 	void LoadCardImage(std::string& cardName)
 	{
@@ -112,7 +147,7 @@ protected:
 		temp.append(".png");
 
 		if (ghc::filesystem::exists(temp)) {
-			m_cardImage = IMG_Load(temp.c_str());
+			m_cardImage = MakeSurface(IMG_Load(temp.c_str()));
 			if (m_cardImage != nullptr)
 				return;
 			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
@@ -145,21 +180,21 @@ protected:
 			std::mt19937 twist(dev());
 			std::uniform_int_distribution<std::mt19937::result_type> rng(0, static_cast<uint8_t>(images.size()) - 1);
 
-			m_cardImage = IMG_Load(images.at(rng(twist)).c_str());
+			m_cardImage = MakeSurface(IMG_Load(images.at(rng(twist)).c_str()));
 			if (m_cardImage != nullptr)
 				return;
 			g_logger->warn("Printer::LoadCardImage: IMG_Load failed to load the random base card image");
 		}
 
 		// Everything else failed, we *need* a surface... So let's generate a transparent one
-		m_cardImage = QuickCreateSurface((m_isHorizontalCard ? 1019 : 640), (m_isHorizontalCard ? 640 : 1019));
+		m_cardImage = MakeSurface(QuickCreateSurface((m_isHorizontalCard ? 1019 : 640), (m_isHorizontalCard ? 640 : 1019)));
 	}
 
-	void SaveCardImage(std::string& cardName)
+	static void SaveCardImage(SDL_Surface* image, const std::string& cardName)
 	{
 		std::string temp = cardName;
 		temp.append(".png");
-		IMG_SavePNG(m_cardImage, temp.c_str());
+		IMG_SavePNG(image, temp.c_str());
 	}
 
 	std::vector<bool> ConvertToBits(std::vector<uint8_t>& vector)
