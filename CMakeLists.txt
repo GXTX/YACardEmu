@@ -120,6 +120,15 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 		${CMAKE_CURRENT_BINARY_DIR}/public
 )
 
+# Copy the printer font next to the executable if it is present in the source tree
+if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/kochi-gothic-subst.ttf)
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy
+			${CMAKE_CURRENT_SOURCE_DIR}/kochi-gothic-subst.ttf
+			$<TARGET_FILE_DIR:${PROJECT_NAME}>/kochi-gothic-subst.ttf
+	)
+endif()
+
 if (WIN32)
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy

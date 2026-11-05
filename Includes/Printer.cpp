@@ -21,6 +21,70 @@
 
 #include "Printer.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+namespace {
+constexpr const char* kFontName = "kochi-gothic-subst.ttf";
+
+ghc::filesystem::path GetExecutableDir()
+{
+	try {
+#ifdef _WIN32
+		wchar_t buf[MAX_PATH] = {};
+		DWORD len = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+		if (len > 0 && len < MAX_PATH)
+			return ghc::filesystem::path(buf).parent_path();
+#else
+		return ghc::filesystem::read_symlink("/proc/self/exe").parent_path();
+#endif
+	} catch (...) {
+	}
+	return {};
+}
+
+// Look for the bundled font next to the executable, then in the working directory,
+// then fall back to common system CJK fonts so Japanese text still renders.
+TTF_Font* OpenPrinterFont(int size)
+{
+	std::vector<ghc::filesystem::path> candidates;
+	const auto exeDir = GetExecutableDir();
+	if (!exeDir.empty()) {
+		candidates.push_back(exeDir / kFontName);
+		candidates.push_back(exeDir / "fonts" / kFontName);
+	}
+	candidates.push_back(ghc::filesystem::path(kFontName));
+	candidates.push_back(ghc::filesystem::path("fonts") / kFontName);
+#ifdef _WIN32
+	candidates.push_back("C:\\Windows\\Fonts\\msgothic.ttc");
+	candidates.push_back("C:\\Windows\\Fonts\\YuGothR.ttc");
+	candidates.push_back("C:\\Windows\\Fonts\\meiryo.ttc");
+#else
+	candidates.push_back("/usr/share/fonts/truetype/kochi/kochi-gothic-subst.ttf");
+	candidates.push_back("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc");
+	candidates.push_back("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc");
+	candidates.push_back("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf");
+	candidates.push_back("/usr/share/fonts/truetype/takao-gothic/TakaoGothic.ttf");
+	candidates.push_back("/usr/share/fonts/ipa-gothic/ipag.ttf");
+	candidates.push_back("/System/Library/Fonts/Hiragino Sans GB.ttc");
+#endif
+
+	for (const auto& path : candidates) {
+		std::error_code ec;
+		if (!ghc::filesystem::exists(path, ec))
+			continue;
+		TTF_Font* font = TTF_OpenFont(path.string().c_str(), size);
+		if (font != nullptr) {
+			g_logger->info("Printer: using font \"{}\"", path.string());
+			return font;
+		}
+		g_logger->warn("Printer: found \"{}\" but failed to load it: {}", path.string(), TTF_GetError());
+	}
+	return nullptr;
+}
+} // namespace
+
 bool Printer::RegisterFont(std::vector<uint8_t>& data)
 {
 	// Real data size is 0x48, but the first byte indicates slot position
@@ -102,9 +166,10 @@ void Printer::PrintLine()
 
 	TTF_Init();
 	constexpr uint8_t defaultFontSize = 36;
-	TTF_Font* font = TTF_OpenFont("kochi-gothic-subst.ttf", defaultFontSize);
+	TTF_Font* font = OpenPrinterFont(defaultFontSize);
 	if (font == nullptr) {
-		g_logger->warn("Printer::PrintLine: Unable to initialize TTF_Font with \"kochi-gothic-subst.ttf\"");
+		g_logger->warn("Printer::PrintLine: Unable to find a usable font. Place \"{}\" next to the executable.", kFontName);
+		TTF_Quit();
 		return;
 	}
 
