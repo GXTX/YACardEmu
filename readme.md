@@ -59,6 +59,7 @@ Running
 
 You must have a USB to RS232 (or a physical serial port) connected to your machine. Configuration is made via both a `config.ini` file & via a web portal / API.
 To access the web portal point your browser to `http://YOURIPHERE:8080/`, this web page is where you'll choose your card and insert your card.
+The web portal has no authentication and listens on every network interface by default; if you only use it on the same machine, add `apihost = 127.0.0.1` to `config.ini` (see `config.ini.sample`).
 
 Editing `config.ini` to point to where you want your cards stored is required.
 

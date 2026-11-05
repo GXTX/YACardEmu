@@ -134,6 +134,10 @@ bool ReadConfig()
 		globalSettings.webPort = std::stoi(lport);
 	}
 
+	if (globalSettings.webListenHost != "127.0.0.1" && globalSettings.webListenHost != "localhost" && globalSettings.webListenHost != "::1") {
+		g_logger->warn("The web UI/API listens on {0}:{1} and has no authentication, anyone who can reach it can control the emulator. Set \"apihost = 127.0.0.1\" in config.ini to only allow this machine.", globalSettings.webListenHost, globalSettings.webPort);
+	}
+
 	if (globalSettings.serial.devicePath.empty()) {
 		globalSettings.serial.devicePath = "/dev/ttyUSB1";
 	}

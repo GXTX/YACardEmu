@@ -22,6 +22,31 @@
 #include "WebIo.h"
 #include "CardName.h"
 
+#include <algorithm>
+#include <cctype>
+
+namespace {
+// Browsers attach an Origin header to cross-site POST/DELETE requests. Clients
+// that don't send one (curl, scripts) are not a CSRF risk and are let through.
+bool IsSameOrigin(const httplib::Request& req)
+{
+	if (!req.has_header("Origin"))
+		return true;
+
+	std::string origin = req.get_header_value("Origin");
+	const auto scheme = origin.find("://");
+	if (scheme == std::string::npos) // e.g. "null"
+		return false;
+	origin.erase(0, scheme + 3);
+
+	const std::string host = req.get_header_value("Host");
+	return origin.size() == host.size() &&
+		std::equal(origin.begin(), origin.end(), host.begin(), [](char a, char b) {
+			return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+		});
+}
+} // namespace
+
 WebIo::WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<bool> *running)
 {
 	m_card = card;
@@ -72,6 +97,14 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 
 	g_logger->debug("WebIo::Router: {0} -> {1}", req.method, route);
 
+	// Stop a web page the user happens to visit from driving the emulator
+	if (req.method != "GET" && !IsSameOrigin(req)) {
+		g_logger->warn("WebIo::Router: Rejected cross-origin {0} request for \"{1}\"", req.method, route);
+		res.status = 403;
+		res.set_content("Cross-origin requests are not allowed", "text/plain");
+		return;
+	}
+
 	switch (m_routeValues[route]) {
 		case Routes::cards:
 			res.set_content(GenerateCardListJSON(m_card->cardPath), "application/json");
@@ -93,6 +126,12 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			res.set_content(m_card->reportDispenserEmpty ? "empty" : "full", "text/plain");
 			break;
 		case Routes::stop:
+			// Shutting down must be an explicit POST, a plain GET (link, <img>, prefetch) must not do it
+			if (req.method != "POST") {
+				res.status = 405;
+				res.set_header("Allow", "POST");
+				break;
+			}
 			m_svr.stop();
 			// g_running controls the main loop, if we kill it before http is flushed then we'll crash
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
