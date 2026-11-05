@@ -126,3 +126,6 @@ F-Zero AX             : CRP-1231BR-10    | 9600 even
 Mario Kart Arcade GP  : CRP-1231LR-10NAB | 9600 none
 Mario Kart Arcade GP2 : CRP-1231LR-10NAB | 9600 none
 ```
+
+### Third-party fonts
+The card printer renders text with `kochi-gothic-subst.ttf` (Kochi Gothic substitute, derived from the Wadalab fonts). It is licensed under the Wadalab Font License; see `licenses/kochi-gothic-subst.txt`.
