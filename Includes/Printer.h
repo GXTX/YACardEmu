@@ -83,10 +83,16 @@ public:
 	Printer(const Printer&) = delete;
 	Printer& operator=(const Printer&) = delete;
 
+	// Every card starts from a clean base image. The preview saved with the card only shows what
+	// was last printed on it, it is never used as a canvas: the game is the one that decides what
+	// ends up on the card, and drawing on top of the old print made new text pile up on the old.
+	// The saved preview stays as it is until the game prints (or erases) something on the card.
 	void InsertCard(std::string& cardName)
 	{
 		m_localName = cardName;
-		LoadCardImage(m_localName);
+		m_printQueue.clear();
+		m_dirty = false;
+		LoadCardImage();
 	}
 
 	void RemoveCard(std::string& cardName)
@@ -96,15 +102,16 @@ public:
 		m_localName.clear();
 	}
 
-	// The game erased the card: start over from a clean base image. The saved preview can't be
-	// used for this, it still has the previous print on it, which would simply come back the
-	// next time the game prints (the new text ended up on top of the old one).
-	// If nothing is printed afterwards the clean image is what gets saved when the card is removed.
+	// The game erased the card: start over from a clean base image and forget any lines that
+	// were still waiting to be printed, they were meant for the old print.
+	// The clean image is saved when the card is removed, so the preview shows the erased card.
 	void Erase()
 	{
+		m_printQueue.clear();
 		m_cardImage.reset();
+		m_dirty = true;
 		if (!m_localName.empty())
-			LoadCardImage(m_localName, false);
+			LoadCardImage();
 	}
 
 	// Forget the card without saving anything
@@ -113,6 +120,7 @@ public:
 		m_cardImage.reset();
 		m_printQueue.clear();
 		m_localName.clear();
+		m_dirty = false;
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -143,6 +151,10 @@ protected:
 
 	Surface m_cardImage = nullptr;
 
+	// Something was printed or erased since the card went in, so the saved preview is out of date.
+	// Cards that pass through untouched keep the preview they already have.
+	bool m_dirty = false;
+
 	// Worker thread and its job queue
 	std::mutex m_jobMutex = {};
 	std::condition_variable m_jobCv = {};
@@ -159,20 +171,9 @@ protected:
 	// Takes the pending lines and the card image and returns a job that prints and saves them
 	std::function<void()> MakeFinishJob(const std::string& cardName);
 
-	// useSavedImage: continue from the preview saved with the card (what was last printed on it),
-	// false starts from a base image
-	void LoadCardImage(const std::string& cardName, bool useSavedImage = true)
+	// Starts a fresh card image from a random base image
+	void LoadCardImage()
 	{
-		std::string temp = cardName;
-		temp.append(".png");
-
-		if (useSavedImage && ghc::filesystem::exists(temp)) {
-			m_cardImage = MakeSurface(IMG_Load(temp.c_str()));
-			if (m_cardImage != nullptr)
-				return;
-			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
-		}
-
 		// Base card images live in "images", next to where we were started or next to the executable
 		std::vector<std::string> images = {};
 		const auto imageDir = AppPaths::Find("images");

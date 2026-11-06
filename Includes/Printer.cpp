@@ -124,7 +124,7 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 	};
 
 	if (m_cardImage == nullptr)
-		LoadCardImage(m_localName);
+		LoadCardImage();
 
 	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
 	constexpr uint8_t maxOffset = 0x14;
@@ -136,6 +136,7 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 	std::vector<uint8_t> temp = {};
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
 	m_printQueue.push_back({ offset, temp });
+	m_dirty = true;
 
 	if (static_cast<Mode>(data[0]) == Mode::Now) {
 		// The worker gets its own copy of the lines, glyphs and a reference to the image, and the
@@ -187,14 +188,17 @@ std::function<void()> Printer::MakeFinishJob(const std::string& cardName)
 	m_printQueue.clear();
 	auto image = std::move(m_cardImage);
 	m_cardImage.reset();
+	const bool save = m_dirty;
+	m_dirty = false;
 
-	return [this, queue = std::move(queue), image = std::move(image), glyphs = m_customGlyphs, horizontal = m_isHorizontalCard, name = cardName]() {
+	return [this, queue = std::move(queue), image = std::move(image), glyphs = m_customGlyphs, horizontal = m_isHorizontalCard, name = cardName, save]() {
 		if (image == nullptr)
 			return;
 
 		RenderLines(queue, image.get(), glyphs, horizontal);
 
-		if (!name.empty())
+		// Only rewrite the preview when the card was printed on or erased
+		if (save && !name.empty())
 			SaveCardImage(image.get(), name);
 	};
 }
