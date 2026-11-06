@@ -21,6 +21,7 @@
 
 #include "WebIo.h"
 #include "CardName.h"
+#include "StringEscape.h"
 
 #include <algorithm>
 #include <cctype>
@@ -172,7 +173,7 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 		return;
 	}
 
-	res.set_content(" { \"cardname\":\"" + m_card->GetCardName() + "\", \"inserted\":" + (m_card->insertedCard ? "true" : "false") + " }", "application/json");
+	res.set_content(" { \"cardname\":\"" + JsonEscape(m_card->GetCardName()) + "\", \"inserted\":" + (m_card->insertedCard ? "true" : "false") + " }", "application/json");
 }
 
 const std::string WebIo::GenerateCardListJSON(std::string basepath)
@@ -193,10 +194,10 @@ const std::string WebIo::GenerateCardListJSON(std::string basepath)
 
 #ifdef _WIN32
 			std::string card = fullCardPath.substr(fullCardPath.find_last_of("\\") + 1);
-			list.append(card);
+			list.append(JsonEscape(card));
 #else
 			std::string card = fullCardPath.substr(fullCardPath.find_last_of("/") + 1);
-			list.append(card);
+			list.append(JsonEscape(card));
 #endif
 
 			list.append("\",\"image\":\"");
