@@ -94,11 +94,12 @@ jobs:
       # was uploaded.
       - name: Build and run tests
         continue-on-error: true
+        timeout-minutes: 15 # a test that hangs (a CRT assert dialog nobody can click) must not hold the job
         run: |
           mkdir build-tests && cd build-tests
           cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DYACARDEMU_BUILD_TESTS=ON
           cmake --build . --config ${{ matrix.configuration }}
-          ctest -C ${{ matrix.configuration }} --output-on-failure
+          ctest -C ${{ matrix.configuration }} --output-on-failure --timeout 120
         shell: cmd
 
   release:

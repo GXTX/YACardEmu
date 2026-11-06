@@ -31,6 +31,10 @@
 #include <random>
 #include <vector>
 
+#ifdef _MSC_VER
+#include <crtdbg.h>
+#endif
+
 #include "spdlog/async.h"
 #include "spdlog/sinks/null_sink.h"
 #include "spdlog/spdlog.h"
@@ -296,6 +300,16 @@ int main()
 {
 	// A fast fail (exit code 0xc0000409 on Windows) throws away buffered output, so make sure
 	// progress reaches the log and say what was going on if the C++ runtime terminates us.
+#ifdef _MSC_VER
+	// The debug CRT answers a failed assert / invalid parameter / abort with a message box, which
+	// nobody can click on a CI machine and hangs the test forever. Print to stderr and die instead.
+	_set_abort_behavior(_WRITE_ABORT_MSG, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+	for (const int type : { _CRT_WARN, _CRT_ERROR, _CRT_ASSERT }) {
+		_CrtSetReportMode(type, _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(type, _CRTDBG_FILE_STDERR);
+	}
+#endif
+
 	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	std::setvbuf(stderr, nullptr, _IONBF, 0);
 	std::set_terminate([]() {
