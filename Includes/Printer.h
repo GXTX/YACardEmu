@@ -31,6 +31,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <cctype>
+#include <system_error>
 
 #include <SDL2/SDL.h>
 #include <SDL_ttf.h>
@@ -41,6 +43,8 @@
 #include "spdlog/fmt/bin_to_hex.h"
 
 #include "ghc/filesystem.hpp"
+
+#include "AppPaths.h"
 
 #include "utf8.h"
 
@@ -153,32 +157,29 @@ protected:
 			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
 		}
 
-		std::string cwd = ghc::filesystem::current_path().string();
-#ifdef _WIN32
-		if (cwd.back() != '\\')
-			cwd.append("\\");
-		cwd.append("images\\");
-#else
-		if (cwd.back() != '/')
-			cwd.append("/");
-		cwd.append("images/");
-#endif
+		// Base card images live in "images", next to where we were started or next to the executable
 		std::vector<std::string> images = {};
+		const auto imageDir = AppPaths::Find("images");
 
-		if (ghc::filesystem::is_directory(cwd)) {
-			for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
-				if (entry.path().string().find(".png") != std::string::npos)
-					images.emplace_back(entry.path().string());
+		std::error_code ec;
+		if (!imageDir.empty() && ghc::filesystem::is_directory(imageDir, ec)) {
+			ghc::filesystem::directory_iterator it(imageDir, ec);
+			for (const ghc::filesystem::directory_iterator end; !ec && it != end; it.increment(ec)) {
+				std::string ext = it->path().extension().string();
+				for (auto& c : ext)
+					c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+				if (ext == ".png" && it->is_regular_file(ec))
+					images.emplace_back(it->path().string());
 			}
 		} else {
 			// FIXME: Create the folder for the user
-			g_logger->warn("Printer::LoadCardImage: Image folder does not exist");
+			g_logger->warn("Printer::LoadCardImage: Image folder does not exist, put an \"images\" folder with base card images (.png) next to the executable");
 		}
 
 		if (!images.empty()) {
 			std::random_device dev;
 			std::mt19937 twist(dev());
-			std::uniform_int_distribution<std::mt19937::result_type> rng(0, static_cast<uint8_t>(images.size()) - 1);
+			std::uniform_int_distribution<std::size_t> rng(0, images.size() - 1);
 
 			m_cardImage = MakeSurface(IMG_Load(images.at(rng(twist)).c_str()));
 			if (m_cardImage != nullptr)

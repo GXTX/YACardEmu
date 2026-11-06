@@ -21,35 +21,17 @@
 
 #include "Printer.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include "AppPaths.h"
 
 namespace {
 constexpr const char* kFontName = "kochi-gothic-subst.ttf";
-
-ghc::filesystem::path GetExecutableDir()
-{
-	try {
-#ifdef _WIN32
-		wchar_t buf[MAX_PATH] = {};
-		DWORD len = GetModuleFileNameW(nullptr, buf, MAX_PATH);
-		if (len > 0 && len < MAX_PATH)
-			return ghc::filesystem::path(buf).parent_path();
-#else
-		return ghc::filesystem::read_symlink("/proc/self/exe").parent_path();
-#endif
-	} catch (...) {
-	}
-	return {};
-}
 
 // Look for the bundled font next to the executable, then in the working directory,
 // then fall back to common system CJK fonts so Japanese text still renders.
 TTF_Font* OpenPrinterFont(int size)
 {
 	std::vector<ghc::filesystem::path> candidates;
-	const auto exeDir = GetExecutableDir();
+	const auto exeDir = AppPaths::ExecutableDir();
 	if (!exeDir.empty()) {
 		candidates.push_back(exeDir / kFontName);
 		candidates.push_back(exeDir / "fonts" / kFontName);

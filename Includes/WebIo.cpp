@@ -22,6 +22,7 @@
 #include "WebIo.h"
 #include "CardName.h"
 #include "StringEscape.h"
+#include "AppPaths.h"
 
 #include <algorithm>
 #include <cctype>
@@ -77,7 +78,11 @@ bool WebIo::Spawn()
 void WebIo::StartServer()
 {
 	g_logger->info("Starting API server...");
-	m_svr.set_mount_point("/", "public");
+
+	// The web UI is the "public" folder, in the current directory or next to the executable
+	const auto publicDir = AppPaths::Find("public");
+	if (publicDir.empty() || !m_svr.set_mount_point("/", publicDir.string()))
+		g_logger->warn("WebIo::StartServer: Unable to find the \"public\" folder, the web page will not load (the API still works)");
 
 	m_svr.Get(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
 		Router(req, res);
