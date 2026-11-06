@@ -20,7 +20,50 @@ on:
       - '*.yml'
       - 'doc/**'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  build-linux:
+    name: Build and test (Linux, ${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Release
+            build_type: Release
+            cxx_flags: ''
+          - name: Debug + AddressSanitizer + UBSan
+            build_type: Debug
+            cxx_flags: '-fsanitize=address,undefined -fno-omit-frame-pointer'
+    steps:
+      - uses: actions/checkout@v4
+      # Only the header-only libraries and spdlog are needed here, SDL and friends come from apt.
+      # The big SDL submodules are only used for the Windows build.
+      - name: Fetch submodules
+        run: |
+          git submodule update --init \
+            3rdparty/cpp-httplib 3rdparty/mINI 3rdparty/spdlog \
+            3rdparty/gulfs 3rdparty/libserialport 3rdparty/utf8
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libserialport-dev libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev
+      - name: Build
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DYACARDEMU_BUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}"
+          cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
   build-windows:
     name: Build (Windows, ${{ matrix.configuration }}, VS${{ matrix.vsver }}) # runner.os doesn't work here
     runs-on: windows-${{ matrix.vsver }}
@@ -32,7 +75,7 @@ jobs:
         configuration: [Release, Debug]
         vsver: [2022]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build
@@ -46,16 +89,29 @@ jobs:
           name: YACardEmu-${{ matrix.configuration }}
           path: build/${{ matrix.configuration }}
           if-no-files-found: error
+      # The tests have not been built with MSVC before, so a problem here is reported but doesn't
+      # fail the build or block a release. They get their own build folder, the one above is what
+      # was uploaded.
+      - name: Build and run tests
+        continue-on-error: true
+        run: |
+          mkdir build-tests && cd build-tests
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DYACARDEMU_BUILD_TESTS=ON
+          cmake --build . --config ${{ matrix.configuration }}
+          ctest -C ${{ matrix.configuration }} --output-on-failure
+        shell: cmd
 
   release:
     if: |
-      github.event.action != 'pull_request' &&
-      github.ref == 'refs/heads/master'     &&
+      github.event_name == 'push'       &&
+      github.ref == 'refs/heads/master' &&
       github.repository == 'GXTX/YACardEmu'
-    needs: build-windows
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -70,7 +126,7 @@ jobs:
               exit 1
             fi
           done
-          echo "::set-output name=tag_name::CI-${GITHUB_SHA::7}"
+          echo "tag_name=CI-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
