@@ -30,7 +30,7 @@ concurrency:
 jobs:
   build-linux:
     name: Build and test (Linux, ${{ matrix.name }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -42,7 +42,7 @@ jobs:
             build_type: Debug
             cxx_flags: '-fsanitize=address,undefined -fno-omit-frame-pointer'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Only the header-only libraries and spdlog are needed here, SDL and friends come from apt.
       # The big SDL submodules are only used for the Windows build.
       - name: Fetch submodules
@@ -75,7 +75,7 @@ jobs:
         configuration: [Release, Debug]
         vsver: [2022]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build
@@ -84,7 +84,7 @@ jobs:
           cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
           cmake --build . --config ${{ matrix.configuration }}
         shell: cmd
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: YACardEmu-${{ matrix.configuration }}
           path: build/${{ matrix.configuration }}
@@ -106,13 +106,13 @@ jobs:
       github.ref == 'refs/heads/master' &&
       github.repository == 'GXTX/YACardEmu'
     needs: [build-linux, build-windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write # create the release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
       - name: Re-zip artifacts
