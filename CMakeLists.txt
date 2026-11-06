@@ -136,6 +136,9 @@ if (YACARDEMU_BUILD_TESTS)
 		Includes/C1231BR.cpp
 		Includes/Printer.cpp
 	)
+	# Printer.h pulls in SDL.h, which on Windows renames main() to SDL_main(). The tests don't link
+	# SDL2main, so keep the real main() or MSVC fails with LNK2019 (unresolved external symbol main)
+	target_compile_definitions(protocol_test PRIVATE SDL_MAIN_HANDLED)
 	if (MSVC)
 		target_link_libraries(protocol_test
 			${CMAKE_THREAD_LIBS_INIT}
