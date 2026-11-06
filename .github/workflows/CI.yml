@@ -89,11 +89,9 @@ jobs:
           name: YACardEmu-${{ matrix.configuration }}
           path: build/${{ matrix.configuration }}
           if-no-files-found: error
-      # The tests have not been built with MSVC before, so a problem here is reported but doesn't
-      # fail the build or block a release. They get their own build folder, the one above is what
-      # was uploaded.
+      # The tests get their own build folder, the one above is what was uploaded. A failing test
+      # fails the job and so blocks the release.
       - name: Build and run tests
-        continue-on-error: true
         timeout-minutes: 15 # a test that hangs (a CRT assert dialog nobody can click) must not hold the job
         run: |
           mkdir build-tests && cd build-tests
