@@ -62,6 +62,7 @@ private:
 	{
 		undefined, // All invalid routes will point here
 		cards,
+		cardImage,
 		hasCard,
 		readyCard,
 		insertedCard,
@@ -75,6 +76,7 @@ private:
 	void SetupRoutes()
 	{
 		m_routeValues["cards"]        = Routes::cards;
+		m_routeValues["cardImage"]    = Routes::cardImage;
 		m_routeValues["hasCard"]      = Routes::hasCard;
 		m_routeValues["readyCard"]    = Routes::readyCard;
 		m_routeValues["insertedCard"] = Routes::insertedCard;
@@ -83,6 +85,7 @@ private:
 	}
 
 	void InsertedCard(const httplib::Request& req, httplib::Response& res);
+	void CardImage(const httplib::Request& req, httplib::Response& res);
 };
 
 #endif //WEBIO_H

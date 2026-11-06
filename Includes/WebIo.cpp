@@ -25,6 +25,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
+#include <system_error>
+#include <vector>
 
 namespace {
 // Browsers attach an Origin header to cross-site POST/DELETE requests. Clients
@@ -111,6 +114,9 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 		case Routes::cards:
 			res.set_content(GenerateCardListJSON(m_card->cardPath), "application/json");
 			break;
+		case Routes::cardImage:
+			CardImage(req, res);
+			break;
 		case Routes::hasCard:
 			res.set_content(m_card->hasCard ? "true" : "false", "application/json");
 			break;
@@ -178,58 +184,77 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 
 const std::string WebIo::GenerateCardListJSON(std::string basepath)
 {
-	std::string list = "[";
 	const std::string selectedCard = m_card->GetCardName();
 
-	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
-		std::string fullCardPath{entry.path().string()};
-
-		if (fullCardPath.find(".png") != std::string::npos)
-			continue;
-
-		auto find = fullCardPath.find(".bin");
-
-		if (find != std::string::npos) {
-			list.append("{\"name\":\"");
-
-#ifdef _WIN32
-			std::string card = fullCardPath.substr(fullCardPath.find_last_of("\\") + 1);
-			list.append(JsonEscape(card));
-#else
-			std::string card = fullCardPath.substr(fullCardPath.find_last_of("/") + 1);
-			list.append(JsonEscape(card));
-#endif
-
-			list.append("\",\"image\":\"");
-			fullCardPath.append(".png");
-
-			std::string base64 = {};
-			if (ghc::filesystem::exists(fullCardPath)) {
-				std::ifstream img(fullCardPath.c_str(), std::ifstream::in | std::ifstream::binary);
-
-				base64.resize(ghc::filesystem::file_size(fullCardPath));
-
-				img.read(reinterpret_cast<char*>(&base64[0]), base64.size());
-				img.close();
-			}
-
-			std::string encoded = base64_encode(base64, false);
-			list.append("data:image/png;base64, ");
-			list.append(encoded);
-
-			// Have the current card be the active item on the carousel
-			list.append("\", \"active\":");
-			if (card == selectedCard)
-				list.append("true},");
-			else
-				list.append("false},");
-		}
+	// Only list files that can actually be inserted, the card folder may also hold
+	// the generated .png previews and anything else the user keeps there
+	std::vector<std::string> names;
+	std::error_code ec;
+	ghc::filesystem::directory_iterator it(basepath, ec);
+	if (ec) {
+		g_logger->warn("WebIo::GenerateCardListJSON: Unable to read card folder \"{0}\": {1}", basepath, ec.message());
+		return "[]";
 	}
 
-	// remove the errant comma
-	if (list.compare("[") != 0)
-		list.pop_back();
+	for (const ghc::filesystem::directory_iterator end; it != end; it.increment(ec)) {
+		if (ec)
+			break;
+
+		if (!it->is_regular_file(ec))
+			continue;
+
+		const std::string name = it->path().filename().string();
+		if (CardName::IsValid(name))
+			names.push_back(name);
+	}
+
+	std::sort(names.begin(), names.end());
+
+	// The images are not embedded, a card folder with a lot of cards would make this a
+	// huge response. The page loads each one on its own from /api/v1/cardImage
+	std::string list = "[";
+	for (const auto& name : names) {
+		std::error_code pngEc;
+		const bool hasImage = ghc::filesystem::exists(ghc::filesystem::path(basepath) / (name + ".png"), pngEc);
+
+		if (list.size() > 1)
+			list.append(",");
+
+		list.append("{\"name\":\"" + JsonEscape(name) + "\",\"image\":\"");
+		if (hasImage)
+			list.append("/api/v1/cardImage?name=" + UrlEncode(name));
+		// Have the current card be the active item on the carousel
+		list.append("\",\"active\":");
+		list.append(name == selectedCard ? "true}" : "false}");
+	}
 
 	list.append("]");
 	return list;
+}
+
+void WebIo::CardImage(const httplib::Request& req, httplib::Response& res)
+{
+	if (req.method != "GET") {
+		res.status = 405;
+		res.set_header("Allow", "GET");
+		return;
+	}
+
+	const std::string name = req.has_param("name") ? req.get_param_value("name") : std::string();
+	if (!CardName::IsValid(name)) {
+		res.status = 400;
+		return;
+	}
+
+	std::ifstream img(m_card->cardPath + name + ".png", std::ifstream::in | std::ifstream::binary);
+	if (!img) {
+		res.status = 404;
+		return;
+	}
+
+	const std::string data((std::istreambuf_iterator<char>(img)), std::istreambuf_iterator<char>());
+
+	// The preview is rewritten whenever the game prints on the card
+	res.set_header("Cache-Control", "no-cache");
+	res.set_content(data, "image/png");
 }
