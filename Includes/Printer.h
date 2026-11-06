@@ -96,9 +96,23 @@ public:
 		m_localName.clear();
 	}
 
+	// The game erased the card: start over from a clean base image. The saved preview can't be
+	// used for this, it still has the previous print on it, which would simply come back the
+	// next time the game prints (the new text ended up on top of the old one).
+	// If nothing is printed afterwards the clean image is what gets saved when the card is removed.
 	void Erase()
 	{
 		m_cardImage.reset();
+		if (!m_localName.empty())
+			LoadCardImage(m_localName, false);
+	}
+
+	// Forget the card without saving anything
+	void Discard()
+	{
+		m_cardImage.reset();
+		m_printQueue.clear();
+		m_localName.clear();
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -145,12 +159,14 @@ protected:
 	// Takes the pending lines and the card image and returns a job that prints and saves them
 	std::function<void()> MakeFinishJob(const std::string& cardName);
 
-	void LoadCardImage(std::string& cardName)
+	// useSavedImage: continue from the preview saved with the card (what was last printed on it),
+	// false starts from a base image
+	void LoadCardImage(const std::string& cardName, bool useSavedImage = true)
 	{
 		std::string temp = cardName;
 		temp.append(".png");
 
-		if (ghc::filesystem::exists(temp)) {
+		if (useSavedImage && ghc::filesystem::exists(temp)) {
 			m_cardImage = MakeSurface(IMG_Load(temp.c_str()));
 			if (m_cardImage != nullptr)
 				return;

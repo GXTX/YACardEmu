@@ -637,7 +637,7 @@ void CardIo::WriteCard()
 	std::string cardName = m_cardSettings->GetCardName();
 	if (!CardName::IsValid(cardName)) {
 		g_logger->warn("CardIo::WriteCard: Refusing to write invalid card name \"{}\"", cardName);
-		m_printer->Erase();
+		m_printer->Discard();
 		ClearCardData();
 		return;
 	}
