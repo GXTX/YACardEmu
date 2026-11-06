@@ -804,6 +804,11 @@ CardIo::StatusCode CardIo::Process(std::vector<uint8_t> &read, std::vector<uint8
 
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 {
+	// Nothing to look at, indexing an empty vector is undefined behaviour
+	if (readBuffer.empty()) {
+		return SizeError;
+	}
+
 	uint8_t *buffer = &readBuffer[0];
 
 	// First, read the sync byte
@@ -825,6 +830,18 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	}
 
 	uint8_t count = GetByte(&buffer);
+
+	// A command is at least the command byte and the three status bytes from the master, plus the
+	// two bytes count covers on top of the payload. Anything shorter can't be a real command (and
+	// a count of 0 never advanced the buffer, so the same bytes were NAKed over and over) and
+	// the code below would also read past the end of the packet. Drop the STX and look for the
+	// next one.
+	constexpr uint8_t minCount = 6;
+	if (count < minCount) {
+		g_logger->warn("CardIo::ReceivePacket: Frame is too short to be a command (count {0:X})", count);
+		readBuffer.erase(readBuffer.begin());
+		return ChecksumError;
+	}
 
 	// count counts itself but readBuffer will have both the STX and sum, we need to skip these.
 	if (count > readBuffer.size() - 2) {
