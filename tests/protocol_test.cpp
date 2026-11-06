@@ -24,6 +24,9 @@
 // reads out of range. Run it with the sanitizers to get the most out of the fuzzing part.
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <memory>
 #include <random>
 #include <vector>
@@ -39,6 +42,11 @@
 std::shared_ptr<spdlog::async_logger> g_logger;
 
 namespace {
+// Where the test is, so a crash can be placed. Written to stderr unbuffered, see main()
+const char* g_stage = "startup";
+int g_run = -1;
+int g_iteration = -1;
+
 constexpr uint8_t STX = 0x02, ETX = 0x03, ENQ = 0x05, ACK = 0x06, NAK = 0x15;
 using Bytes = std::vector<uint8_t>;
 
@@ -241,6 +249,10 @@ void TestFuzz()
 		Bytes read, write;
 
 		for (int i = 0; i < 4000; i++) {
+			g_run = run;
+			g_iteration = i;
+			if (i % 500 == 0)
+				std::fprintf(stderr, "protocol_test: fuzz run %d iteration %d\n", run, i);
 			f.settings.insertedCard = (rng() % 4) == 0;
 			f.settings.hasCard = (rng() % 4) == 0;
 
@@ -282,13 +294,39 @@ void TestFuzz()
 
 int main()
 {
+	// A fast fail (exit code 0xc0000409 on Windows) throws away buffered output, so make sure
+	// progress reaches the log and say what was going on if the C++ runtime terminates us.
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
+	std::setvbuf(stderr, nullptr, _IONBF, 0);
+	std::set_terminate([]() {
+		std::fprintf(stderr, "protocol_test: std::terminate in stage \"%s\" (fuzz run %d, iteration %d)\n", g_stage, g_run, g_iteration);
+		try {
+			const std::exception_ptr current = std::current_exception();
+			if (current)
+				std::rethrow_exception(current);
+		} catch (const std::exception& e) {
+			std::fprintf(stderr, "protocol_test: uncaught exception: %s\n", e.what());
+		} catch (...) {
+			std::fprintf(stderr, "protocol_test: uncaught exception of unknown type\n");
+		}
+		std::abort();
+	});
+
 	spdlog::init_thread_pool(8192, 1);
 	std::vector<spdlog::sink_ptr> sinks{ std::make_shared<spdlog::sinks::null_sink_mt>() };
 	g_logger = std::make_shared<spdlog::async_logger>("test", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
 	g_logger->set_level(spdlog::level::off);
 
+	g_stage = "TestFraming";
+	std::fprintf(stderr, "protocol_test: %s\n", g_stage);
 	TestFraming();
+	g_stage = "TestMalformedFrames";
+	std::fprintf(stderr, "protocol_test: %s\n", g_stage);
 	TestMalformedFrames();
+	g_stage = "TestFuzz";
+	std::fprintf(stderr, "protocol_test: %s\n", g_stage);
 	TestFuzz();
+	g_stage = "finished";
+	std::fprintf(stderr, "protocol_test: %s\n", g_stage);
 	return test::Finish("protocol_test");
 }
