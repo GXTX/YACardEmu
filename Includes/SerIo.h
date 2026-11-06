@@ -78,8 +78,11 @@ private:
 	HANDLE m_pipeHandle = INVALID_HANDLE_VALUE;
 #endif
 	bool m_isPipe = false;
+	// Set when the device could not be opened as a serial port and we wrapped a plain file
+	// descriptor in a sp_port of our own instead (a pty or socat link). It is not owned by
+	// libserialport, so it must not go through sp_close()/sp_free_port().
+	bool m_isFdPort = false;
 	sp_port *m_portHandle = nullptr;
-	sp_port_config *m_portConfig = nullptr;
 };
 
 #endif
