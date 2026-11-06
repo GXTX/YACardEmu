@@ -37,6 +37,7 @@
 
 #include "Printer.h"
 #include "CardName.h"
+#include "ConfigFile.h"
 
 #include "mini/ini.h"
 
@@ -68,6 +69,7 @@ public:
 	// mech are set once before any thread starts and are read-only afterwards.
 	struct Settings {
 		std::string cardPath{};
+		std::string configPath = "config.ini"; // The file that was loaded, autoselectedcard is saved back to it
 		std::atomic<bool> insertedCard{ false };
 		std::atomic<bool> hasCard{ false };
 		std::atomic<bool> waitingForCard{ false };

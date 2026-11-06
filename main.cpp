@@ -31,6 +31,8 @@
 #include "SerIo.h"
 #include "WebIo.h"
 #include "CardName.h"
+#include "AppPaths.h"
+#include "ConfigFile.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
@@ -58,6 +60,7 @@ const char *helptext =
 	"-d : debug log level\n"
 	"-t : trace log level\n"
 	"-f : log to yacardemu.log\n"
+	"-c <file> : use this config file instead of config.ini\n"
 	"-h : show this help text\n"
 	"\n";
 
@@ -80,26 +83,112 @@ void SigHandler(int sig)
 	}
 }
 
-// TODO: Handle this elsewhere, feels dirty
-bool ReadConfig()
+// Parses a whole number from the config, anything else (empty, text, trailing junk, out of range) fails
+bool ParseNumber(const std::string& text, long min, long max, int& out)
 {
-	// Read in config values
-	mINI::INIFile config("config.ini");
-	mINI::INIStructure ini;
-	std::string lhost, lport, lbaud, lparity;
-	
-	// TODO: Generate INI
-	if (!config.read(ini)) {
-		spdlog::critical("Unable to open config.ini!");
+	try {
+		std::size_t used = 0;
+		const long value = std::stol(text, &used, 10);
+		if (used != text.size() || value < min || value > max)
+			return false;
+		out = static_cast<int>(value);
+		return true;
+	} catch (const std::exception&) {
 		return false;
 	}
+}
+
+// Used when there is no config.ini, so there is always something to edit
+const char *defaultConfig = R"([config]
+; Your path MUST end in a slash, and we do not create folders when none exists
+; Linux
+;basepath = /home/user/cards/
+; Windows
+;basepath = C:\Temp\cards\
+
+; Linux
+;serialpath = /dev/ttyUSB0
+; Windows
+;serialpath = COM3
+;serialpath = \\.\pipe\YACardEmu
+
+; Which device should we emulate?
+; C1231LR / C1231BR / S31R
+;targetdevice = C1231LR
+
+;
+; Optional
+;
+;serialbaud = 9600
+; Acceptable none/even/odd
+;serialparity = none
+; Address the web UI / API listens on. The default is every interface (0.0.0.0) so
+; the page can be used from another device. There is NO authentication, if you only
+; use it on this machine set this to 127.0.0.1
+;apihost = 127.0.0.1
+apiport = 8080
+autoselectedcard = card.bin
+)";
+
+// Creates a config.ini next to the executable (or in the current directory if we can't tell
+// where that is), copied from config.ini.sample when it's there
+bool CreateDefaultConfig(std::string &createdPath)
+{
+	const auto exeDir = AppPaths::ExecutableDir();
+	const auto target = (exeDir.empty() ? ghc::filesystem::current_path() : exeDir) / "config.ini";
+	createdPath = target.string();
+
+	std::error_code ec;
+	const auto sample = AppPaths::Find("config.ini.sample");
+	if (!sample.empty()) {
+		ghc::filesystem::copy_file(sample, target, ec);
+		return !ec;
+	}
+
+	std::ofstream out(target.string(), std::ios::out | std::ios::binary);
+	out << defaultConfig;
+	return static_cast<bool>(out);
+}
+
+// TODO: Handle this elsewhere, feels dirty
+bool ReadConfig(const std::string &requestedPath)
+{
+	// Where config.ini is: -c, then the current directory, then next to the executable
+	std::string configPath = requestedPath;
+	if (configPath.empty()) {
+		const auto found = AppPaths::Find("config.ini");
+		configPath = found.empty() ? std::string() : found.string();
+	}
+
+	if (configPath.empty() && requestedPath.empty()) {
+		std::string created;
+		if (CreateDefaultConfig(created))
+			g_logger->critical("There was no config.ini, so one was created at \"{}\". Edit it (basepath, serialpath and targetdevice at least) and start again.", created);
+		else
+			g_logger->critical("Unable to find config.ini and unable to create \"{}\"!", created);
+		return false;
+	}
+
+	// Read in config values
+	globalSettings.card.configPath = configPath;
+	mINI::INIFile config(configPath);
+	mINI::INIStructure ini;
+	std::string lhost, lport, lbaud, lparity;
+
+	if (!config.read(ini)) {
+		g_logger->critical("Unable to open \"{}\"!", configPath);
+		return false;
+	}
+	g_logger->info("Using config \"{}\"", configPath);
 
 	if (ini.has("config")) {
 		lhost = ini["config"]["apihost"];
 		lport = ini["config"]["apiport"];
 		lbaud = ini["config"]["serialbaud"];
 		lparity = ini["config"]["serialparity"];
-		globalSettings.card.mech = ini["config"]["targetdevice"];
+		// Keep the default when targetdevice isn't set, an empty string is never a valid device
+		if (!ini["config"]["targetdevice"].empty())
+			globalSettings.card.mech = ini["config"]["targetdevice"];
 		globalSettings.card.cardPath = ini["config"]["basepath"];
 		globalSettings.card.SetCardName(ini["config"]["autoselectedcard"]);
 		globalSettings.serial.devicePath = ini["config"]["serialpath"];
@@ -117,6 +206,12 @@ bool ReadConfig()
 		globalSettings.card.cardPath = ghc::filesystem::current_path().string();
 	}
 
+	{
+		std::error_code ec;
+		if (!ghc::filesystem::is_directory(globalSettings.card.cardPath, ec))
+			g_logger->warn("basepath \"{}\" is not a folder, no cards will be listed or saved until it exists", globalSettings.card.cardPath);
+	}
+
 #ifdef _WIN32
 	if (globalSettings.card.cardPath.back() != '\\')
 		globalSettings.card.cardPath.append("\\");
@@ -131,11 +226,9 @@ bool ReadConfig()
 		globalSettings.webListenHost = lhost;
 	}
 
-	if (lport.empty()) {
-		globalSettings.webPort = 8080;
-	} else { 
-		globalSettings.webPort = std::stoi(lport);
-	}
+	globalSettings.webPort = 8080;
+	if (!lport.empty() && !ParseNumber(lport, 1, 65535, globalSettings.webPort))
+		g_logger->warn("Invalid apiport \"{}\" in config.ini, using 8080", lport);
 
 	if (globalSettings.webListenHost != "127.0.0.1" && globalSettings.webListenHost != "localhost" && globalSettings.webListenHost != "::1") {
 		g_logger->warn("The web UI/API listens on {0}:{1} and has no authentication, anyone who can reach it can control the emulator. Set \"apihost = 127.0.0.1\" in config.ini to only allow this machine.", globalSettings.webListenHost, globalSettings.webPort);
@@ -145,11 +238,9 @@ bool ReadConfig()
 		globalSettings.serial.devicePath = "/dev/ttyUSB1";
 	}
 
-	if (lbaud.empty()) {
-		globalSettings.serial.baudRate = 9600;
-	} else {
-		globalSettings.serial.baudRate = std::stoi(lbaud);
-	}
+	globalSettings.serial.baudRate = 9600;
+	if (!lbaud.empty() && !ParseNumber(lbaud, 1, 4000000, globalSettings.serial.baudRate))
+		g_logger->warn("Invalid serialbaud \"{}\" in config.ini, using 9600", lbaud);
 
 	if (lparity.empty()) {
 		globalSettings.serial.parity = SP_PARITY_NONE;
@@ -181,6 +272,7 @@ int main(int argc, char *argv[])
 #endif
 
 	bool file_log = false;
+	std::string configArg;
 	if (argc > 1) {
 		for (int i = 1; i < argc; i++) {
 			std::string arg = argv[i];
@@ -194,6 +286,13 @@ int main(int argc, char *argv[])
 					break;
 				case 'f':
 					file_log = true;
+					break;
+				case 'c':
+					if (i + 1 >= argc) {
+						std::cout << "-c needs a file name\n\n" << helptext;
+						return 1;
+					}
+					configArg = argv[++i];
 					break;
 				case 'h':
 				default:
@@ -219,7 +318,7 @@ int main(int argc, char *argv[])
 	g_logger->flush_on(spdlog::level::info);
 	g_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
 
-	if (!ReadConfig()) {
+	if (!ReadConfig(configArg)) {
 		WaitForInput();
 		return 1;
 	}

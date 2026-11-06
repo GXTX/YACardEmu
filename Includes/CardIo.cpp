@@ -699,12 +699,10 @@ void CardIo::WriteCard()
 		card.write(writeBack.c_str(), writeBack.size());
 		card.close();
 
-		// FIXME: This is dirty
-		mINI::INIFile config("config.ini");
-		mINI::INIStructure ini;
-		config.read(ini);
-		ini["config"]["autoselectedcard"] = cardName;
-		config.write(ini);
+		// Only touch the one setting, rewriting the whole file loses the user's comments
+		std::string configError;
+		if (!ConfigFile::SetValue(m_cardSettings->configPath, "config", "autoselectedcard", cardName, &configError))
+			g_logger->warn("CardIo::WriteCard: Unable to save the selected card to \"{0}\": {1}", m_cardSettings->configPath, configError);
 	}
 
 	m_printer->RemoveCard(fullPath);
