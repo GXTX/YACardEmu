@@ -324,7 +324,16 @@ void Printer::RenderLines(const std::vector<PrintCommand>& queue, SDL_Surface* i
 
 			// TODO: Solid produces a better glyph but with non-transparent backgrounds
 			SDL_Surface* glyph = TTF_RenderGlyph32_Blended(font, currentChar, color);
+			if (glyph == nullptr) {
+				// The font can't draw this character, skip it instead of crashing the print thread
+				g_logger->warn("Printer::RenderLines: Unable to render glyph {:X}: {}", currentChar, TTF_GetError());
+				continue;
+			}
 			SDL_Surface* scaledGlyph = QuickCreateSurface(glyph->clip_rect.w * std::atoi(xScale.c_str()), glyph->clip_rect.h * std::atoi(yScale.c_str()));
+			if (scaledGlyph == nullptr) {
+				SDL_FreeSurface(glyph);
+				continue;
+			}
 			SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
 
 			// Final blit
