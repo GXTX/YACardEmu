@@ -75,12 +75,14 @@ void WaitForInput()
 #endif
 }
 
+// Only async-signal-safe things may happen in here, no logging or flushing. A lock free
+// atomic store is fine, the main loop notices it and flushes the log on its way out.
+static_assert(ATOMIC_BOOL_LOCK_FREE == 2, "std::atomic<bool> must be lock free to be used from a signal handler");
+
 void SigHandler(int sig)
 {
-	if (sig == SIGINT || sig == SIGTERM) {
-		g_logger->flush();
+	if (sig == SIGINT || sig == SIGTERM)
 		running = false;
-	}
 }
 
 // Parses a whole number from the config, anything else (empty, text, trailing junk, out of range) fails
@@ -359,6 +361,9 @@ int main(int argc, char *argv[])
 
 		std::this_thread::sleep_for(delay);
 	}
+
+	g_logger->info("Shutting down...");
+	g_logger->flush();
 
 	return 0;
 }

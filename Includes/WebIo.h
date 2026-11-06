@@ -54,6 +54,9 @@ public:
 	std::atomic<bool> *g_running = nullptr;
 private:
 	httplib::Server m_svr = {};
+	std::thread m_thread = {};
+	std::atomic<bool> m_listenFailed{ false };
+	std::atomic<bool> m_threadDone{ false };
 
 	void Router(const httplib::Request &req, httplib::Response &res);
 	const std::string GenerateCardListJSON(std::string basepath);

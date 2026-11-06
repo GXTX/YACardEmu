@@ -63,15 +63,27 @@ WebIo::WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<boo
 
 WebIo::~WebIo()
 {
+	// stop() does nothing while the server is still starting up, so keep asking until the
+	// thread is done. Only then is it safe to destroy the server it is running.
 	m_svr.stop();
+	while (m_thread.joinable() && !m_threadDone) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		m_svr.stop();
+	}
+	if (m_thread.joinable())
+		m_thread.join();
 }
 
 bool WebIo::Spawn()
 {
-	std::thread(&WebIo::StartServer, this).detach();
+	m_thread = std::thread(&WebIo::StartServer, this);
 
-	// Need to wait before checking the status otherwise we'll crash
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	// The server reports it is running once the port is bound. Wait for that (or for the
+	// bind to fail) instead of guessing, a fixed 10 ms was not enough on a busy machine
+	// and made a perfectly fine start look like a failure.
+	for (int i = 0; i < 500 && !m_svr.is_running() && !m_listenFailed; i++)
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
 	return m_svr.is_running();
 }
 
@@ -96,8 +108,12 @@ void WebIo::StartServer()
 		Router(req, res);
 	});
 
-	if (!m_svr.listen(m_host.c_str(), m_port))
-		g_logger->critical("Failed to start API server!");
+	if (!m_svr.listen(m_host.c_str(), m_port)) {
+		m_listenFailed = true;
+		g_logger->critical("Failed to start API server on {0}:{1}, is the port already in use?", m_host, m_port);
+	}
+
+	m_threadDone = true;
 }
 
 void WebIo::Router(const httplib::Request &req, httplib::Response &res)
