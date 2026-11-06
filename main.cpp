@@ -33,6 +33,7 @@
 #include "CardName.h"
 #include "AppPaths.h"
 #include "ConfigFile.h"
+#include "NumberParse.h"
 
 #include "httplib.h"
 #include "mini/ini.h"
@@ -83,21 +84,6 @@ void SigHandler(int sig)
 {
 	if (sig == SIGINT || sig == SIGTERM)
 		running = false;
-}
-
-// Parses a whole number from the config, anything else (empty, text, trailing junk, out of range) fails
-bool ParseNumber(const std::string& text, long min, long max, int& out)
-{
-	try {
-		std::size_t used = 0;
-		const long value = std::stol(text, &used, 10);
-		if (used != text.size() || value < min || value > max)
-			return false;
-		out = static_cast<int>(value);
-		return true;
-	} catch (const std::exception&) {
-		return false;
-	}
 }
 
 // Used when there is no config.ini, so there is always something to edit

@@ -65,6 +65,19 @@ Editing `config.ini` to point to where you want your cards stored is required.
 
 `config.ini`, the `images` and `public` folders are looked for in the folder you start the program from and then next to the executable. If there is no `config.ini` one is created next to the executable (a copy of `config.ini.sample`) and the program exits so you can edit it. Use `-c <file>` to load a different config file; the selected card is saved back to the file that was loaded, and the comments in it are kept.
 
+Tests
+---------
+
+The unit tests (card names, escaping, config editing, the serial protocol including a fuzz test) are not built by default:
+
+```
+cmake -S . -B build -DYACARDEMU_BUILD_TESTS=ON
+cmake --build build
+cd build && ctest --output-on-failure
+```
+
+Add `-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"` to the first command to run them under the sanitizers.
+
 Ubuntu
 
 ```
