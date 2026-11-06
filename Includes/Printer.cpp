@@ -315,6 +315,11 @@ void Printer::RenderLines(const std::vector<PrintCommand>& queue, SDL_Surface* i
 						}
 					}
 					continue;
+				default:
+					// UseCustomGlyph ('g') and SetScale ('s') only mean something right after an
+					// Escape, which is handled above. On their own they are ordinary letters and
+					// get drawn like any other character.
+					break;
 			}
 
 			// TODO: Solid produces a better glyph but with non-transparent backgrounds

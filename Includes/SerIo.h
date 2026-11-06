@@ -26,6 +26,11 @@
 #include <windows.h>
 #else
 #define SP_PRIV
+// libserialport_internal.h defines _POSIX_C_SOURCE itself. g++ defines _GNU_SOURCE, so it is
+// already defined by now and the compiler warns about the redefinition. Same end result, no warning.
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
 #include "libserialport_internal.h"
 #include <fcntl.h>
 #include <unistd.h>
