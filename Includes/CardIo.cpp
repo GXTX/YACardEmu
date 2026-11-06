@@ -542,7 +542,15 @@ void CardIo::Command_E1_SetRTC()
 
 	std::tm tempTime{};
 	timeStrS >> std::get_time(&tempTime, "%y%m%d%H%M%S");
-	setTime = std::mktime(&tempTime);
+
+	// Ignore a time we can't make sense of. Without this a failed parse made mktime() return -1,
+	// which was then used as the clock and crashed localtime() users on Windows
+	const std::time_t parsed = timeStrS.fail() ? static_cast<std::time_t>(-1) : std::mktime(&tempTime);
+	if (parsed != static_cast<std::time_t>(-1)) {
+		setTime = parsed;
+	} else {
+		g_logger->warn("CardIo::Command_E1_SetRTC: Ignoring an invalid time");
+	}
 
 	status.SoftReset();
 	runningCommand = false;
@@ -558,7 +566,8 @@ void CardIo::Command_F0_GetVersion()
 
 void CardIo::Command_F1_GetRTC()
 {
-	std::string timeStr(12, 0);
+	// 12 characters plus the terminating NUL that strftime always writes
+	std::string timeStr(13, 0);
 	std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
 	std::time_t convTime;
@@ -569,7 +578,17 @@ void CardIo::Command_F1_GetRTC()
 		convTime = currentTime;
 	}
 
-	std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&convTime));
+	// localtime() returns null for times it can't represent (negative or far in the future on
+	// Windows) and strftime() must never see a null tm, that's a fast fail with the MSVC runtime
+	const std::tm* local = std::localtime(&convTime);
+	if (local == nullptr)
+		local = std::localtime(&currentTime);
+
+	if (local != nullptr && std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", local) == 12) {
+		timeStr.resize(12);
+	} else {
+		timeStr.assign(12, '0');
+	}
 	std::copy(timeStr.begin(), timeStr.end(), std::back_inserter(commandBuffer));
 
 	status.SoftReset();
