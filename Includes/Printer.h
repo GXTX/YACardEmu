@@ -92,6 +92,7 @@ public:
 		m_localName = cardName;
 		m_printQueue.clear();
 		m_dirty = false;
+		m_hasPrint = false;
 		LoadCardImage();
 	}
 
@@ -110,8 +111,20 @@ public:
 		m_printQueue.clear();
 		m_cardImage.reset();
 		m_dirty = true;
+		m_hasPrint = false;
 		if (!m_localName.empty())
 			LoadCardImage();
+	}
+
+	// The game started a new print job (command 0x78, which comes right before its print lines).
+	// Some games, Wangan Midnight Maximum Tune 3DX+ for one, never send an erase when they print
+	// the card again, for example after the next match. The real printer replaces the old print
+	// with the new one, so if something was already printed on this card, start from a clean
+	// card first. Otherwise the new text ends up on top of the old text.
+	void BeginPrintJob()
+	{
+		if (m_hasPrint)
+			Erase();
 	}
 
 	// Forget the card without saving anything
@@ -121,6 +134,7 @@ public:
 		m_printQueue.clear();
 		m_localName.clear();
 		m_dirty = false;
+		m_hasPrint = false;
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -154,6 +168,9 @@ protected:
 	// Something was printed or erased since the card went in, so the saved preview is out of date.
 	// Cards that pass through untouched keep the preview they already have.
 	bool m_dirty = false;
+
+	// Lines were printed on the current card image since it was loaded or erased
+	bool m_hasPrint = false;
 
 	// Worker thread and its job queue
 	std::mutex m_jobMutex = {};

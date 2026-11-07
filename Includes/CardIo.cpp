@@ -319,6 +319,9 @@ void CardIo::Command_53_WriteData2()
 
 void CardIo::Command_78_PrintSettings2()
 {
+	// Comes right before the print lines of a new print job
+	m_printer->BeginPrintJob();
+
 	status.SoftReset();
 	runningCommand = false;
 }

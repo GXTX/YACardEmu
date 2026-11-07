@@ -137,6 +137,7 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
 	m_printQueue.push_back({ offset, temp });
 	m_dirty = true;
+	m_hasPrint = true;
 
 	if (static_cast<Mode>(data[0]) == Mode::Now) {
 		// The worker gets its own copy of the lines, glyphs and a reference to the image, and the
@@ -190,6 +191,7 @@ std::function<void()> Printer::MakeFinishJob(const std::string& cardName)
 	m_cardImage.reset();
 	const bool save = m_dirty;
 	m_dirty = false;
+	m_hasPrint = false;
 
 	return [this, queue = std::move(queue), image = std::move(image), glyphs = m_customGlyphs, horizontal = m_isHorizontalCard, name = cardName, save]() {
 		if (image == nullptr)
