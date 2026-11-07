@@ -1,0 +1,4 @@
+// Windows resource script: gives YACardEmu.exe its icon.
+// To change the icon, replace app.ico (include 16, 32, 48, 128 and 256 px images inside it).
+// The path is relative to this file.
+IDI_ICON1 ICON "app.ico"

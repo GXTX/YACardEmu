@@ -18,6 +18,12 @@ add_executable(${PROJECT_NAME}
 	Includes/Printer.cpp
 )
 
+# Icon of the .exe (Windows only), see resources/app.rc
+if (WIN32)
+	enable_language(RC)
+	target_sources(${PROJECT_NAME} PRIVATE resources/app.rc)
+endif()
+
 if (WIN32)
 	add_subdirectory(3rdparty/libserialport)
 	set(SERIAL_INCLUDE_DIRS ${libserialport_SOURCE_DIR})
