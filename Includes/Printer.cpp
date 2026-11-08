@@ -123,9 +123,6 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		Append = '1',
 	};
 
-	if (m_cardImage == nullptr)
-		LoadCardImage();
-
 	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
 	constexpr uint8_t maxOffset = 0x14;
 	const uint8_t offset = data[2] < maxOffset ? data[2] : maxOffset;
@@ -135,9 +132,21 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 
 	std::vector<uint8_t> temp = {};
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
+
+	// Printing on rows an earlier job already used replaces that print: start from a clean card.
+	// Lines of this job that are still in the queue are kept, they get drawn on the new card.
+	const auto rows = PrintRows::Used(offset, temp.data(), temp.data() + temp.size());
+	if ((rows & m_prevRows).any()) {
+		m_prevRows.reset();
+		StartCleanCard();
+	}
+	m_jobRows |= rows;
+
+	if (m_cardImage == nullptr)
+		LoadCardImage();
+
 	m_printQueue.push_back({ offset, temp });
 	m_dirty = true;
-	m_hasPrint = true;
 
 	if (static_cast<Mode>(data[0]) == Mode::Now) {
 		// The worker gets its own copy of the lines, glyphs and a reference to the image, and the
@@ -191,7 +200,8 @@ std::function<void()> Printer::MakeFinishJob(const std::string& cardName)
 	m_cardImage.reset();
 	const bool save = m_dirty;
 	m_dirty = false;
-	m_hasPrint = false;
+	m_prevRows.reset();
+	m_jobRows.reset();
 
 	return [this, queue = std::move(queue), image = std::move(image), glyphs = m_customGlyphs, horizontal = m_isHorizontalCard, name = cardName, save]() {
 		if (image == nullptr)

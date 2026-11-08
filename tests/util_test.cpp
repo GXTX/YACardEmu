@@ -20,7 +20,7 @@
 */
 
 // Tests for the small header-only helpers (card names, JSON/URL escaping, config editing,
-// number parsing, the CSRF origin check and the folder lookup). They need no SDL, serial port or
+// number parsing, the CSRF origin check, the folder lookup and the printed rows). They need no SDL, serial port or
 // web server, so they run anywhere the project can be compiled.
 
 #include <fstream>
@@ -33,6 +33,7 @@
 #include "CardName.h"
 #include "ConfigFile.h"
 #include "NumberParse.h"
+#include "PrintRows.h"
 #include "SameOrigin.h"
 #include "StringEscape.h"
 #include "test.h"
@@ -221,6 +222,44 @@ void TestAppPaths()
 
 	fs::current_path(originalCwd, ec);
 }
+
+void TestPrintRows()
+{
+	using PrintRows::Used;
+	auto rowsOf = [](uint8_t offset, const std::string& text) {
+		const uint8_t* begin = reinterpret_cast<const uint8_t*>(text.data());
+		return Used(offset, begin, begin + text.size());
+	};
+
+	// text on the row it starts on, every CR moves down a row
+	auto rows = rowsOf(1, "AB\rCD");
+	CHECK_EQ(rows.count(), static_cast<size_t>(2));
+	CHECK(rows.test(1));
+	CHECK(rows.test(2));
+
+	// leading CRs skip rows, the offset is where counting starts
+	rows = rowsOf(3, "\r\rX");
+	CHECK_EQ(rows.count(), static_cast<size_t>(1));
+	CHECK(rows.test(5));
+
+	// spaces, control bytes and empty lines draw nothing
+	rows = rowsOf(1, "   \r\r\x11\x14 \r");
+	CHECK(rows.none());
+
+	// a row is only counted once, however much text is on it
+	CHECK_EQ(rowsOf(2, "abc def").count(), static_cast<size_t>(1));
+
+	// rows past the end are ignored instead of overflowing the set
+	std::string deep(PrintRows::kMaxRows + 5, '\r');
+	deep += "X";
+	CHECK(rowsOf(1, deep).none());
+
+	// the top half and the bottom half of a card don't share rows, the same half printed twice does
+	const auto top = rowsOf(1, "AB\rCD");
+	const auto bottom = rowsOf(1, "\r\r\r\rEF\rGH");
+	CHECK((top & bottom).none());
+	CHECK((top & rowsOf(1, "XY\rZ")).any());
+}
 } // namespace
 
 int main()
@@ -231,5 +270,6 @@ int main()
 	TestParseNumber();
 	TestSameOrigin();
 	TestAppPaths();
+	TestPrintRows();
 	return test::Finish("util_test");
 }

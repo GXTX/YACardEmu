@@ -45,6 +45,7 @@
 #include "ghc/filesystem.hpp"
 
 #include "AppPaths.h"
+#include "PrintRows.h"
 
 #include "utf8.h"
 
@@ -92,7 +93,8 @@ public:
 		m_localName = cardName;
 		m_printQueue.clear();
 		m_dirty = false;
-		m_hasPrint = false;
+		m_prevRows.reset();
+		m_jobRows.reset();
 		LoadCardImage();
 	}
 
@@ -109,22 +111,23 @@ public:
 	void Erase()
 	{
 		m_printQueue.clear();
-		m_cardImage.reset();
-		m_dirty = true;
-		m_hasPrint = false;
-		if (!m_localName.empty())
-			LoadCardImage();
+		m_prevRows.reset();
+		m_jobRows.reset();
+		StartCleanCard();
 	}
 
 	// The game started a new print job (command 0x78, which comes right before its print lines).
+	// What was printed until now belongs to an earlier job from here on.
 	// Some games, Wangan Midnight Maximum Tune 3DX+ for one, never send an erase when they print
 	// the card again, for example after the next match. The real printer replaces the old print
-	// with the new one, so if something was already printed on this card, start from a clean
-	// card first. Otherwise the new text ends up on top of the old text.
+	// with the new one, so when a line of the new job lands on a row an earlier job already
+	// printed on, QueuePrintLine starts from a clean card (otherwise the new text ends up on top
+	// of the old text). A job that prints other rows is the next part of the same card (some games
+	// print half of the card at a time) and leaves the earlier text alone.
 	void BeginPrintJob()
 	{
-		if (m_hasPrint)
-			Erase();
+		m_prevRows |= m_jobRows;
+		m_jobRows.reset();
 	}
 
 	// Forget the card without saving anything
@@ -134,7 +137,8 @@ public:
 		m_printQueue.clear();
 		m_localName.clear();
 		m_dirty = false;
-		m_hasPrint = false;
+		m_prevRows.reset();
+		m_jobRows.reset();
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -169,8 +173,9 @@ protected:
 	// Cards that pass through untouched keep the preview they already have.
 	bool m_dirty = false;
 
-	// Lines were printed on the current card image since it was loaded or erased
-	bool m_hasPrint = false;
+	// Rows of the card that earlier print jobs printed on, and rows the current job printed on
+	PrintRows::RowSet m_prevRows;
+	PrintRows::RowSet m_jobRows;
 
 	// Worker thread and its job queue
 	std::mutex m_jobMutex = {};
@@ -187,6 +192,16 @@ protected:
 
 	// Takes the pending lines and the card image and returns a job that prints and saves them
 	std::function<void()> MakeFinishJob(const std::string& cardName);
+
+	// Throws away the image and starts a new one. The caller decides what happens to the queue
+	// and the row bookkeeping.
+	void StartCleanCard()
+	{
+		m_cardImage.reset();
+		m_dirty = true;
+		if (!m_localName.empty())
+			LoadCardImage();
+	}
 
 	// Starts a fresh card image from a random base image
 	void LoadCardImage()
