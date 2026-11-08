@@ -59,8 +59,24 @@ Running
 
 You must have a USB to RS232 (or a physical serial port) connected to your machine. Configuration is made via both a `config.ini` file & via a web portal / API.
 To access the web portal point your browser to `http://YOURIPHERE:8080/`, this web page is where you'll choose your card and insert your card.
+The web portal has no authentication and listens on every network interface by default; if you only use it on the same machine, add `apihost = 127.0.0.1` to `config.ini` (see `config.ini.sample`).
 
 Editing `config.ini` to point to where you want your cards stored is required.
+
+`config.ini`, the `images` and `public` folders are looked for in the folder you start the program from and then next to the executable. If there is no `config.ini` one is created next to the executable (a copy of `config.ini.sample`) and the program exits so you can edit it. Use `-c <file>` to load a different config file; the selected card is saved back to the file that was loaded, and the comments in it are kept.
+
+Tests
+---------
+
+The unit tests (card names, escaping, config editing, the serial protocol including a fuzz test) are not built by default:
+
+```
+cmake -S . -B build -DYACARDEMU_BUILD_TESTS=ON
+cmake --build build
+cd build && ctest --output-on-failure
+```
+
+Add `-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"` to the first command to run them under the sanitizers.
 
 Ubuntu
 
@@ -126,3 +142,6 @@ F-Zero AX             : CRP-1231BR-10    | 9600 even
 Mario Kart Arcade GP  : CRP-1231LR-10NAB | 9600 none
 Mario Kart Arcade GP2 : CRP-1231LR-10NAB | 9600 none
 ```
+
+### Third-party fonts
+The card printer renders text with `kochi-gothic-subst.ttf` (Kochi Gothic substitute, derived from the Wadalab fonts). It is licensed under the Wadalab Font License; see `licenses/kochi-gothic-subst.txt`.

@@ -18,6 +18,12 @@ add_executable(${PROJECT_NAME}
 	Includes/Printer.cpp
 )
 
+# Icon of the .exe (Windows only), see resources/app.rc
+if (WIN32)
+	enable_language(RC)
+	target_sources(${PROJECT_NAME} PRIVATE resources/app.rc)
+endif()
+
 if (WIN32)
 	add_subdirectory(3rdparty/libserialport)
 	set(SERIAL_INCLUDE_DIRS ${libserialport_SOURCE_DIR})
@@ -119,6 +125,61 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 		${CMAKE_CURRENT_SOURCE_DIR}/public
 		${CMAKE_CURRENT_BINARY_DIR}/public
 )
+
+# Unit tests, build with -DYACARDEMU_BUILD_TESTS=ON and run them with ctest
+option(YACARDEMU_BUILD_TESTS "Build the unit tests" OFF)
+if (YACARDEMU_BUILD_TESTS)
+	enable_testing()
+
+	# Helpers that need nothing but the standard library
+	add_executable(util_test tests/util_test.cpp)
+
+	# The card reader protocol, links what CardIo needs (the printer pulls in SDL)
+	add_executable(protocol_test
+		tests/protocol_test.cpp
+		Includes/CardIo.cpp
+		Includes/C1231LR.cpp
+		Includes/C1231BR.cpp
+		Includes/Printer.cpp
+	)
+	# Printer.h pulls in SDL.h, which on Windows renames main() to SDL_main(). The tests don't link
+	# SDL2main, so keep the real main() or MSVC fails with LNK2019 (unresolved external symbol main)
+	target_compile_definitions(protocol_test PRIVATE SDL_MAIN_HANDLED)
+	if (MSVC)
+		target_link_libraries(protocol_test
+			${CMAKE_THREAD_LIBS_INIT}
+			spdlog::spdlog
+			SDL2::SDL2-static
+			SDL2_ttf::SDL2_ttf-static
+			SDL2_image::SDL2_image-static
+		)
+	else()
+		target_link_libraries(protocol_test
+			${CMAKE_THREAD_LIBS_INIT}
+			spdlog::spdlog
+			${SDL2_LIBRARIES}
+			${SDL2_IMAGE_LIBRARIES}
+			${SDL2_TTF_LIBRARIES}
+		)
+	endif()
+
+	foreach (test_target util_test protocol_test)
+		set_target_properties(${test_target} PROPERTIES CXX_STANDARD 14)
+		if (NOT MSVC)
+			target_compile_options(${test_target} PRIVATE -Wall -Wextra -Wpedantic)
+		endif()
+		add_test(NAME ${test_target} COMMAND ${test_target} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+	endforeach()
+endif()
+
+# Copy the printer font next to the executable if it is present in the source tree
+if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/kochi-gothic-subst.ttf)
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy
+			${CMAKE_CURRENT_SOURCE_DIR}/kochi-gothic-subst.ttf
+			$<TARGET_FILE_DIR:${PROJECT_NAME}>/kochi-gothic-subst.ttf
+	)
+endif()
 
 if (WIN32)
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

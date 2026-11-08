@@ -25,6 +25,14 @@
 #include <vector>
 #include <random>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <string>
+#include <cctype>
+#include <system_error>
 
 #include <SDL2/SDL.h>
 #include <SDL_ttf.h>
@@ -36,6 +44,9 @@
 
 #include "ghc/filesystem.hpp"
 
+#include "AppPaths.h"
+#include "PrintRows.h"
+
 #include "utf8.h"
 
 extern std::shared_ptr<spdlog::async_logger> g_logger;
@@ -43,45 +54,91 @@ extern std::shared_ptr<spdlog::async_logger> g_logger;
 class Printer
 {
 public:
+	// Rendering and saving the card image happens on a single worker thread, so print jobs
+	// never overlap and nothing keeps running (detached) after the Printer is gone.
+	//
+	// Every job gets its own copy of what it needs (print queue, image reference, glyphs),
+	// taken on the thread that drives CardIo. Everything else in this class is only ever
+	// touched by that thread, so no locking is needed outside of the job queue.
 	Printer()
 	{
 		m_customGlyphs.resize(256);
+		m_worker = std::thread(&Printer::WorkerLoop, this);
 	}
 	~Printer()
 	{
-		DetachedRemove();
+		{
+			std::lock_guard<std::mutex> lock(m_jobMutex);
+			m_stopWorker = true;
+		}
+		m_jobCv.notify_all();
+		if (m_worker.joinable())
+			m_worker.join(); // Outstanding jobs are finished before the worker exits
+
+		// Whatever card is still in the printer gets saved, same as when it's removed
+		MakeFinishJob(m_localName)();
+		m_localName.clear();
 		SDL_Quit();
 	}
 
+	Printer(const Printer&) = delete;
+	Printer& operator=(const Printer&) = delete;
+
+	// Every card starts from a clean base image. The preview saved with the card only shows what
+	// was last printed on it, it is never used as a canvas: the game is the one that decides what
+	// ends up on the card, and drawing on top of the old print made new text pile up on the old.
+	// The saved preview stays as it is until the game prints (or erases) something on the card.
 	void InsertCard(std::string& cardName)
 	{
 		m_localName = cardName;
-		LoadCardImage(m_localName);
+		m_printQueue.clear();
+		m_dirty = false;
+		m_prevRows.reset();
+		m_jobRows.reset();
+		LoadCardImage();
 	}
 
 	void RemoveCard(std::string& cardName)
 	{
-		m_localName = cardName;
-		std::thread(&Printer::DetachedRemove, this).detach();
+		// Takes the queue and image away from us now, so the next card can start right away
+		Enqueue(MakeFinishJob(cardName));
+		m_localName.clear();
 	}
 
-	void DetachedRemove()
-	{
-		PrintLine();
-		if (m_cardImage != nullptr) {
-			SaveCardImage(m_localName);
-			SDL_FreeSurface(m_cardImage);
-			m_cardImage = nullptr;
-		}
-		m_localName = "";
-	}
-
+	// The game erased the card: start over from a clean base image and forget any lines that
+	// were still waiting to be printed, they were meant for the old print.
+	// The clean image is saved when the card is removed, so the preview shows the erased card.
 	void Erase()
 	{
-		if (m_cardImage != nullptr) {
-			SDL_FreeSurface(m_cardImage);
-			m_cardImage = nullptr;
-		}
+		m_printQueue.clear();
+		m_prevRows.reset();
+		m_jobRows.reset();
+		StartCleanCard();
+	}
+
+	// The game started a new print job (command 0x78, which comes right before its print lines).
+	// What was printed until now belongs to an earlier job from here on.
+	// Some games, Wangan Midnight Maximum Tune 3DX+ for one, never send an erase when they print
+	// the card again, for example after the next match. The real printer replaces the old print
+	// with the new one, so when a line of the new job lands on a row an earlier job already
+	// printed on, QueuePrintLine starts from a clean card (otherwise the new text ends up on top
+	// of the old text). A job that prints other rows is the next part of the same card (some games
+	// print half of the card at a time) and leaves the earlier text alone.
+	void BeginPrintJob()
+	{
+		m_prevRows |= m_jobRows;
+		m_jobRows.reset();
+	}
+
+	// Forget the card without saving anything
+	void Discard()
+	{
+		m_cardImage.reset();
+		m_printQueue.clear();
+		m_localName.clear();
+		m_dirty = false;
+		m_prevRows.reset();
+		m_jobRows.reset();
 	}
 
 	bool RegisterFont(std::vector<uint8_t>& data);
@@ -99,67 +156,95 @@ protected:
 		std::vector<uint8_t> data = {};
 	};
 
-	std::vector<PrintCommand> m_printQueue = {};
-	std::vector<SDL_Surface*> m_customGlyphs = {};
-
-	SDL_Surface* m_cardImage = nullptr;
-
-	void PrintLine();
-
-	void LoadCardImage(std::string& cardName)
+	// Surfaces are reference counted so a job that is still drawing on (or with) one keeps it
+	// alive even if the card is removed or the game registers a new glyph in the meantime
+	using Surface = std::shared_ptr<SDL_Surface>;
+	static Surface MakeSurface(SDL_Surface* surface)
 	{
-		std::string temp = cardName;
-		temp.append(".png");
+		return surface != nullptr ? Surface(surface, SDL_FreeSurface) : Surface();
+	}
 
-		if (ghc::filesystem::exists(temp)) {
-			m_cardImage = IMG_Load(temp.c_str());
-			if (m_cardImage != nullptr)
-				return;
-			g_logger->warn("Printer::LoadCardImage: Found card image but IMG_Load couldn't create the surface, generating a transparent surface");
-		}
+	std::vector<PrintCommand> m_printQueue = {};
+	std::vector<Surface> m_customGlyphs = {};
 
-		std::string cwd = ghc::filesystem::current_path().string();
-#ifdef _WIN32
-		if (cwd.back() != '\\')
-			cwd.append("\\");
-		cwd.append("images\\");
-#else
-		if (cwd.back() != '/')
-			cwd.append("/");
-		cwd.append("images/");
-#endif
+	Surface m_cardImage = nullptr;
+
+	// Something was printed or erased since the card went in, so the saved preview is out of date.
+	// Cards that pass through untouched keep the preview they already have.
+	bool m_dirty = false;
+
+	// Rows of the card that earlier print jobs printed on, and rows the current job printed on
+	PrintRows::RowSet m_prevRows;
+	PrintRows::RowSet m_jobRows;
+
+	// Worker thread and its job queue
+	std::mutex m_jobMutex = {};
+	std::condition_variable m_jobCv = {};
+	std::deque<std::function<void()>> m_jobs = {};
+	bool m_stopWorker = false;
+	std::thread m_worker = {};
+
+	void Enqueue(std::function<void()> job);
+	void WorkerLoop();
+
+	// Draws the queued lines onto image, runs on the worker thread (or after it has stopped)
+	void RenderLines(const std::vector<PrintCommand>& queue, SDL_Surface* image, const std::vector<Surface>& glyphs, bool horizontal);
+
+	// Takes the pending lines and the card image and returns a job that prints and saves them
+	std::function<void()> MakeFinishJob(const std::string& cardName);
+
+	// Throws away the image and starts a new one. The caller decides what happens to the queue
+	// and the row bookkeeping.
+	void StartCleanCard()
+	{
+		m_cardImage.reset();
+		m_dirty = true;
+		if (!m_localName.empty())
+			LoadCardImage();
+	}
+
+	// Starts a fresh card image from a random base image
+	void LoadCardImage()
+	{
+		// Base card images live in "images", next to where we were started or next to the executable
 		std::vector<std::string> images = {};
+		const auto imageDir = AppPaths::Find("images");
 
-		if (ghc::filesystem::is_directory(cwd)) {
-			for (const auto& entry : ghc::filesystem::directory_iterator(cwd)) {
-				if (entry.path().string().find(".png") != std::string::npos)
-					images.emplace_back(entry.path().string());
+		std::error_code ec;
+		if (!imageDir.empty() && ghc::filesystem::is_directory(imageDir, ec)) {
+			ghc::filesystem::directory_iterator it(imageDir, ec);
+			for (const ghc::filesystem::directory_iterator end; !ec && it != end; it.increment(ec)) {
+				std::string ext = it->path().extension().string();
+				for (auto& c : ext)
+					c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+				if (ext == ".png" && it->is_regular_file(ec))
+					images.emplace_back(it->path().string());
 			}
 		} else {
 			// FIXME: Create the folder for the user
-			g_logger->warn("Printer::LoadCardImage: Image folder does not exist");
+			g_logger->warn("Printer::LoadCardImage: Image folder does not exist, put an \"images\" folder with base card images (.png) next to the executable");
 		}
 
 		if (!images.empty()) {
 			std::random_device dev;
 			std::mt19937 twist(dev());
-			std::uniform_int_distribution<std::mt19937::result_type> rng(0, static_cast<uint8_t>(images.size()) - 1);
+			std::uniform_int_distribution<std::size_t> rng(0, images.size() - 1);
 
-			m_cardImage = IMG_Load(images.at(rng(twist)).c_str());
+			m_cardImage = MakeSurface(IMG_Load(images.at(rng(twist)).c_str()));
 			if (m_cardImage != nullptr)
 				return;
 			g_logger->warn("Printer::LoadCardImage: IMG_Load failed to load the random base card image");
 		}
 
 		// Everything else failed, we *need* a surface... So let's generate a transparent one
-		m_cardImage = QuickCreateSurface((m_isHorizontalCard ? 1019 : 640), (m_isHorizontalCard ? 640 : 1019));
+		m_cardImage = MakeSurface(QuickCreateSurface((m_isHorizontalCard ? 1019 : 640), (m_isHorizontalCard ? 640 : 1019)));
 	}
 
-	void SaveCardImage(std::string& cardName)
+	static void SaveCardImage(SDL_Surface* image, const std::string& cardName)
 	{
 		std::string temp = cardName;
 		temp.append(".png");
-		IMG_SavePNG(m_cardImage, temp.c_str());
+		IMG_SavePNG(image, temp.c_str());
 	}
 
 	std::vector<bool> ConvertToBits(std::vector<uint8_t>& vector)

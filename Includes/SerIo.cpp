@@ -36,7 +36,22 @@ SerIo::~SerIo()
 		return;
 	}
 #endif
+	if (m_portHandle == nullptr)
+		return;
+
+#ifdef __linux
+	if (m_isFdPort) {
+		if (m_portHandle->fd >= 0)
+			close(m_portHandle->fd);
+		std::free(m_portHandle);
+		m_portHandle = nullptr;
+		return;
+	}
+#endif
+
 	sp_close(m_portHandle);
+	sp_free_port(m_portHandle);
+	m_portHandle = nullptr;
 }
 
 bool SerIo::Open()
@@ -55,35 +70,50 @@ bool SerIo::Open()
 	}
 #endif
 
-	sp_new_config(&m_portConfig);
-	sp_set_config_baudrate(m_portConfig, m_portSettings->baudRate);
-	sp_set_config_bits(m_portConfig, 8);
-	sp_set_config_parity(m_portConfig, m_portSettings->parity);
-	sp_set_config_stopbits(m_portConfig, 1);
-	sp_set_config_flowcontrol(m_portConfig, SP_FLOWCONTROL_NONE);
+	sp_port *port = nullptr;
+	if (sp_get_port_by_name(m_portSettings->devicePath.c_str(), &port) == SP_OK) {
+		if (sp_open(port, SP_MODE_READ_WRITE) == SP_OK) {
+			// libserialport copies the settings, so the config can be released right after
+			sp_port_config *config = nullptr;
+			if (sp_new_config(&config) == SP_OK) {
+				sp_set_config_baudrate(config, m_portSettings->baudRate);
+				sp_set_config_bits(config, 8);
+				sp_set_config_parity(config, m_portSettings->parity);
+				sp_set_config_stopbits(config, 1);
+				sp_set_config_flowcontrol(config, SP_FLOWCONTROL_NONE);
+				if (sp_set_config(port, config) != SP_OK)
+					g_logger->warn("SerIo::Init: Unable to apply the serial settings: {}", sp_last_error_message());
+				sp_free_config(config);
+			}
 
-	sp_get_port_by_name(m_portSettings->devicePath.c_str(), &m_portHandle);
-
-	auto status = sp_open(m_portHandle, SP_MODE_READ_WRITE);
-	if (status != SP_OK) {
-		g_logger->warn("SerIo::Init: {}", sp_last_error_message());
-#ifdef __linux
-		g_logger->info("SerIo::Init: Failed to open as a serial tty -- attemping to open as regular FD", m_portSettings->devicePath);
-		m_portHandle = static_cast<sp_port*>(std::malloc(sizeof(sp_port)));
-		m_portHandle->name = const_cast<char*>(m_portSettings->devicePath.c_str());
-		m_portHandle->fd = open(m_portSettings->devicePath.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NDELAY);
-		if (m_portHandle->fd > 0)
+			m_portHandle = port;
 			return true;
-		else
-			std::free(m_portHandle);
-#endif
-		g_logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
-		return false;
+		}
+
+		g_logger->warn("SerIo::Init: {}", sp_last_error_message());
+		sp_free_port(port);
+	} else {
+		g_logger->warn("SerIo::Init: {}", sp_last_error_message());
 	}
 
-	sp_set_config(m_portHandle, m_portConfig);
+#ifdef __linux
+	g_logger->info("SerIo::Init: Failed to open {} as a serial tty -- attemping to open as regular FD", m_portSettings->devicePath);
+	const int fd = open(m_portSettings->devicePath.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NDELAY);
+	if (fd >= 0) {
+		// libserialport only needs the descriptor for reading and writing, zero the rest
+		m_portHandle = static_cast<sp_port*>(std::calloc(1, sizeof(sp_port)));
+		if (m_portHandle != nullptr) {
+			m_portHandle->name = const_cast<char*>(m_portSettings->devicePath.c_str());
+			m_portHandle->fd = fd;
+			m_isFdPort = true;
+			return true;
+		}
+		close(fd);
+	}
+#endif
 
-	return true;
+	g_logger->critical("SerIo::Init: Failed to open {}", m_portSettings->devicePath);
+	return false;
 }
 
 void SerIo::SendAck(bool okay)
@@ -124,7 +154,8 @@ SerIo::Status SerIo::Write()
 	} else
 #endif
 	ret = sp_blocking_write(m_portHandle, &m_writeBuffer[0], m_writeBuffer.size(), 0);
-	sp_drain(m_portHandle);
+	if (!m_isPipe)
+		sp_drain(m_portHandle);
 
 	if (ret > 0) {
 		if (ret < static_cast<int>(m_writeBuffer.size())) {
@@ -173,10 +204,13 @@ SerIo::Status SerIo::Read()
 	if (m_isPipe) {
 		DWORD dwRet = 0;
 		BOOL bRet = ReadFile(m_pipeHandle, &m_readBuffer[originalSize], static_cast<DWORD>(bytes), &dwRet, NULL);
-		ret = bRet;
+		ret = bRet ? static_cast<int>(dwRet) : 0;
 	} else
 #endif
 		ret = sp_nonblocking_read(m_portHandle, &m_readBuffer[originalSize], static_cast<size_t>(bytes));
+
+	// The buffer was grown by what was waiting, but only "ret" bytes are really there
+	m_readBuffer.resize(originalSize + (ret > 0 ? static_cast<size_t>(ret) : 0));
 
 	if (ret <= 0) {
 		return Status::ReadError;

@@ -20,6 +20,17 @@
 */
 
 #include "WebIo.h"
+#include "CardName.h"
+#include "StringEscape.h"
+#include "AppPaths.h"
+#include "SameOrigin.h"
+
+#include <algorithm>
+#include <cctype>
+#include <iterator>
+#include <system_error>
+#include <vector>
+
 
 WebIo::WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<bool> *running)
 {
@@ -32,22 +43,38 @@ WebIo::WebIo(CardIo::Settings *card, std::string host, int port, std::atomic<boo
 
 WebIo::~WebIo()
 {
+	// stop() does nothing while the server is still starting up, so keep asking until the
+	// thread is done. Only then is it safe to destroy the server it is running.
 	m_svr.stop();
+	while (m_thread.joinable() && !m_threadDone) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		m_svr.stop();
+	}
+	if (m_thread.joinable())
+		m_thread.join();
 }
 
 bool WebIo::Spawn()
 {
-	std::thread(&WebIo::StartServer, this).detach();
+	m_thread = std::thread(&WebIo::StartServer, this);
 
-	// Need to wait before checking the status otherwise we'll crash
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	// The server reports it is running once the port is bound. Wait for that (or for the
+	// bind to fail) instead of guessing, a fixed 10 ms was not enough on a busy machine
+	// and made a perfectly fine start look like a failure.
+	for (int i = 0; i < 500 && !m_svr.is_running() && !m_listenFailed; i++)
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
 	return m_svr.is_running();
 }
 
 void WebIo::StartServer()
 {
 	g_logger->info("Starting API server...");
-	m_svr.set_mount_point("/", "public");
+
+	// The web UI is the "public" folder, in the current directory or next to the executable
+	const auto publicDir = AppPaths::Find("public");
+	if (publicDir.empty() || !m_svr.set_mount_point("/", publicDir.string()))
+		g_logger->warn("WebIo::StartServer: Unable to find the \"public\" folder, the web page will not load (the API still works)");
 
 	m_svr.Get(R"(/api/v1/(\w+))", [&](const httplib::Request& req, httplib::Response& res) {
 		Router(req, res);
@@ -61,8 +88,12 @@ void WebIo::StartServer()
 		Router(req, res);
 	});
 
-	if (!m_svr.listen(m_host.c_str(), m_port))
-		g_logger->critical("Failed to start API server!");
+	if (!m_svr.listen(m_host.c_str(), m_port)) {
+		m_listenFailed = true;
+		g_logger->critical("Failed to start API server on {0}:{1}, is the port already in use?", m_host, m_port);
+	}
+
+	m_threadDone = true;
 }
 
 void WebIo::Router(const httplib::Request &req, httplib::Response &res)
@@ -71,9 +102,21 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 
 	g_logger->debug("WebIo::Router: {0} -> {1}", req.method, route);
 
-	switch (m_routeValues[route]) {
+	// Stop a web page the user happens to visit from driving the emulator
+	if (req.method != "GET" && !IsSameOrigin(req)) {
+		g_logger->warn("WebIo::Router: Rejected cross-origin {0} request for \"{1}\"", req.method, route);
+		res.status = 403;
+		res.set_content("Cross-origin requests are not allowed", "text/plain");
+		return;
+	}
+
+	const auto routeIt = m_routeValues.find(route);
+	switch (routeIt != m_routeValues.end() ? routeIt->second : Routes::undefined) {
 		case Routes::cards:
 			res.set_content(GenerateCardListJSON(m_card->cardPath), "application/json");
+			break;
+		case Routes::cardImage:
+			CardImage(req, res);
 			break;
 		case Routes::hasCard:
 			res.set_content(m_card->hasCard ? "true" : "false", "application/json");
@@ -92,6 +135,12 @@ void WebIo::Router(const httplib::Request &req, httplib::Response &res)
 			res.set_content(m_card->reportDispenserEmpty ? "empty" : "full", "text/plain");
 			break;
 		case Routes::stop:
+			// Shutting down must be an explicit POST, a plain GET (link, <img>, prefetch) must not do it
+			if (req.method != "POST") {
+				res.status = 405;
+				res.set_header("Allow", "POST");
+				break;
+			}
 			m_svr.stop();
 			// g_running controls the main loop, if we kill it before http is flushed then we'll crash
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -112,10 +161,18 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 	}
 
 	if (req.method == "POST") {
+		// Validate first so a rejected request doesn't change any state
+		if (req.has_param("cardname") && !CardName::IsValid(req.get_param_value("cardname"))) {
+			g_logger->warn("WebIo::InsertedCard: Rejected invalid card name");
+			res.status = 400;
+			res.set_content("{ \"error\":\"invalid cardname\" }", "application/json");
+			return;
+		}
+
 		if (req.has_param("loadonly"))
 			m_card->insertedCard = true;
 		if (req.has_param("cardname"))
-			m_card->cardName = req.get_param_value("cardname");
+			m_card->SetCardName(req.get_param_value("cardname"));
 	}
 
 	if (req.has_param("redirect")) {
@@ -123,62 +180,82 @@ void WebIo::InsertedCard(const httplib::Request& req, httplib::Response& res)
 		return;
 	}
 
-	res.set_content(" { \"cardname\":\"" + m_card->cardName + "\", \"inserted\":" + (m_card->insertedCard ? "true" : "false") + " }", "application/json");
+	res.set_content(" { \"cardname\":\"" + JsonEscape(m_card->GetCardName()) + "\", \"inserted\":" + (m_card->insertedCard ? "true" : "false") + " }", "application/json");
 }
 
 const std::string WebIo::GenerateCardListJSON(std::string basepath)
 {
-	std::string list = "[";
+	const std::string selectedCard = m_card->GetCardName();
 
-	for (const auto& entry : ghc::filesystem::directory_iterator(basepath)) {
-		std::string fullCardPath{entry.path().string()};
-
-		if (fullCardPath.find(".png") != std::string::npos)
-			continue;
-
-		auto find = fullCardPath.find(".bin");
-
-		if (find != std::string::npos) {
-			list.append("{\"name\":\"");
-
-#ifdef _WIN32
-			std::string card = fullCardPath.substr(fullCardPath.find_last_of("\\") + 1);
-			list.append(card);
-#else
-			std::string card = fullCardPath.substr(fullCardPath.find_last_of("/") + 1);
-			list.append(card);
-#endif
-
-			list.append("\",\"image\":\"");
-			fullCardPath.append(".png");
-
-			std::string base64 = {};
-			if (ghc::filesystem::exists(fullCardPath)) {
-				std::ifstream img(fullCardPath.c_str(), std::ifstream::in | std::ifstream::binary);
-
-				base64.resize(ghc::filesystem::file_size(fullCardPath));
-
-				img.read(reinterpret_cast<char*>(&base64[0]), base64.size());
-				img.close();
-			}
-
-			std::string encoded = base64_encode(base64, false);
-			list.append("data:image/png;base64, ");
-			list.append(encoded);
-
-			// Have the current card be the active item on the carousel
-			list.append("\", \"active\":");
-			if (card == m_card->cardName)
-				list.append("true},");
-			else
-				list.append("false},");
-		}
+	// Only list files that can actually be inserted, the card folder may also hold
+	// the generated .png previews and anything else the user keeps there
+	std::vector<std::string> names;
+	std::error_code ec;
+	ghc::filesystem::directory_iterator it(basepath, ec);
+	if (ec) {
+		g_logger->warn("WebIo::GenerateCardListJSON: Unable to read card folder \"{0}\": {1}", basepath, ec.message());
+		return "[]";
 	}
 
-	// remove the errant comma
-	if (list.compare("[") != 0)
-		list.pop_back();
+	for (const ghc::filesystem::directory_iterator end; it != end; it.increment(ec)) {
+		if (ec)
+			break;
+
+		if (!it->is_regular_file(ec))
+			continue;
+
+		const std::string name = it->path().filename().string();
+		if (CardName::IsValid(name))
+			names.push_back(name);
+	}
+
+	std::sort(names.begin(), names.end());
+
+	// The images are not embedded, a card folder with a lot of cards would make this a
+	// huge response. The page loads each one on its own from /api/v1/cardImage
+	std::string list = "[";
+	for (const auto& name : names) {
+		std::error_code pngEc;
+		const bool hasImage = ghc::filesystem::exists(ghc::filesystem::path(basepath) / (name + ".png"), pngEc);
+
+		if (list.size() > 1)
+			list.append(",");
+
+		list.append("{\"name\":\"" + JsonEscape(name) + "\",\"image\":\"");
+		if (hasImage)
+			list.append("/api/v1/cardImage?name=" + UrlEncode(name));
+		// Have the current card be the active item on the carousel
+		list.append("\",\"active\":");
+		list.append(name == selectedCard ? "true}" : "false}");
+	}
 
 	list.append("]");
 	return list;
+}
+
+void WebIo::CardImage(const httplib::Request& req, httplib::Response& res)
+{
+	if (req.method != "GET") {
+		res.status = 405;
+		res.set_header("Allow", "GET");
+		return;
+	}
+
+	const std::string name = req.has_param("name") ? req.get_param_value("name") : std::string();
+	if (!CardName::IsValid(name)) {
+		res.status = 400;
+		return;
+	}
+
+	std::ifstream img(m_card->cardPath + name + ".png", std::ifstream::in | std::ifstream::binary);
+	if (!img) {
+		res.status = 404;
+		return;
+	}
+
+	const std::string data((std::istreambuf_iterator<char>(img)), std::istreambuf_iterator<char>());
+
+	// The preview is rewritten whenever the game prints on the card
+	res.set_header("Cache-Control", "no-cache");
+	res.set_content(data, "image/png");
 }

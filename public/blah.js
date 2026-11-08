@@ -32,7 +32,10 @@ function updateCards() {
 		}
 		const carouselImage = document.createElement('img')
 		carouselDiv.id = card.name
-		carouselImage.src = card.image
+		// Cards that were never printed on have no preview image
+		if (card.image) {
+			carouselImage.src = card.image
+		}
 		carouselImage.alt = card.name
 		carouselDiv.dataset.cardName = card.name
 		carouselImage.className = 'd-block w-100 img-responsive center-block'
@@ -40,7 +43,7 @@ function updateCards() {
 		carouselInnerDivEl.appendChild(carouselDiv);
 	})
 
-	if (!foundActive) {
+	if (!foundActive && cards.length > 0) {
 		const item = document.getElementById(cards[0].name)
 		item.className = "carousel-item active"
 		cardNameInput.value = cards[0].name

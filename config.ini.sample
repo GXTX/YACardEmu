@@ -21,5 +21,9 @@
 ;serialbaud = 9600
 ; Acceptable none/even/odd
 ;serialparity = none
+; Address the web UI / API listens on. The default is every interface (0.0.0.0) so
+; the page can be used from another device. There is NO authentication, if you only
+; use it on this machine set this to 127.0.0.1
+;apihost = 127.0.0.1
 apiport = 8080
 autoselectedcard = card.bin

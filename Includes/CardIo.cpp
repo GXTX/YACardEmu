@@ -319,6 +319,9 @@ void CardIo::Command_53_WriteData2()
 
 void CardIo::Command_78_PrintSettings2()
 {
+	// Comes right before the print lines of a new print job
+	m_printer->BeginPrintJob();
+
 	status.SoftReset();
 	runningCommand = false;
 }
@@ -542,7 +545,15 @@ void CardIo::Command_E1_SetRTC()
 
 	std::tm tempTime{};
 	timeStrS >> std::get_time(&tempTime, "%y%m%d%H%M%S");
-	setTime = std::mktime(&tempTime);
+
+	// Ignore a time we can't make sense of. Without this a failed parse made mktime() return -1,
+	// which was then used as the clock and crashed localtime() users on Windows
+	const std::time_t parsed = timeStrS.fail() ? static_cast<std::time_t>(-1) : std::mktime(&tempTime);
+	if (parsed != static_cast<std::time_t>(-1)) {
+		setTime = parsed;
+	} else {
+		g_logger->warn("CardIo::Command_E1_SetRTC: Ignoring an invalid time");
+	}
 
 	status.SoftReset();
 	runningCommand = false;
@@ -558,7 +569,8 @@ void CardIo::Command_F0_GetVersion()
 
 void CardIo::Command_F1_GetRTC()
 {
-	std::string timeStr(12, 0);
+	// 12 characters plus the terminating NUL that strftime always writes
+	std::string timeStr(13, 0);
 	std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
 	std::time_t convTime;
@@ -569,7 +581,17 @@ void CardIo::Command_F1_GetRTC()
 		convTime = currentTime;
 	}
 
-	std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", std::localtime(&convTime));
+	// localtime() returns null for times it can't represent (negative or far in the future on
+	// Windows) and strftime() must never see a null tm, that's a fast fail with the MSVC runtime
+	const std::tm* local = std::localtime(&convTime);
+	if (local == nullptr)
+		local = std::localtime(&currentTime);
+
+	if (local != nullptr && std::strftime(&timeStr[0], timeStr.size(), "%y%m%d%H%M%S", local) == 12) {
+		timeStr.resize(12);
+	} else {
+		timeStr.assign(12, '0');
+	}
 	std::copy(timeStr.begin(), timeStr.end(), std::back_inserter(commandBuffer));
 
 	status.SoftReset();
@@ -591,13 +613,20 @@ void CardIo::ClearCardData()
 // FIXME: Move these into a filesystem access class which will allow better flexability if someone wanted to use NFC cards
 void CardIo::ReadCard()
 {
-	std::string fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	ClearCardData();
+
+	const std::string cardName = m_cardSettings->GetCardName();
+	if (!CardName::IsValid(cardName)) {
+		g_logger->warn("CardIo::ReadCard: Refusing to read invalid card name \"{}\"", cardName);
+		SetPError(P::READ_ERR);
+		return;
+	}
+
+	std::string fullPath = m_cardSettings->cardPath + cardName;
 	g_logger->debug("CardIo::ReadCard: Reading card data from - {}", fullPath);
 
 	// TODO: Should we actually be seeding zero's when the file doesn't exist?
 	std::string readBack;
-
-	ClearCardData();
 
 	if (ghc::filesystem::exists(fullPath.c_str())) {
 		auto fileSize = ghc::filesystem::file_size(fullPath.c_str());
@@ -626,12 +655,21 @@ void CardIo::ReadCard()
 
 void CardIo::WriteCard()
 {
+	// The web thread can change the selected card at any time, so work on one snapshot
+	std::string cardName = m_cardSettings->GetCardName();
+	if (!CardName::IsValid(cardName)) {
+		g_logger->warn("CardIo::WriteCard: Refusing to write invalid card name \"{}\"", cardName);
+		m_printer->Discard();
+		ClearCardData();
+		return;
+	}
+
 	// Should only happen when issued from dispenser, we want to avoid overwriting a previous card
 	if (!m_cardSettings->insertedCard) {
 		auto i = 0;
 		while (i < 1000) {
 			// TODO: It would be nicer if the generated name was abc.123.bin instead of abc.bin.123
-			std::string newCardName = m_cardSettings->cardName;
+			std::string newCardName = cardName;
 
 			// $3 contains any numbers a sqeuence of "*.bin."
 			auto find = std::regex_replace(newCardName, std::regex("(.*)(\\.bin\\.)(\\d+)"), "$3");
@@ -648,20 +686,21 @@ void CardIo::WriteCard()
 
 			// Perfenece to not having a number...
 			if (i == 0) {
-				newCardName = m_cardSettings->cardName;
+				newCardName = cardName;
 			}
 
 			auto fullName = m_cardSettings->cardPath + newCardName;
 
 			if (!ghc::filesystem::exists(fullName.c_str())) {
-				m_cardSettings->cardName = newCardName;
+				cardName = newCardName;
+				m_cardSettings->SetCardName(cardName);
 				break;
 			}
 			i++;
 		}
 	}
 
-	auto fullPath = m_cardSettings->cardPath + m_cardSettings->cardName;
+	auto fullPath = m_cardSettings->cardPath + cardName;
 	g_logger->debug("CardIo::WriteCard: Writing card data to {}", fullPath);
 
 	std::string writeBack;
@@ -682,12 +721,10 @@ void CardIo::WriteCard()
 		card.write(writeBack.c_str(), writeBack.size());
 		card.close();
 
-		// FIXME: This is dirty
-		mINI::INIFile config("config.ini");
-		mINI::INIStructure ini;
-		config.read(ini);
-		ini["config"]["autoselectedcard"] = m_cardSettings->cardName;
-		config.write(ini);
+		// Only touch the one setting, rewriting the whole file loses the user's comments
+		std::string configError;
+		if (!ConfigFile::SetValue(m_cardSettings->configPath, "config", "autoselectedcard", cardName, &configError))
+			g_logger->warn("CardIo::WriteCard: Unable to save the selected card to \"{0}\": {1}", m_cardSettings->configPath, configError);
 	}
 
 	m_printer->RemoveCard(fullPath);
@@ -789,6 +826,11 @@ CardIo::StatusCode CardIo::Process(std::vector<uint8_t> &read, std::vector<uint8
 
 CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 {
+	// Nothing to look at, indexing an empty vector is undefined behaviour
+	if (readBuffer.empty()) {
+		return SizeError;
+	}
+
 	uint8_t *buffer = &readBuffer[0];
 
 	// First, read the sync byte
@@ -810,6 +852,18 @@ CardIo::StatusCode CardIo::ReceivePacket(std::vector<uint8_t> &readBuffer)
 	}
 
 	uint8_t count = GetByte(&buffer);
+
+	// A command is at least the command byte and the three status bytes from the master, plus the
+	// two bytes count covers on top of the payload. Anything shorter can't be a real command (and
+	// a count of 0 never advanced the buffer, so the same bytes were NAKed over and over) and
+	// the code below would also read past the end of the packet. Drop the STX and look for the
+	// next one.
+	constexpr uint8_t minCount = 6;
+	if (count < minCount) {
+		g_logger->warn("CardIo::ReceivePacket: Frame is too short to be a command (count {0:X})", count);
+		readBuffer.erase(readBuffer.begin());
+		return ChecksumError;
+	}
 
 	// count counts itself but readBuffer will have both the STX and sum, we need to skip these.
 	if (count > readBuffer.size() - 2) {

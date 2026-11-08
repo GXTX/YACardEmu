@@ -21,6 +21,52 @@
 
 #include "Printer.h"
 
+#include "AppPaths.h"
+
+namespace {
+constexpr const char* kFontName = "kochi-gothic-subst.ttf";
+
+// Look for the bundled font next to the executable, then in the working directory,
+// then fall back to common system CJK fonts so Japanese text still renders.
+TTF_Font* OpenPrinterFont(int size)
+{
+	std::vector<ghc::filesystem::path> candidates;
+	const auto exeDir = AppPaths::ExecutableDir();
+	if (!exeDir.empty()) {
+		candidates.push_back(exeDir / kFontName);
+		candidates.push_back(exeDir / "fonts" / kFontName);
+	}
+	candidates.push_back(ghc::filesystem::path(kFontName));
+	candidates.push_back(ghc::filesystem::path("fonts") / kFontName);
+#ifdef _WIN32
+	candidates.push_back("C:\\Windows\\Fonts\\msgothic.ttc");
+	candidates.push_back("C:\\Windows\\Fonts\\YuGothR.ttc");
+	candidates.push_back("C:\\Windows\\Fonts\\meiryo.ttc");
+#else
+	candidates.push_back("/usr/share/fonts/truetype/kochi/kochi-gothic-subst.ttf");
+	candidates.push_back("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc");
+	candidates.push_back("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc");
+	candidates.push_back("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf");
+	candidates.push_back("/usr/share/fonts/truetype/takao-gothic/TakaoGothic.ttf");
+	candidates.push_back("/usr/share/fonts/ipa-gothic/ipag.ttf");
+	candidates.push_back("/System/Library/Fonts/Hiragino Sans GB.ttc");
+#endif
+
+	for (const auto& path : candidates) {
+		std::error_code ec;
+		if (!ghc::filesystem::exists(path, ec))
+			continue;
+		TTF_Font* font = TTF_OpenFont(path.string().c_str(), size);
+		if (font != nullptr) {
+			g_logger->info("Printer: using font \"{}\"", path.string());
+			return font;
+		}
+		g_logger->warn("Printer: found \"{}\" but failed to load it: {}", path.string(), TTF_GetError());
+	}
+	return nullptr;
+}
+} // namespace
+
 bool Printer::RegisterFont(std::vector<uint8_t>& data)
 {
 	// Real data size is 0x48, but the first byte indicates slot position
@@ -56,9 +102,11 @@ bool Printer::RegisterFont(std::vector<uint8_t>& data)
 	SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
 
 	SDL_FreeSurface(glyph);
-	if (m_customGlyphs.at(slot) != nullptr)
-		SDL_FreeSurface(m_customGlyphs.at(slot));
-	m_customGlyphs.at(slot) = scaledGlyph;
+	if (scaledGlyph == nullptr)
+		return false;
+
+	// A running print job holds its own reference to the old glyph, it's freed once that's done
+	m_customGlyphs.at(slot) = MakeSurface(scaledGlyph);
 
 	return true;
 }
@@ -75,9 +123,6 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 		Append = '1',
 	};
 
-	if (m_cardImage == nullptr)
-		LoadCardImage(m_localName);
-
 	// Microsoft in their infinite wisdom defines min in windows.h, so we can't use std::min
 	constexpr uint8_t maxOffset = 0x14;
 	const uint8_t offset = data[2] < maxOffset ? data[2] : maxOffset;
@@ -87,29 +132,105 @@ bool Printer::QueuePrintLine(std::vector<uint8_t>& data)
 
 	std::vector<uint8_t> temp = {};
 	std::copy(data.begin() + 3, data.end(), std::back_inserter(temp));
-	m_printQueue.push_back({ offset, temp });
 
-	if (static_cast<Mode>(data[0]) == Mode::Now)
-		std::thread(&Printer::PrintLine, this).detach();
+	// Printing on rows an earlier job already used replaces that print: start from a clean card.
+	// Lines of this job that are still in the queue are kept, they get drawn on the new card.
+	const auto rows = PrintRows::Used(offset, temp.data(), temp.data() + temp.size());
+	if ((rows & m_prevRows).any()) {
+		m_prevRows.reset();
+		StartCleanCard();
+	}
+	m_jobRows |= rows;
+
+	if (m_cardImage == nullptr)
+		LoadCardImage();
+
+	m_printQueue.push_back({ offset, temp });
+	m_dirty = true;
+
+	if (static_cast<Mode>(data[0]) == Mode::Now) {
+		// The worker gets its own copy of the lines, glyphs and a reference to the image, and the
+		// next line starts from an empty queue like it did when PrintLine cleared it afterwards
+		Enqueue([this, queue = std::move(m_printQueue), image = m_cardImage, glyphs = m_customGlyphs, horizontal = m_isHorizontalCard]() {
+			RenderLines(queue, image.get(), glyphs, horizontal);
+		});
+		m_printQueue.clear();
+	}
 
 	return true;
 }
 
-void Printer::PrintLine()
+void Printer::Enqueue(std::function<void()> job)
 {
-	if (m_printQueue.empty())
+	{
+		std::lock_guard<std::mutex> lock(m_jobMutex);
+		m_jobs.push_back(std::move(job));
+	}
+	m_jobCv.notify_one();
+}
+
+void Printer::WorkerLoop()
+{
+	for (;;) {
+		std::function<void()> job;
+		{
+			std::unique_lock<std::mutex> lock(m_jobMutex);
+			m_jobCv.wait(lock, [this] { return m_stopWorker || !m_jobs.empty(); });
+			if (m_jobs.empty())
+				return; // Asked to stop and everything queued has been done
+			job = std::move(m_jobs.front());
+			m_jobs.pop_front();
+		}
+
+		try {
+			job();
+		} catch (const std::exception& e) {
+			g_logger->error("Printer::WorkerLoop: Print job failed: {}", e.what());
+		} catch (...) {
+			g_logger->error("Printer::WorkerLoop: Print job failed with an unknown error");
+		}
+	}
+}
+
+std::function<void()> Printer::MakeFinishJob(const std::string& cardName)
+{
+	auto queue = std::move(m_printQueue);
+	m_printQueue.clear();
+	auto image = std::move(m_cardImage);
+	m_cardImage.reset();
+	const bool save = m_dirty;
+	m_dirty = false;
+	m_prevRows.reset();
+	m_jobRows.reset();
+
+	return [this, queue = std::move(queue), image = std::move(image), glyphs = m_customGlyphs, horizontal = m_isHorizontalCard, name = cardName, save]() {
+		if (image == nullptr)
+			return;
+
+		RenderLines(queue, image.get(), glyphs, horizontal);
+
+		// Only rewrite the preview when the card was printed on or erased
+		if (save && !name.empty())
+			SaveCardImage(image.get(), name);
+	};
+}
+
+void Printer::RenderLines(const std::vector<PrintCommand>& queue, SDL_Surface* image, const std::vector<Surface>& glyphs, bool horizontal)
+{
+	if (queue.empty() || image == nullptr)
 		return;
 
 	TTF_Init();
 	constexpr uint8_t defaultFontSize = 36;
-	TTF_Font* font = TTF_OpenFont("kochi-gothic-subst.ttf", defaultFontSize);
+	TTF_Font* font = OpenPrinterFont(defaultFontSize);
 	if (font == nullptr) {
-		g_logger->warn("Printer::PrintLine: Unable to initialize TTF_Font with \"kochi-gothic-subst.ttf\"");
+		g_logger->warn("Printer::RenderLines: Unable to find a usable font. Place \"{}\" next to the executable.", kFontName);
+		TTF_Quit();
 		return;
 	}
 
 	constexpr uint8_t defaultX = 95; // This is good for *most* cards
-	const uint8_t defaultY = m_isHorizontalCard ? 85 : 120;
+	const uint8_t defaultY = horizontal ? 85 : 120;
 	constexpr SDL_Color color = { 0x64, 0x64, 0x96, 0xFF };
 	constexpr uint8_t verticalCardOffset = 4;
 
@@ -122,12 +243,12 @@ void Printer::PrintLine()
 		SetScale = 0x73,
 	};
 
-	for (const auto& print : m_printQueue)
+	for (const auto& print : queue)
 	{
 		auto converted = SDL_iconv_string("UTF-8", "SHIFT-JIS", (const char*)print.data.data(), print.data.size());
 		if (converted == nullptr) {
-			g_logger->error("Printer::PrintLine: iconv couldn't convert the string while printing!");
-			return;
+			g_logger->error("Printer::RenderLines: iconv couldn't convert the string while printing!");
+			break; // Still needs to close the font below
 		}
 
 		int xPos = defaultX;
@@ -141,7 +262,7 @@ void Printer::PrintLine()
 		// We don't run this for a single line skip as the FontLineSkip isn't the same as our defaultY
 		if (print.offset > 1) {
 			yPos += TTF_FontLineSkip(font) * (print.offset);
-			if (!m_isHorizontalCard)
+			if (!horizontal)
 				yPos += (print.offset) * (verticalCardOffset - 2); // Don't ask
 		}
 
@@ -157,7 +278,7 @@ void Printer::PrintLine()
 			switch (static_cast<Commands>(currentChar)) {
 				case Return:
 					TTF_SetFontSize(font, defaultFontSize * std::atoi(yScale.c_str()));
-					yPos += TTF_FontLineSkip(font) + (m_isHorizontalCard ? 0 : verticalCardOffset);
+					yPos += TTF_FontLineSkip(font) + (horizontal ? 0 : verticalCardOffset);
 					TTF_SetFontSize(font, defaultFontSize);
 					xPos = defaultX;
 					yScale = '1';
@@ -185,41 +306,55 @@ void Printer::PrintLine()
 					else if (currentChar == Commands::UseCustomGlyph) {
 						i = utf8codepoint(i, &currentChar);
 						if (currentChar > 0xFF) {
-							g_logger->warn("Printer::PrintLine: Attempted to use out of range glyph {:X}", currentChar);
+							g_logger->warn("Printer::RenderLines: Attempted to use out of range glyph {:X}", currentChar);
 							continue;
 						}
-						if (m_customGlyphs.at(currentChar) == nullptr) {
-							g_logger->warn("Printer::PrintLine: Game never set glyph {:X} but tried to use it", currentChar);
+						if (glyphs.at(currentChar) == nullptr) {
+							g_logger->warn("Printer::RenderLines: Game never set glyph {:X} but tried to use it", currentChar);
 							continue;
 						}
 						SDL_Rect location = { xPos, yPos, 0, 0 };
 
 						if (xScale[0] != '1' || yScale[0] != '1') {
 							auto scaledCustomGlyph = QuickCreateSurface(maxCustomGylphDimensions * std::atoi(xScale.c_str()), maxCustomGylphDimensions * std::atoi(yScale.c_str()));
-							SDL_BlitScaled(m_customGlyphs.at(currentChar), NULL, scaledCustomGlyph, NULL);
+							SDL_BlitScaled(glyphs.at(currentChar).get(), NULL, scaledCustomGlyph, NULL);
 							if (yScale[0] != '1')
 								location.y -= (scaledCustomGlyph->h / std::atoi(yScale.c_str()));
-							SDL_BlitSurface(scaledCustomGlyph, NULL, m_cardImage, &location);
+							SDL_BlitSurface(scaledCustomGlyph, NULL, image, &location);
 							xPos += scaledCustomGlyph->w;
 							SDL_FreeSurface(scaledCustomGlyph);
 							scaledCustomGlyph = nullptr;
 						}
 						else {
-							SDL_BlitSurface(m_customGlyphs.at(currentChar), NULL, m_cardImage, &location);
-							xPos += m_customGlyphs.at(currentChar)->w;
+							SDL_BlitSurface(glyphs.at(currentChar).get(), NULL, image, &location);
+							xPos += glyphs.at(currentChar)->w;
 						}
 					}
 					continue;
+				default:
+					// UseCustomGlyph ('g') and SetScale ('s') only mean something right after an
+					// Escape, which is handled above. On their own they are ordinary letters and
+					// get drawn like any other character.
+					break;
 			}
 
 			// TODO: Solid produces a better glyph but with non-transparent backgrounds
 			SDL_Surface* glyph = TTF_RenderGlyph32_Blended(font, currentChar, color);
+			if (glyph == nullptr) {
+				// The font can't draw this character, skip it instead of crashing the print thread
+				g_logger->warn("Printer::RenderLines: Unable to render glyph {:X}: {}", currentChar, TTF_GetError());
+				continue;
+			}
 			SDL_Surface* scaledGlyph = QuickCreateSurface(glyph->clip_rect.w * std::atoi(xScale.c_str()), glyph->clip_rect.h * std::atoi(yScale.c_str()));
+			if (scaledGlyph == nullptr) {
+				SDL_FreeSurface(glyph);
+				continue;
+			}
 			SDL_BlitScaled(glyph, NULL, scaledGlyph, NULL);
 
 			// Final blit
 			SDL_Rect location = { xPos, yPos, 0, 0 };
-			SDL_BlitSurface(scaledGlyph, NULL, m_cardImage, &location);
+			SDL_BlitSurface(scaledGlyph, NULL, image, &location);
 
 			// Used with yScaleCompensate when we reset scale on the same line
 			maxYSizeForLine = scaledGlyph->h > maxYSizeForLine ? scaledGlyph->h : maxYSizeForLine;
@@ -239,7 +374,6 @@ void Printer::PrintLine()
 		}
 		SDL_free(converted);
 	}
-	m_printQueue.clear();
 	TTF_CloseFont(font);
 	TTF_Quit();
 }

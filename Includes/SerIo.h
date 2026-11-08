@@ -26,6 +26,11 @@
 #include <windows.h>
 #else
 #define SP_PRIV
+// libserialport_internal.h defines _POSIX_C_SOURCE itself. g++ defines _GNU_SOURCE, so it is
+// already defined by now and the compiler warns about the redefinition. Same end result, no warning.
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
 #include "libserialport_internal.h"
 #include <fcntl.h>
 #include <unistd.h>
@@ -78,8 +83,11 @@ private:
 	HANDLE m_pipeHandle = INVALID_HANDLE_VALUE;
 #endif
 	bool m_isPipe = false;
+	// Set when the device could not be opened as a serial port and we wrapped a plain file
+	// descriptor in a sp_port of our own instead (a pty or socat link). It is not owned by
+	// libserialport, so it must not go through sp_close()/sp_free_port().
+	bool m_isFdPort = false;
 	sp_port *m_portHandle = nullptr;
-	sp_port_config *m_portConfig = nullptr;
 };
 
 #endif

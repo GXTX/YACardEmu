@@ -1,0 +1,29 @@
+kochi-gothic-subst.ttf
+======================
+
+This file is the Kochi Gothic substitute font (東風ゴシック, version
+20030809), bundled so that the card printer can render Japanese text.
+
+The font is derived from the Wadalab fonts, which are distributed by the
+Wadalab group at ftp.ipl.t.u-tokyo.ac.jp, and is licensed under the
+Wadalab Font License (the font's own license field reads "Wada lab's font
+license (except NAGA10)"). This is the free variant that does not include
+the naga10 bitmap data.
+
+In short, the Wadalab Font License allows the font to be used, modified
+and redistributed provided that:
+
+  1. redistributions carry a note stating that the font is derived from
+     the Wadalab fonts distributed at ftp.ipl.t.u-tokyo.ac.jp, and
+  2. a modified redistribution is accompanied by documentation of the
+     changes made to the original.
+
+This notice is that note. The font file in this repository is the
+unmodified Kochi Gothic substitute font and has not been changed.
+
+Reference text of the license:
+  https://scancode-licensedb.aboutcode.org/wadalab.html
+  https://fedoraproject.org/wiki/Licensing:Wadalab
+
+The license of this font applies to the font file only. The rest of
+YACardEmu is covered by the GPL (see license.txt).
